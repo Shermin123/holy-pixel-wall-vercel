@@ -155,26 +155,25 @@
     .vintage-logo .vl-mark { width: 30px; height: 30px; }
   }
 
-  /* Precise hotspots: second/third numbers in url() are click point */
+
+
+  /* Cool + precise cursors (hotspot = click pixel) */
   .viewport {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%233d2b1a' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23d4a017' stroke-width='1'/%3E%3Cpath stroke='%233d2b1a' stroke-width='2' d='M12 2V6M12 18V22M2 12H6M18 12H22'/%3E%3Ccircle cx='12' cy='12' r='2' fill='%23d4a017' stroke='%233d2b1a' stroke-width='1'/%3E%3C/svg%3E") 12 12, crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath fill='%23ffe566' stroke='%233d2b1a' stroke-width='1.5' d='M4 4 L4 24 L10 18 L14 28 L18 26 L14 16 L24 16 Z'/%3E%3Crect x='20' y='4' width='8' height='8' fill='%23d4a017' stroke='%233d2b1a' stroke-width='1'/%3E%3C/svg%3E") 4 4, crosshair;
   }
   body.buy-on .viewport:not(.drag-mode):not(.panning),
   body.buy-on .viewport:not(.drag-mode):not(.panning) canvas {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath stroke='%23d4a017' stroke-width='2' d='M11 0V8M11 14V22M0 11H8M14 11H22'/%3E%3Cpath stroke='%233d2b1a' stroke-width='1' d='M11 0V8M11 14V22M0 11H8M14 11H22'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%23ffe566' stroke='%233d2b1a' stroke-width='1'/%3E%3C/svg%3E") 11 11, crosshair !important;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath stroke='%23d4a017' stroke-width='2' d='M16 2 V12 M16 20 V30 M2 16 H12 M20 16 H30'/%3E%3Cpath stroke='%233d2b1a' stroke-width='1' d='M16 2 V12 M16 20 V30 M2 16 H12 M20 16 H30'/%3E%3Crect x='13' y='13' width='6' height='6' fill='%23ffe566' stroke='%233d2b1a' stroke-width='1.5'/%3E%3Crect x='15' y='15' width='2' height='2' fill='%233d2b1a'/%3E%3C/svg%3E") 16 16, crosshair !important;
   }
-  .viewport.drag-mode,
-  .viewport.drag-mode canvas {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath fill='%23fffdf8' stroke='%233d2b1a' stroke-width='1.5' d='M10 14V8a2 2 0 014 0v2m0 0V7a2 2 0 014 0v5m0 0V8a2 2 0 014 0v8c0 4-2 7-8 7h-1c-4 0-7-2-7-6v-5a2 2 0 014 0v2'/%3E%3C/svg%3E") 14 14, grab !important;
+  .viewport.drag-mode, .viewport.drag-mode canvas {
+    cursor: grab !important;
   }
-  .viewport.panning,
-  .viewport.panning *,
-  .viewport.drag-mode.panning,
-  .viewport.drag-mode.panning canvas {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath fill='%23f0c14b' stroke='%233d2b1a' stroke-width='1.5' d='M9 13V9a2 2 0 014 0v2m0 0V8a2 2 0 014 0v4m0 0V9a2 2 0 014 0v7c0 4-2 7-8 7h-1c-4 0-7-2-7-6v-4a2 2 0 014 0v1'/%3E%3C/svg%3E") 14 14, grabbing !important;
+  .viewport.panning, .viewport.panning *,
+  .viewport.drag-mode.panning, .viewport.drag-mode.panning canvas {
+    cursor: grabbing !important;
   }
   .buy-cta, .tool-btn, .btn, button, .btn-claim, .btn-clear {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Cpath fill='%23ffe566' stroke='%233d2b1a' stroke-width='1.2' d='M1 1L1 13L5 9L8 16L10 15L7 8L13 8Z'/%3E%3C/svg%3E") 1 1, pointer;
+    cursor: pointer;
   }
 
   :root {
@@ -1966,13 +1965,16 @@ function getImg(src) {
 
   function pos(e) {
     try {
-      const rect = canvas.getBoundingClientRect();
+      // Always use STAGE visual rect so CSS-zoom and HQ modes match the same cells
+      const rect = stage.getBoundingClientRect();
       if (!rect.width || !rect.height) return { c: 0, r: 0 };
       const cx = e.clientX ?? e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX;
       const cy = e.clientY ?? e.touches?.[0]?.clientY ?? e.changedTouches?.[0]?.clientY;
       if (cx == null || cy == null) return { c: 0, r: 0 };
-      const x = (cx - rect.left) / rect.width;
-      const y = (cy - rect.top) / rect.height;
+      let x = (cx - rect.left) / rect.width;
+      let y = (cy - rect.top) / rect.height;
+      x = Math.max(0, Math.min(0.999999, x));
+      y = Math.max(0, Math.min(0.999999, y));
       return {
         c: Math.max(0, Math.min(COLS - 1, Math.floor(x * COLS))),
         r: Math.max(0, Math.min(ROWS - 1, Math.floor(y * ROWS)))
@@ -2043,28 +2045,24 @@ function getImg(src) {
     let maxR = Math.min(ROWS - 1, Math.max(startR, curR));
     if (maxC < minC || maxR < minR) return;
 
-    // Only solid rectangles — shrink box until every cell is free (or empty)
+    // Require a solid free rectangle — if any cell is owned, selection is invalid (empty)
     let blocked = 0;
-    for (let c = minC; c <= maxC; c++)
-      for (let r = minR; r <= maxR; r++)
-        if (sold.has(c + ',' + r)) blocked++;
-
-    // No max size — any free rectangle allowed
-
     const next = new Set();
-    blocked = 0;
     for (let c = minC; c <= maxC; c++) {
       for (let r = minR; r <= maxR; r++) {
         const k = c + ',' + r;
-        if (sold.has(k)) { blocked++; continue; }
-        next.add(k);
+        if (sold.has(k)) blocked++;
+        else next.add(k);
       }
     }
-    // If any owned inside, selection is not a solid free rectangle — still show free cells but warn
-    selected = next;
-    if (blocked > 0 && tip) {
-      tip.style.display = 'block';
-      tip.innerHTML = '<strong>RECTANGLE</strong>contains ' + blocked + ' owned — pick a free area';
+    if (blocked > 0) {
+      selected = new Set();
+      if (tip) {
+        tip.style.display = 'block';
+        tip.innerHTML = '<strong>BLOCKED</strong>' + blocked + ' owned cells — drag a free rectangle only';
+      }
+    } else {
+      selected = next;
     }
     try { draw(); } catch (err) { console.warn(err); }
     try { updateFloat(); } catch (err) { console.warn(err); }

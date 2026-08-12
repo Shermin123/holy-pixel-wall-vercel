@@ -101,6 +101,30 @@
     .buy-cta { font-size: 0.4rem !important; padding: 9px 12px !important; }
   }
 
+
+  /* Sharp pixel cursors */
+  .viewport {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23d4a017' stroke='%233d2b1a' stroke-width='1.5' d='M3 3 L3 17 L8 12 L12 20 L14 19 L10 11 L17 11 Z'/%3E%3C/svg%3E") 3 3, crosshair;
+  }
+  .viewport.drag-mode,
+  .viewport.drag-mode canvas {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Crect x='10' y='10' width='8' height='8' fill='%23fffdf8' stroke='%233d2b1a' stroke-width='2'/%3E%3Cpath stroke='%23d4a017' stroke-width='2' fill='none' d='M14 4 L14 9 M14 19 L14 24 M4 14 L9 14 M19 14 L24 14'/%3E%3C/svg%3E") 14 14, grab !important;
+  }
+  .viewport.panning,
+  .viewport.panning *,
+  .viewport.drag-mode.panning,
+  .viewport.drag-mode.panning canvas {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Crect x='9' y='9' width='10' height='10' fill='%23f0c14b' stroke='%233d2b1a' stroke-width='2'/%3E%3Cpath stroke='%233d2b1a' stroke-width='2' fill='none' d='M14 3 L14 8 M14 20 L14 25 M3 14 L8 14 M20 14 L25 14'/%3E%3C/svg%3E") 14 14, grabbing !important;
+  }
+  /* Buy / select mode: sharp cross on wall */
+  body.buy-on .viewport:not(.drag-mode):not(.panning),
+  body.buy-on .viewport:not(.drag-mode):not(.panning) canvas {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath stroke='%23d4a017' stroke-width='2' d='M13 2 L13 24 M2 13 L24 13'/%3E%3Crect x='10' y='10' width='6' height='6' fill='%23fff' stroke='%233d2b1a' stroke-width='1.5'/%3E%3C/svg%3E") 13 13, crosshair !important;
+  }
+  .buy-cta, .tool-btn, .btn, button {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23d4a017' stroke='%233d2b1a' stroke-width='1.2' d='M2 2 L2 14 L6 10 L9 16 L11 15 L8 9 L14 9 Z'/%3E%3C/svg%3E") 2 2, pointer;
+  }
+
   :root {
     --bg: #faf6ee;
     --surface: #fffdf8;
@@ -3261,6 +3285,7 @@ function clearPending() {
 
   function setBuyMode(on) {
     buyMode = on;
+    document.body.classList.toggle('buy-on', !!on);
     const btn = $('buyModeBtn');
     if (btn) {
       btn.textContent = on ? '✓ VIEW MODE' : '★ BUY PIXELS ★';

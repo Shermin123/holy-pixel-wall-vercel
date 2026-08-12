@@ -1337,6 +1337,10 @@ Min 10 blocks · no maximum
     if (fitReset) {
       zoom = 1;
       hqZoom = 1;
+      clearTimeout(zoomTimer);
+      if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
+      zoomAnim = null;
+      stage.style.transform = 'none';
     }
     applyZoomHQ();
     if (fitReset) {
@@ -1377,8 +1381,11 @@ Min 10 blocks · no maximum
     stage.style.margin = '0';
   }
 
+  let zoomSettling = false;
+  let zoomGesture = false;
+
   function applyZoomSmooth() {
-    // Temporary CSS scale for fluid feel; settle redraw makes it sharp
+    // CSS-only scale during gesture — no canvas resize = no lag/glitch
     zoom = Math.max(1, Math.min(12, zoom));
     const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
     const wrap = $('wallWrap');
@@ -1393,22 +1400,25 @@ Min 10 blocks · no maximum
     stage.style.width = baseW + 'px';
     stage.style.height = baseH + 'px';
     stage.style.transformOrigin = '0 0';
-    stage.style.transition = 'none'; // driven by rAF
+    stage.style.transition = 'none';
+    stage.style.willChange = 'transform';
     stage.style.transform = 'scale(' + zoom + ')';
+    // Keep canvas at base resolution while gesturing
+    canvas.style.imageRendering = 'pixelated';
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
   }
 
   function applyZoomHQ() {
     zoom = Math.max(1, Math.min(12, zoom));
     hqZoom = zoom;
-    // Draw at zoomed resolution — crisp pixel blocks (no blur)
+    zoomSettling = false;
+    zoomGesture = false;
     cell = baseCell * zoom;
     sizeW = baseW * zoom;
     sizeH = baseH * zoom;
     if (!baseW || !baseH) return;
-    // Cap pixel ratio when zoomed in hard (big canvas = lag)
-    const dprCap = zoom >= 4 ? 1 : (zoom >= 2 ? 1.25 : Math.min(window.devicePixelRatio || 1, 1.5));
-    const dpr = dprCap;
+    // Lower DPR when zoomed in hard = less lag
+    const dpr = zoom >= 5 ? 1 : (zoom >= 2.5 ? 1.15 : Math.min(window.devicePixelRatio || 1, 1.5));
     canvas.width = Math.max(1, Math.round(sizeW * dpr));
     canvas.height = Math.max(1, Math.round(sizeH * dpr));
     canvas.style.width = sizeW + 'px';
@@ -1416,6 +1426,10 @@ Min 10 blocks · no maximum
     canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
+    // Clear CSS scale — bitmap is already at zoom size
+    stage.style.transition = 'none';
+    stage.style.transform = 'none';
+    stage.style.willChange = 'auto';
     layoutWall();
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
     draw();
@@ -1424,7 +1438,11 @@ Min 10 blocks · no maximum
 
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(() => applyZoomHQ(), 180);
+    zoomSettling = true;
+    // Wait until fingers/wheel stop — one redraw only
+    zoomTimer = setTimeout(() => {
+      applyZoomHQ();
+    }, 220);
   }
 
   let zoomAnim = null; // { from, to, start, dur, px, py, lx, ly }
@@ -1437,7 +1455,7 @@ Min 10 blocks · no maximum
     const prev = zoom;
     zoom = Math.max(1, Math.min(12, level));
     applyZoomSmooth();
-    // Keep focus point under cursor / center
+    // Keep focus under cursor
     if (lx != null && ly != null && px != null && py != null) {
       const srect2 = stage.getBoundingClientRect();
       viewport.scrollLeft += (srect2.left + lx * zoom) - px;
@@ -1456,7 +1474,7 @@ Min 10 blocks · no maximum
     } else {
       zoom = zoomAnim.to;
       zoomAnim = null;
-      applyZoomHQ();
+      scheduleZoomHQ();
     }
   }
 
@@ -1465,12 +1483,31 @@ Min 10 blocks · no maximum
     const next = Math.max(1, Math.min(12, prev + d));
     if (Math.abs(next - prev) < 0.0005) return;
 
+    zoomGesture = true;
+    clearTimeout(zoomTimer);
+
+    // If we were in HQ mode, go back to CSS-smooth base first (prevents glitch)
+    if (Math.abs(hqZoom - zoom) < 0.001 && stage.style.transform === 'none' && zoom !== 1) {
+      // currently HQ: switch to smooth layer at current visual size
+      cell = baseCell;
+      sizeW = baseW;
+      sizeH = baseH;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.max(1, Math.round(baseW * dpr));
+      canvas.height = Math.max(1, Math.round(baseH * dpr));
+      canvas.style.width = baseW + 'px';
+      canvas.style.height = baseH + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      draw();
+      hqZoom = 1;
+    }
+
     const vrect = viewport.getBoundingClientRect();
     const hasPointer = clientX != null && clientY != null && isFinite(clientX) && isFinite(clientY);
     const px = hasPointer ? clientX : (vrect.left + vrect.width / 2);
     const py = hasPointer ? clientY : (vrect.top + vrect.height / 2);
 
-    // Local coords relative to current visual zoom
     const srect = stage.getBoundingClientRect();
     const curZ = zoom || 1;
     const lx = (px - srect.left) / curZ;
@@ -1484,13 +1521,12 @@ Min 10 blocks · no maximum
       return;
     }
 
-    // Smooth animated zoom
     if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
     zoomAnim = {
       from: zoom,
       to: next,
       start: performance.now(),
-      dur: 220,
+      dur: 160,
       px, py, lx, ly,
       raf: null
     };

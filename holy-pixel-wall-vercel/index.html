@@ -9,6 +9,34 @@
 
 <style>
   
+
+  /* Clean header — hide extra chrome */
+  .center-badge, .price-hero, .live-tag, .willow { display: none !important; }
+  header {
+    min-height: 52px !important;
+    padding: 6px 12px !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+  }
+  .brand h1 { font-size: 0.58rem !important; }
+  .brand p { display: none !important; }
+  .buy-cta {
+    font-size: 0.48rem !important;
+    padding: 10px 14px !important;
+  }
+  .toolbar {
+    padding: 6px 8px !important;
+    gap: 4px !important;
+  }
+  .tool-btn {
+    font-size: 0.34rem !important;
+    padding: 6px 8px !important;
+  }
+
+
+  /* Hide internal tools from public UI */
+  #toolSelect, #toolDrag, #toolDev, #exportBtn, #adminBtn { display: none !important; }
+
   :root {
     --bg: #faf6ee;
     --surface: #fffdf8;
@@ -807,10 +835,8 @@
   <span id="zoomLvl" style="font-family:'Press Start 2P',monospace;font-size:0.4rem;color:var(--dark);min-width:42px;text-align:center">100%</span>
   <button class="tool-btn" id="zoomIn">+</button>
   <button class="tool-btn" id="zoomFit">FIT</button>
-  <button class="tool-btn" id="exportBtn">EXPORT</button>
-  <button class="tool-btn" id="helpBtn">HOW IT WORKS</button>
-  <button class="tool-btn" id="adminBtn" type="button" title="Owner admin">ADMIN</button>
-</div>
+    <button class="tool-btn" id="helpBtn">HOW IT WORKS</button>
+  </div>
 
 <div class="viewport" id="viewport">
   <div id="wallWrap">
@@ -2021,7 +2047,7 @@ function getImg(src) {
     draw();
   };
 
-  $('exportBtn').onclick = () => {
+  if ($('exportBtn')) $('exportBtn').onclick = () => {
     const ex = document.createElement('canvas');
     const s = 2;
     ex.width = sizeW * s;
@@ -3091,13 +3117,24 @@ function clearPending() {
     }
   }
 
-  if ($('adminBtn')) $('adminBtn').onclick = () => {
+  function openAdminPanel() {
     try {
       const saved = localStorage.getItem('hpw_admin_key');
       if (saved && $('adminKeyInput')) $('adminKeyInput').value = saved;
     } catch (e) {}
-    $('adminModal').style.display = 'flex';
-  };
+    if ($('adminModal')) $('adminModal').style.display = 'flex';
+  }
+  // Secret: Ctrl+Shift+A or URL ?admin=1 (owner only)
+  window.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      e.preventDefault();
+      openAdminPanel();
+    }
+  });
+  if (new URLSearchParams(location.search).get('admin') === '1') {
+    setTimeout(openAdminPanel, 400);
+  }
+  if ($('adminBtn')) $('adminBtn').onclick = () => openAdminPanel();
   if ($('adminCloseBtn')) $('adminCloseBtn').onclick = () => { $('adminModal').style.display = 'none'; };
   if ($('adminLoadBtn')) $('adminLoadBtn').onclick = () => adminLoadClaims();
   if ($('adminClearBtn')) $('adminClearBtn').onclick = async () => {

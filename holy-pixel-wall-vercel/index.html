@@ -412,9 +412,9 @@
   canvas {
     display: block;
     background: #fffdf8;
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
+    image-rendering: pixelated !important;
+    image-rendering: -moz-crisp-edges !important;
+    image-rendering: crisp-edges !important;
   }
 
   .media-layer {
@@ -1348,16 +1348,19 @@ Min 10 blocks · no maximum
   function applyZoomHQ() {
     zoom = Math.max(1, Math.min(12, zoom));
     hqZoom = zoom;
-    // Draw at TRUE zoomed resolution — sharp blocks, no blur
+    // Draw at zoomed resolution — crisp pixel blocks (no blur)
     cell = baseCell * zoom;
     sizeW = baseW * zoom;
     sizeH = baseH * zoom;
     if (!baseW || !baseH) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(sizeW * dpr);
-    canvas.height = Math.round(sizeH * dpr);
+    // Cap pixel ratio when zoomed in hard (big canvas = lag)
+    const dprCap = zoom >= 4 ? 1 : (zoom >= 2 ? 1.25 : Math.min(window.devicePixelRatio || 1, 1.5));
+    const dpr = dprCap;
+    canvas.width = Math.max(1, Math.round(sizeW * dpr));
+    canvas.height = Math.max(1, Math.round(sizeH * dpr));
     canvas.style.width = sizeW + 'px';
     canvas.style.height = sizeH + 'px';
+    canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     layoutWall();
@@ -1368,7 +1371,7 @@ Min 10 blocks · no maximum
 
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(() => applyZoomHQ(), 120);
+    zoomTimer = setTimeout(() => applyZoomHQ(), 180);
   }
 
   let zoomAnim = null; // { from, to, start, dur, px, py, lx, ly }
@@ -1526,8 +1529,8 @@ Min 10 blocks · no maximum
     c.beginPath();
     c.rect(x, y, w, h);
     c.clip();
-    c.imageSmoothingEnabled = true;
-    c.imageSmoothingQuality = 'high';
+    // Pixel-wall look: nearest-neighbor, no blur
+    c.imageSmoothingEnabled = false;
     c.drawImage(img, dx, dy, dw, dh);
     c.restore();
   }
@@ -1590,8 +1593,7 @@ function getImg(src) {
     tctx.imageSmoothingQuality = 'high';
     tctx.drawImage(img, 0, 0, nw, nh, 0, 0, tc.width, tc.height);
 
-    c.imageSmoothingEnabled = true;
-    c.imageSmoothingQuality = 'high';
+    c.imageSmoothingEnabled = false;
     c.drawImage(tc, 0, 0, tc.width, tc.height, dx, dy, dw, dh);
 
     // Thin pixel-block frame
@@ -1628,11 +1630,11 @@ function getImg(src) {
       }
     }
 
-    // Individual block lines — stronger when zoomed so each block is clear
-    if (vis >= 1.5) {
-      ctx.strokeStyle = vis >= 4 ? 'rgba(139, 90, 43, 0.35)' : 'rgba(139, 90, 43, 0.2)';
+    // Pixel grid — every block visible when zoomed (crisp, no blur)
+    if (vis >= 1.2) {
+      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.55)' : (vis >= 3 ? 'rgba(139, 90, 43, 0.4)' : 'rgba(139, 90, 43, 0.22)');
       ctx.lineWidth = 1;
-      const step = vis >= 3 ? 1 : 2;
+      const step = 1; // always full grid when zoomed enough
       ctx.beginPath();
       for (let c = 0; c <= COLS; c += step) {
         const x = Math.floor(c * cell) + 0.5;
@@ -3389,8 +3391,8 @@ function clearPending() {
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
       // Pinch / ctrl+wheel → zoom to pointer
-      let delta = -e.deltaY * 0.012;
-      delta = Math.max(-0.4, Math.min(0.4, delta));
+      let delta = -e.deltaY * 0.008;
+      delta = Math.max(-0.25, Math.min(0.25, delta));
       bumpZoom(delta, e.clientX, e.clientY, true); // continuous = instant steps, still HQ settle
     } else {
       // Two-finger scroll / mouse wheel → pan

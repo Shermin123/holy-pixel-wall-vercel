@@ -104,6 +104,56 @@
 
 
 
+
+  .trust-chip { display: none !important; }
+  .vintage-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    user-select: none;
+    pointer-events: none;
+  }
+  .vintage-logo .vl-mark {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    animation: logoFloat 2.4s ease-in-out infinite;
+    filter: drop-shadow(2px 2px 0 #5c3d1e);
+  }
+  .vintage-logo .vl-mark rect,
+  .vintage-logo .vl-mark path {
+    animation: logoPulse 1.8s steps(2) infinite;
+  }
+  .vintage-logo .vl-word {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.36rem;
+    line-height: 1.45;
+    color: var(--dark);
+    letter-spacing: 0.5px;
+  }
+  .vintage-logo .vl-word span {
+    display: block;
+    color: var(--gold);
+    animation: logoGlow 2s steps(2) infinite;
+  }
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+  @keyframes logoPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+  }
+  @keyframes logoGlow {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.15); }
+  }
+  @media (max-width: 700px) {
+    .vintage-logo .vl-word { display: none; }
+    .vintage-logo .vl-mark { width: 30px; height: 30px; }
+  }
+
   /* Precise hotspots: second/third numbers in url() are click point */
   .viewport {
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%233d2b1a' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23d4a017' stroke-width='1'/%3E%3Cpath stroke='%233d2b1a' stroke-width='2' d='M12 2V6M12 18V22M2 12H6M18 12H22'/%3E%3Ccircle cx='12' cy='12' r='2' fill='%23d4a017' stroke='%233d2b1a' stroke-width='1'/%3E%3C/svg%3E") 12 12, crosshair;
@@ -887,7 +937,17 @@
   </div>
   <div class="header-mid">
     <div class="price-chip">1 PIXEL = $0.50</div>
-    <div class="trust-chip">Secure Stripe pay</div>
+    <div class="vintage-logo" title="Holy Pixel Wall" aria-hidden="true">
+      <svg class="vl-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="28" height="28" fill="#fffdf8" stroke="#3d2b1a" stroke-width="2"/>
+        <rect x="6" y="6" width="8" height="8" fill="#d4a017" stroke="#3d2b1a" stroke-width="1"/>
+        <rect x="18" y="6" width="8" height="8" fill="#c47a3a" stroke="#3d2b1a" stroke-width="1"/>
+        <rect x="6" y="18" width="8" height="8" fill="#8b5a2b" stroke="#3d2b1a" stroke-width="1"/>
+        <rect x="18" y="18" width="8" height="8" fill="#f0c14b" stroke="#3d2b1a" stroke-width="1"/>
+        <rect x="12" y="12" width="8" height="8" fill="#ffe566" stroke="#3d2b1a" stroke-width="1"/>
+      </svg>
+      <div class="vl-word">HOLY<br><span>PIXEL</span></div>
+    </div>
     <button class="buy-cta" id="buyModeBtn" type="button">★ BUY PIXELS ★</button>
   </div>
   <div class="header-right">

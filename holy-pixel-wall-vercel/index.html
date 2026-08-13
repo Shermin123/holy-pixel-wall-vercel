@@ -996,6 +996,8 @@
     <div class="stage" id="stage">
       <canvas id="canvas"></canvas>
       <div class="media-layer" id="mediaLayer"></div>
+    <div id="hoverBox" style="display:none;position:absolute;pointer-events:none;z-index:5;box-sizing:border-box;border:2px solid #d4a017;background:rgba(212,160,23,0.35);"></div>
+    <div id="selBox" style="display:none;position:absolute;pointer-events:none;z-index:6;box-sizing:border-box;border:2px solid #1a9b6c;background:rgba(34,197,140,0.28);box-shadow:inset 0 0 0 1px #fff;"></div>
     </div>
   </div>
 </div>
@@ -1955,37 +1957,61 @@ function getImg(src) {
 
   function pos(e) {
     try {
-      // Single source: STAGE content box (border excluded). Canvas is 100% of stage.
-      const srect = stage.getBoundingClientRect();
-      const cs = getComputedStyle(stage);
-      const bl = parseFloat(cs.borderLeftWidth) || 0;
-      const bt = parseFloat(cs.borderTopWidth) || 0;
-      const br = parseFloat(cs.borderRightWidth) || 0;
-      const bb = parseFloat(cs.borderBottomWidth) || 0;
-      const left = srect.left + bl;
-      const top = srect.top + bt;
-      const width = srect.width - bl - br;
-      const height = srect.height - bt - bb;
-      if (width < 1 || height < 1) return { c: 0, r: 0 };
-
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return { c: 0, r: 0 };
       let cx, cy;
-      if (e.touches && e.touches[0]) {
+      if (e.touches && e.touches.length) {
         cx = e.touches[0].clientX; cy = e.touches[0].clientY;
-      } else if (e.changedTouches && e.changedTouches[0]) {
+      } else if (e.changedTouches && e.changedTouches.length) {
         cx = e.changedTouches[0].clientX; cy = e.changedTouches[0].clientY;
       } else {
         cx = e.clientX; cy = e.clientY;
       }
       if (cx == null || cy == null) return { c: 0, r: 0 };
-
-      const x = (cx - left) / width;
-      const y = (cy - top) / height;
+      const x = (cx - rect.left) / rect.width;
+      const y = (cy - rect.top) / rect.height;
       const c = Math.min(COLS - 1, Math.max(0, Math.floor(x * COLS)));
       const r = Math.min(ROWS - 1, Math.max(0, Math.floor(y * ROWS)));
       return { c, r };
     } catch (err) {
       return { c: 0, r: 0 };
     }
+  }
+
+  function setHoverBox(c, r) {
+    const el = $('hoverBox');
+    if (!el) return;
+    if (!buyMode || c < 0 || r < 0 || dragging) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = 'block';
+    el.style.left = (c / COLS * 100) + '%';
+    el.style.top = (r / ROWS * 100) + '%';
+    el.style.width = (100 / COLS) + '%';
+    el.style.height = (100 / ROWS) + '%';
+  }
+
+  function setSelBoxFromSelected() {
+    const el = $('selBox');
+    if (!el) return;
+    if (!selected.size) {
+      el.style.display = 'none';
+      return;
+    }
+    let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
+    selected.forEach(k => {
+      const [c, r] = k.split(',').map(Number);
+      if (c < minC) minC = c;
+      if (c > maxC) maxC = c;
+      if (r < minR) minR = r;
+      if (r > maxR) maxR = r;
+    });
+    el.style.display = 'block';
+    el.style.left = (minC / COLS * 100) + '%';
+    el.style.top = (minR / ROWS * 100) + '%';
+    el.style.width = ((maxC - minC + 1) / COLS * 100) + '%';
+    el.style.height = ((maxR - minR + 1) / ROWS * 100) + '%';
   }
 
   function purgeSelectedOwned() {
@@ -2088,9 +2114,13 @@ function getImg(src) {
     try { refreshClaimValidation(); } catch (e) {}
   }
 
+  let lastDownT = 0;
   function onDown(e) {
     if (!buyMode) return; // VIEW ONLY - no selecting
     if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
+    const now = performance.now();
+    if (now - lastDownT < 30) return; // ignore duplicate stage+canvas fire
+    lastDownT = now;
     try { e.preventDefault(); } catch (err) {}
     // Finish any pending zoom layout so mapping matches pixels
     if (zoomGesture || zoomSettling || Math.abs((hqZoom || 1) - zoom) > 0.01) {
@@ -2132,7 +2162,7 @@ function getImg(src) {
         const p = pos(e);
         if (p.c !== hoverC || p.r !== hoverR) {
           hoverC = p.c; hoverR = p.r;
-          if (buyMode) scheduleDraw();
+          setHoverBox(hoverC, hoverR);
         }
         const r = sold.get(p.c + ',' + p.r);
         if (r && tip) {
@@ -2171,6 +2201,7 @@ function getImg(src) {
   }
 
   canvas.addEventListener('mousedown', onDown);
+  stage.addEventListener('mousedown', onDown);
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
   canvas.addEventListener('touchstart', e => { onDown(e); e.preventDefault(); }, { passive: false });
@@ -3364,6 +3395,7 @@ function clearPending() {
   function setBuyMode(on) {
     buyMode = on;
     document.body.classList.toggle('buy-on', !!on);
+    if (!on) { hoverC = -1; hoverR = -1; try { setHoverBox(-1,-1); } catch(e) {} }
     const btn = $('buyModeBtn');
     if (btn) {
       btn.textContent = on ? '✓ VIEW MODE' : '★ BUY PIXELS ★';

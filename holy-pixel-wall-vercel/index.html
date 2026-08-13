@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Holy Pixel Wall</title>
-<!-- HPW_SEL_FIX_3 -->
+<!-- HPW_SEL_FIX_7 -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' shape-rendering='crispEdges'%3E%3Crect width='32' height='32' fill='%233d2b1a'/%3E%3Crect x='2' y='2' width='28' height='28' fill='%23fffdf8'/%3E%3Crect x='4' y='4' width='10' height='10' fill='%23d4a017'/%3E%3Crect x='18' y='4' width='10' height='10' fill='%23c47a3a'/%3E%3Crect x='4' y='18' width='10' height='10' fill='%238b5a2b'/%3E%3Crect x='18' y='18' width='10' height='10' fill='%23f0c14b'/%3E%3Crect x='11' y='11' width='10' height='10' fill='%23ffe566'/%3E%3Crect x='14' y='14' width='4' height='4' fill='%233d2b1a'/%3E%3C/svg%3E" type="image/svg+xml">
 <script src="https://js.stripe.com/v3/"></script>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -185,6 +185,8 @@
   .buy-cta, .tool-btn, .btn, button, .btn-claim, .btn-clear, a {
     cursor: pointer !important;
   }
+
+
 
   :root {
     --bg: #faf6ee;
@@ -563,8 +565,6 @@
     display: block;
     background: #fffdf8;
     cursor: inherit;
-    width: 100% !important;
-    height: 100% !important;
     image-rendering: pixelated !important;
     image-rendering: -moz-crisp-edges !important;
     image-rendering: crisp-edges !important;
@@ -997,8 +997,6 @@
     <div class="stage" id="stage">
       <canvas id="canvas"></canvas>
       <div class="media-layer" id="mediaLayer"></div>
-    <div id="hoverBox" style="display:none;position:absolute;pointer-events:none;z-index:5;box-sizing:border-box;border:2px solid #d4a017;background:rgba(212,160,23,0.35);"></div>
-    <div id="selBox" style="display:none;position:absolute;pointer-events:none;z-index:6;box-sizing:border-box;border:2px solid #1a9b6c;background:rgba(34,197,140,0.28);box-shadow:inset 0 0 0 1px #fff;"></div>
     </div>
   </div>
 </div>
@@ -1486,8 +1484,8 @@ Min 10 blocks · no maximum
     stage.style.transform = 'none';
     stage.style.margin = '0';
     // Canvas always fills stage (CSS 100%) — don't set conflicting pixel sizes
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
+    canvas.style.width = sizeW + 'px';
+    canvas.style.height = sizeH + 'px';
   }
 
   let zoomSettling = false;
@@ -1508,11 +1506,11 @@ Min 10 blocks · no maximum
     if (!baseW || !baseH) return;
     layoutWall();
     // Draw buffer matches visual size
-    const dpr = zoom >= 5 ? 1 : (zoom >= 2.5 ? 1.15 : Math.min(window.devicePixelRatio || 1, 1.5));
+    const dpr = 1; // always 1 — pointer cells match pixels
     canvas.width = Math.max(1, Math.round(sizeW * dpr));
     canvas.height = Math.max(1, Math.round(sizeH * dpr));
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
+    canvas.style.width = sizeW + 'px';
+    canvas.style.height = sizeH + 'px';
     canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
@@ -1865,7 +1863,40 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // Selection + drag preview via DOM #selBox / #hoverBox only
+    // Selection highlight (canvas) + DOM boxes stay in sync
+    if (selected.size) {
+      let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+      selected.forEach(k => {
+        if (sold.has(k)) return;
+        const [c, r] = k.split(',').map(Number);
+        ctx.fillRect(c * cell, r * cell, cell, cell);
+        if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
+        if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
+      });
+      if (sMaxC >= sMinC) {
+        ctx.strokeStyle = '#047857';
+        ctx.lineWidth = Math.max(2, cell * 0.3);
+        ctx.strokeRect(sMinC * cell + 0.5, sMinR * cell + 0.5,
+          (sMaxC - sMinC + 1) * cell - 1, (sMaxR - sMinR + 1) * cell - 1);
+      }
+    }
+    if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
+      const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
+      const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+      ctx.fillRect(minC * cell, minR * cell, (maxC - minC + 1) * cell, (maxR - minR + 1) * cell);
+      ctx.strokeStyle = '#047857';
+      ctx.lineWidth = Math.max(2, cell * 0.25);
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(minC * cell + 0.5, minR * cell + 0.5,
+        (maxC - minC + 1) * cell - 1, (maxR - minR + 1) * cell - 1);
+      ctx.setLineDash([]);
+    }
+
+
+
+    
 
     // Live preview: show how image will look on selection before claim
     if (selected.size && pendingMedia && pendingType !== 'video') {
@@ -1903,66 +1934,22 @@ function getImg(src) {
     $('progressFill').style.width = (n / TOTAL * 100) + '%';
   }
 
-  let hoverC = -1, hoverR = -1;
-
-  function pointerClient(e) {
-    if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    if (e.changedTouches && e.changedTouches.length) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
-    return { x: e.clientX, y: e.clientY };
-  }
-
   function pos(e) {
-    try {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) return { c: 0, r: 0 };
-      const { x: cx, y: cy } = pointerClient(e);
-      if (cx == null || cy == null) return { c: 0, r: 0 };
-      // Exact ratio into grid
-      const x = (cx - rect.left) / rect.width;
-      const y = (cy - rect.top) / rect.height;
-      const c = Math.min(COLS - 1, Math.max(0, (x * COLS) | 0));
-      const r = Math.min(ROWS - 1, Math.max(0, (y * ROWS) | 0));
-      return { c, r };
-    } catch (err) {
-      return { c: 0, r: 0 };
-    }
-  }
-
-  function setHoverBox(c, r) {
-    const el = $('hoverBox');
-    if (!el) return;
-    if (!buyMode || c < 0 || r < 0 || dragging) {
-      el.style.display = 'none';
-      return;
-    }
-    el.style.display = 'block';
-    el.style.left = ((c / COLS) * 100).toFixed(4) + '%';
-    el.style.top = ((r / ROWS) * 100).toFixed(4) + '%';
-    el.style.width = ((1 / COLS) * 100).toFixed(4) + '%';
-    el.style.height = ((1 / ROWS) * 100).toFixed(4) + '%';
-  }
-
-  function setSelBoxFromSelected() {
-    const el = $('selBox');
-    if (!el) return;
-    if (!selected.size) {
-      el.style.display = 'none';
-      return;
-    }
-    let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
-    selected.forEach(k => {
-      const parts = k.split(',');
-      const c = +parts[0], r = +parts[1];
-      if (c < minC) minC = c;
-      if (c > maxC) maxC = c;
-      if (r < minR) minR = r;
-      if (r > maxR) maxR = r;
-    });
-    el.style.display = 'block';
-    el.style.left = ((minC / COLS) * 100).toFixed(4) + '%';
-    el.style.top = ((minR / ROWS) * 100).toFixed(4) + '%';
-    el.style.width = (((maxC - minC + 1) / COLS) * 100).toFixed(4) + '%';
-    el.style.height = (((maxR - minR + 1) / ROWS) * 100).toFixed(4) + '%';
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.touches && e.touches[0] ? e.touches[0].clientX : null) ??
+               (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : null) ??
+               e.clientX;
+    const cy = (e.touches && e.touches[0] ? e.touches[0].clientY : null) ??
+               (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : null) ??
+               e.clientY;
+    if (cx == null || cy == null || rect.width <= 0 || rect.height <= 0) return { c: 0, r: 0 };
+    let c = Math.floor((cx - rect.left) / rect.width * COLS);
+    let r = Math.floor((cy - rect.top) / rect.height * ROWS);
+    if (c < 0) c = 0;
+    if (r < 0) r = 0;
+    if (c >= COLS) c = COLS - 1;
+    if (r >= ROWS) r = ROWS - 1;
+    return { c, r };
   }
 
   function purgeSelectedOwned() {
@@ -2020,38 +2007,25 @@ function getImg(src) {
 
   function applyDrag() {
     if (!Number.isFinite(startC) || !Number.isFinite(curC)) return;
-    let minC = Math.max(0, Math.min(startC, curC));
-    let maxC = Math.min(COLS - 1, Math.max(startC, curC));
-    let minR = Math.max(0, Math.min(startR, curR));
-    let maxR = Math.min(ROWS - 1, Math.max(startR, curR));
-    if (maxC < minC || maxR < minR) return;
-
-    // Require a solid free rectangle — if any cell is owned, selection is invalid (empty)
-    let blocked = 0;
+    const minC = Math.max(0, Math.min(startC, curC));
+    const maxC = Math.min(COLS - 1, Math.max(startC, curC));
+    const minR = Math.max(0, Math.min(startR, curR));
+    const maxR = Math.min(ROWS - 1, Math.max(startR, curR));
     const next = new Set();
     for (let c = minC; c <= maxC; c++) {
       for (let r = minR; r <= maxR; r++) {
         const k = c + ',' + r;
-        if (sold.has(k)) blocked++;
-        else next.add(k);
+        if (!sold.has(k)) next.add(k);
       }
     }
-    if (blocked > 0) {
-      selected = new Set();
-      if (tip) {
-        tip.style.display = 'block';
-        tip.innerHTML = '<strong>BLOCKED</strong>' + blocked + ' owned cells — drag a free rectangle only';
-      }
-    } else {
-      selected = next;
-    }
-    try { draw(); } catch (err) { console.warn(err); }
-    try { updateFloat(); } catch (err) { console.warn(err); }
+    selected = next;
+    try { draw(); } catch (e) {}
+    try { updateFloat(); } catch (e) {}
   }
 
-    function updateFloat() {
+  function updateFloat() {
     purgeSelectedOwned();
-    const n = selected.size;
+        const n = selected.size;
     if (n > 0) {
       const issues = typeof selectionIssues === 'function'? selectionIssues() : [];
       $('selCount').textContent = issues.length
@@ -2065,21 +2039,13 @@ function getImg(src) {
     try { refreshClaimValidation(); } catch (e) {}
   }
 
-  let lastDownT = 0;
   function onDown(e) {
-    if (!buyMode) return; // VIEW ONLY - no selecting
-    if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
-    const now = performance.now();
-    if (now - lastDownT < 30) return; // ignore duplicate stage+canvas fire
-    lastDownT = now;
+    if (!buyMode) return;
+    // In buy mode always select (ignore drag tool). Space still pans.
+    if (spaceHeld || (e.button != null && e.button !== 0)) return;
     try { e.preventDefault(); } catch (err) {}
-    // Finish any pending zoom layout so mapping matches pixels
-    if (zoomGesture || zoomSettling || Math.abs((hqZoom || 1) - zoom) > 0.01) {
-      clearTimeout(zoomTimer);
-      try { applyZoomHQ(); } catch (err) {}
-    }
     const p = pos(e);
-    hoverC = p.c; hoverR = p.r;
+    
     const key = p.c + ',' + p.r;
     if (sold.has(key)) {
       dragging = false;
@@ -2111,10 +2077,6 @@ function getImg(src) {
     if (!dragging) {
       try {
         const p = pos(e);
-        if (p.c !== hoverC || p.r !== hoverR) {
-          hoverC = p.c; hoverR = p.r;
-          setHoverBox(hoverC, hoverR);
-        }
         const r = sold.get(p.c + ',' + p.r);
         if (r && tip) {
           tip.innerHTML = '<strong>' + (r.name || 'OWNED') + '</strong>' +
@@ -2152,13 +2114,12 @@ function getImg(src) {
   }
 
   canvas.addEventListener('mousedown', onDown);
-  stage.addEventListener('mousedown', onDown);
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
   canvas.addEventListener('touchstart', e => { onDown(e); e.preventDefault(); }, { passive: false });
   window.addEventListener('touchmove', e => { onMove(e); if (dragging) e.preventDefault(); }, { passive: false });
   window.addEventListener('touchend', onUp);
-  canvas.addEventListener('mouseleave', () => tip.style.display = 'none');
+  canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
   canvas.addEventListener('click', e => {
     // Ignore click that ends a drag-select (second select used to break here)
     if (dragging || didDrag) {
@@ -3346,7 +3307,7 @@ function clearPending() {
   function setBuyMode(on) {
     buyMode = on;
     document.body.classList.toggle('buy-on', !!on);
-    if (!on) { hoverC = -1; hoverR = -1; try { setHoverBox(-1,-1); } catch(e) {} }
+    if (!on) {  try {  } catch(e) {} }
     const btn = $('buyModeBtn');
     if (btn) {
       btn.textContent = on ? '✓ VIEW MODE' : '★ BUY PIXELS ★';

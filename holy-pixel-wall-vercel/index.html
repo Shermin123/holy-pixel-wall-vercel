@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Holy Pixel Wall</title>
+<!-- HPW_SEL_FIX_3 -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' shape-rendering='crispEdges'%3E%3Crect width='32' height='32' fill='%233d2b1a'/%3E%3Crect x='2' y='2' width='28' height='28' fill='%23fffdf8'/%3E%3Crect x='4' y='4' width='10' height='10' fill='%23d4a017'/%3E%3Crect x='18' y='4' width='10' height='10' fill='%23c47a3a'/%3E%3Crect x='4' y='18' width='10' height='10' fill='%238b5a2b'/%3E%3Crect x='18' y='18' width='10' height='10' fill='%23f0c14b'/%3E%3Crect x='11' y='11' width='10' height='10' fill='%23ffe566'/%3E%3Crect x='14' y='14' width='4' height='4' fill='%233d2b1a'/%3E%3C/svg%3E" type="image/svg+xml">
 <script src="https://js.stripe.com/v3/"></script>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -1864,58 +1865,7 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // Hover cell under cursor (precise feedback)
-    if (buyMode && hoverC >= 0 && hoverR >= 0 && !dragging) {
-      const hx = hoverC * cell, hy = hoverR * cell;
-      ctx.fillStyle = 'rgba(212, 160, 23, 0.35)';
-      ctx.fillRect(hx, hy, cell, cell);
-      ctx.strokeStyle = '#d4a017';
-      ctx.lineWidth = Math.max(1.5, cell * 0.2);
-      ctx.strokeRect(hx + 0.5, hy + 0.5, Math.max(0, cell - 1), Math.max(0, cell - 1));
-    }
-
-    // Selection on top — clear teal, easy to see
-    if (selected.size) {
-      let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
-      selected.forEach(k => {
-        if (sold.has(k)) return;
-        const [c, r] = k.split(',').map(Number);
-        const x = c * cell, y = r * cell;
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
-        ctx.fillRect(x, y, cell, cell);
-        sMinC = Math.min(sMinC, c); sMaxC = Math.max(sMaxC, c);
-        sMinR = Math.min(sMinR, r); sMaxR = Math.max(sMaxR, r);
-      });
-      if (sMaxC >= sMinC) {
-        const bx = sMinC * cell;
-        const by = sMinR * cell;
-        const bw = (sMaxC - sMinC + 1) * cell;
-        const bh = (sMaxR - sMinR + 1) * cell;
-        // Outer bold border
-        ctx.strokeStyle = '#047857';
-        ctx.lineWidth = Math.max(2.5, cell * 0.35);
-        ctx.strokeRect(bx + 1, by + 1, bw - 2, bh - 2);
-        // Inner light edge
-        ctx.strokeStyle = '#ecfdf5';
-        ctx.lineWidth = Math.max(1, cell * 0.12);
-        ctx.strokeRect(bx + 3, by + 3, Math.max(0, bw - 6), Math.max(0, bh - 6));
-      }
-    }
-
-    // Dragging preview box
-    if (dragging) {
-      const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
-      const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
-      const dx = minC * cell, dy = minR * cell;
-      const dw = (maxC - minC + 1) * cell, dh = (maxR - minR + 1) * cell;
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
-      ctx.fillRect(dx, dy, dw, dh);
-      ctx.strokeStyle = '#047857';
-      ctx.lineWidth = Math.max(2, cell * 0.3);
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(dx + 1, dy + 1, dw - 2, dh - 2);
-      ctx.setLineDash([]);
-    }
+    // Selection + drag preview via DOM #selBox / #hoverBox only
 
     // Live preview: show how image will look on selection before claim
     if (selected.size && pendingMedia && pendingType !== 'video') {
@@ -1955,23 +1905,23 @@ function getImg(src) {
 
   let hoverC = -1, hoverR = -1;
 
+  function pointerClient(e) {
+    if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (e.changedTouches && e.changedTouches.length) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    return { x: e.clientX, y: e.clientY };
+  }
+
   function pos(e) {
     try {
       const rect = canvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) return { c: 0, r: 0 };
-      let cx, cy;
-      if (e.touches && e.touches.length) {
-        cx = e.touches[0].clientX; cy = e.touches[0].clientY;
-      } else if (e.changedTouches && e.changedTouches.length) {
-        cx = e.changedTouches[0].clientX; cy = e.changedTouches[0].clientY;
-      } else {
-        cx = e.clientX; cy = e.clientY;
-      }
+      if (rect.width < 1 || rect.height < 1) return { c: 0, r: 0 };
+      const { x: cx, y: cy } = pointerClient(e);
       if (cx == null || cy == null) return { c: 0, r: 0 };
+      // Exact ratio into grid
       const x = (cx - rect.left) / rect.width;
       const y = (cy - rect.top) / rect.height;
-      const c = Math.min(COLS - 1, Math.max(0, Math.floor(x * COLS)));
-      const r = Math.min(ROWS - 1, Math.max(0, Math.floor(y * ROWS)));
+      const c = Math.min(COLS - 1, Math.max(0, (x * COLS) | 0));
+      const r = Math.min(ROWS - 1, Math.max(0, (y * ROWS) | 0));
       return { c, r };
     } catch (err) {
       return { c: 0, r: 0 };
@@ -1986,10 +1936,10 @@ function getImg(src) {
       return;
     }
     el.style.display = 'block';
-    el.style.left = (c / COLS * 100) + '%';
-    el.style.top = (r / ROWS * 100) + '%';
-    el.style.width = (100 / COLS) + '%';
-    el.style.height = (100 / ROWS) + '%';
+    el.style.left = ((c / COLS) * 100).toFixed(4) + '%';
+    el.style.top = ((r / ROWS) * 100).toFixed(4) + '%';
+    el.style.width = ((1 / COLS) * 100).toFixed(4) + '%';
+    el.style.height = ((1 / ROWS) * 100).toFixed(4) + '%';
   }
 
   function setSelBoxFromSelected() {
@@ -2001,17 +1951,18 @@ function getImg(src) {
     }
     let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
     selected.forEach(k => {
-      const [c, r] = k.split(',').map(Number);
+      const parts = k.split(',');
+      const c = +parts[0], r = +parts[1];
       if (c < minC) minC = c;
       if (c > maxC) maxC = c;
       if (r < minR) minR = r;
       if (r > maxR) maxR = r;
     });
     el.style.display = 'block';
-    el.style.left = (minC / COLS * 100) + '%';
-    el.style.top = (minR / ROWS * 100) + '%';
-    el.style.width = ((maxC - minC + 1) / COLS * 100) + '%';
-    el.style.height = ((maxR - minR + 1) / ROWS * 100) + '%';
+    el.style.left = ((minC / COLS) * 100).toFixed(4) + '%';
+    el.style.top = ((minR / ROWS) * 100).toFixed(4) + '%';
+    el.style.width = (((maxC - minC + 1) / COLS) * 100).toFixed(4) + '%';
+    el.style.height = (((maxR - minR + 1) / ROWS) * 100).toFixed(4) + '%';
   }
 
   function purgeSelectedOwned() {

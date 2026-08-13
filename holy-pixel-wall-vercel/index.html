@@ -4,190 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Holy Pixel Wall</title>
-<!-- HPW_SEL_FIX_7 -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' shape-rendering='crispEdges'%3E%3Crect width='32' height='32' fill='%233d2b1a'/%3E%3Crect x='2' y='2' width='28' height='28' fill='%23fffdf8'/%3E%3Crect x='4' y='4' width='10' height='10' fill='%23d4a017'/%3E%3Crect x='18' y='4' width='10' height='10' fill='%23c47a3a'/%3E%3Crect x='4' y='18' width='10' height='10' fill='%238b5a2b'/%3E%3Crect x='18' y='18' width='10' height='10' fill='%23f0c14b'/%3E%3Crect x='11' y='11' width='10' height='10' fill='%23ffe566'/%3E%3Crect x='14' y='14' width='4' height='4' fill='%233d2b1a'/%3E%3C/svg%3E" type="image/svg+xml">
 <script src="https://js.stripe.com/v3/"></script>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 
 <style>
   
-
-/* Hide internal tools from public UI */
-  #toolSelect, #toolDrag, #toolDev, #exportBtn, #adminBtn { display: none !important; }
-
-  /* Public tools: keep useful only */
-  #toolSelect, #toolDrag, #toolDev, #exportBtn, #adminBtn { display: none !important; }
-
-  header {
-    min-height: 58px !important;
-    padding: 10px 16px !important;
-    gap: 12px !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-  }
-  .brand { min-width: 0 !important; }
-  .brand h1 {
-    font-size: 0.62rem !important;
-    line-height: 1.25 !important;
-  }
-  .brand p {
-    display: block !important;
-    font-size: 0.78rem !important;
-    margin-top: 3px !important;
-    color: var(--muted) !important;
-    max-width: 220px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .header-mid {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1 1 auto;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .price-chip {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.42rem;
-    color: #5c3d0e;
-    background: linear-gradient(180deg, #fff6c8, #f0c14b);
-    border: 2px solid var(--gold);
-    padding: 8px 12px;
-    box-shadow: 2px 2px 0 #5c3d1e;
-    white-space: nowrap;
-  }
-  .trust-chip {
-    font-family: 'VT323', monospace;
-    font-size: 0.95rem;
-    color: var(--muted);
-    background: #fff;
-    border: 2px solid var(--border);
-    padding: 6px 10px;
-    white-space: nowrap;
-  }
-  .trust-chip b { color: var(--dark); }
-  .header-right {
-    display: flex !important;
-    align-items: center;
-    gap: 10px;
-    margin-left: 0 !important;
-  }
-  /* Hide old noisy pieces */
-  .center-badge, .price-hero, .live-tag, .willow { display: none !important; }
-  .buy-cta {
-    font-size: 0.48rem !important;
-    padding: 11px 16px !important;
-    flex-shrink: 0;
-  }
-  .counter {
-    text-align: left !important;
-    min-width: 88px;
-  }
-  .toolbar {
-    padding: 6px 10px !important;
-    gap: 5px !important;
-    justify-content: center !important;
-  }
-  .tool-btn {
-    font-size: 0.36rem !important;
-    padding: 7px 9px !important;
-  }
-  @media (max-width: 700px) {
-    header { padding: 8px 10px !important; gap: 8px !important; }
-    .brand p { display: none !important; }
-    .trust-chip { display: none !important; }
-    .price-chip { font-size: 0.34rem; padding: 6px 8px; }
-    .buy-cta { font-size: 0.4rem !important; padding: 9px 12px !important; }
-  }
-
-
-
-
-
-  .trust-chip { display: none !important; }
-  .vintage-logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
-    user-select: none;
-    pointer-events: none;
-  }
-  .vintage-logo .vl-mark {
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    animation: logoFloat 2.4s ease-in-out infinite;
-    filter: drop-shadow(2px 2px 0 #5c3d1e);
-  }
-  .vintage-logo .vl-mark rect,
-  .vintage-logo .vl-mark path {
-    animation: logoPulse 1.8s steps(2) infinite;
-  }
-  .vintage-logo .vl-word {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.36rem;
-    line-height: 1.45;
-    color: var(--dark);
-    letter-spacing: 0.5px;
-  }
-  .vintage-logo .vl-word span {
-    display: block;
-    color: var(--gold);
-    animation: logoGlow 2s steps(2) infinite;
-  }
-  @keyframes logoFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
-  }
-  @keyframes logoPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.85; }
-  }
-  @keyframes logoGlow {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.15); }
-  }
-  @media (max-width: 700px) {
-    .vintage-logo .vl-word { display: none; }
-    .vintage-logo .vl-mark { width: 30px; height: 30px; }
-  }
-
-
-
-
-
-
-
-  /* ONE cursor only — system cursors (no dual custom/system) */
-  .viewport { cursor: default; }
-  .viewport canvas, .stage, .stage canvas { cursor: inherit; }
-  body.buy-on .viewport,
-  body.buy-on .viewport canvas,
-  body.buy-on .stage {
-    cursor: crosshair !important;
-  }
-  body.buy-on .viewport.drag-mode,
-  body.buy-on .viewport.drag-mode canvas,
-  .viewport.drag-mode,
-  .viewport.drag-mode canvas {
-    cursor: grab !important;
-  }
-  .viewport.panning,
-  .viewport.panning *,
-  .viewport.drag-mode.panning,
-  .viewport.drag-mode.panning canvas {
-    cursor: grabbing !important;
-  }
-  .buy-cta, .tool-btn, .btn, button, .btn-claim, .btn-clear, a {
-    cursor: pointer !important;
-  }
-
-
-
   :root {
     --bg: #faf6ee;
     --surface: #fffdf8;
@@ -543,7 +364,6 @@
 
   .stage {
     position: absolute;
-    pointer-events: auto;
     left: 0;
     top: 0;
     display: block;
@@ -564,10 +384,9 @@
   canvas {
     display: block;
     background: #fffdf8;
-    cursor: inherit;
-    image-rendering: pixelated !important;
-    image-rendering: -moz-crisp-edges !important;
-    image-rendering: crisp-edges !important;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
   }
 
   .media-layer {
@@ -946,37 +765,36 @@
 <header>
   <div class="brand">
     <h1>HOLY PIXEL WALL</h1>
-    <p>Own a piece of the internet wall</p>
+    <p>Claim your place on the Holy Pixel Wall</p>
   </div>
-  <div class="header-mid">
-    <div class="price-chip">1 PIXEL = $0.50</div>
-    <div class="vintage-logo" title="Holy Pixel Wall" aria-hidden="true">
-      <svg class="vl-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-        <rect width="32" height="32" fill="#3d2b1a"/>
-        <rect x="2" y="2" width="28" height="28" fill="#fffdf8"/>
-        <rect x="4" y="4" width="10" height="10" fill="#d4a017"/>
-        <rect x="18" y="4" width="10" height="10" fill="#c47a3a"/>
-        <rect x="4" y="18" width="10" height="10" fill="#8b5a2b"/>
-        <rect x="18" y="18" width="10" height="10" fill="#f0c14b"/>
-        <rect x="11" y="11" width="10" height="10" fill="#ffe566"/>
-        <rect x="14" y="14" width="4" height="4" fill="#3d2b1a"/>
-      </svg>
-      <div class="vl-word">HOLY<br><span>PIXEL</span></div>
-    </div>
-    <button class="buy-cta" id="buyModeBtn" type="button">★ BUY PIXELS ★</button>
+  <div class="price-hero" title="Price">
+    <span class="price-main">1 PIXEL = $0.10</span>
+  </div>
+  <button class="buy-cta" id="buyModeBtn" type="button">★ BUY PIXELS ★</button>
+  <div class="center-badge">
+    <div class="hw-banner"><span class="hw-text">CLAIM PIXELS</span></div>
   </div>
   <div class="header-right">
-    <div class="counter" title="Pixels claimed on the wall">
-      <div class="counter-label">CLAIMED</div>
+    <div class="live-tag" title="People viewing the wall right now">
+      <span class="live-dot"></span>
+      <div class="live-label">
+        <em>● LIVE</em>
+        <span><span id="viewerCount">27842</span> ONLINE</span>
+      </div>
+    </div>
+    <div class="willow" id="willow" title="Wish Stick">
+      <svg width="22" height="22" viewBox="0 0 100 100">
+        <path d="M48 90 Q52 50 44 20 Q42 12 48 8 Q54 15 52 30 Q58 60 52 90Z" fill="#8b5a2b"/>
+        <circle cx="48" cy="10" r="6" fill="#d4a017"/>
+      </svg>
+      <span>WISH</span>
+    </div>
+    <div class="counter">
+      <div class="counter-label">SOLD</div>
       <div class="counter-num" id="counterText">0/—</div>
       <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
     </div>
   </div>
-  <!-- kept for JS (hidden) -->
-  <div class="price-hero" style="display:none" aria-hidden="true"><span class="price-main">1 PIXEL = $0.50</span></div>
-  <div class="center-badge" style="display:none" aria-hidden="true"></div>
-  <div class="live-tag" style="display:none" aria-hidden="true"><span id="viewerCount">0</span></div>
-  <div class="willow" id="willow" style="display:none" aria-hidden="true"></div>
 </header>
 
 <div class="toolbar">
@@ -989,8 +807,10 @@
   <span id="zoomLvl" style="font-family:'Press Start 2P',monospace;font-size:0.4rem;color:var(--dark);min-width:42px;text-align:center">100%</span>
   <button class="tool-btn" id="zoomIn">+</button>
   <button class="tool-btn" id="zoomFit">FIT</button>
-    <button class="tool-btn" id="helpBtn">HOW IT WORKS</button>
-  </div>
+  <button class="tool-btn" id="exportBtn">EXPORT</button>
+  <button class="tool-btn" id="helpBtn">HOW IT WORKS</button>
+  <button class="tool-btn" id="adminBtn" type="button" title="Owner admin">ADMIN</button>
+</div>
 
 <div class="viewport" id="viewport">
   <div id="wallWrap">
@@ -1032,7 +852,7 @@
       <div class="field">
         <label>DURATION</label>
         <select id="duration">
-          <option value="1month">30 DAYS — $0.50 / PIXEL</option>
+          <option value="1month">30 DAYS — $0.10 / PIXEL</option>
           <option value="3month">3 MONTHS — $1 / PIXEL</option>
           <option value="6month">6 MONTHS — $10 / PIXEL</option>
           <option value="permanent">PERMANENT — $50 / PIXEL (limited)</option>
@@ -1129,7 +949,7 @@
     <div class="modal-body" style="font-size:1rem;line-height:1.45;color:var(--muted)">
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">1.</strong> Drag to select free pixels.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">2.</strong> Add your name and a photo (tap to upload). Optional link & description.</p>
-      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.50 / pixel for 30 days, $1 for 3 months, $10 for 6 months, or $50 permanent (max 1000 permanent pixels on the wall).</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.10 / pixel for 30 days, $1 for 3 months, $10 for 6 months, or $50 permanent (max 1000 permanent pixels on the wall).</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">4.</strong> Your pixels stay locked — others cannot take them until time ends.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">Hover</strong> any claim to see owner, description, and time left.</p>
             <p style="margin-top:12px;font-size:0.9rem"><strong style="color:var(--dark)">Photo tip:</strong> Use a clear JPG or PNG under 2MB. It fills your block automatically.</p>
@@ -1331,7 +1151,7 @@ Min 10 blocks · no maximum
     if (d === 'permanent') return 50;
     if (d === '6month') return 10;
     if (d === '3month') return 1;
-    return 0.50; // 30 days
+    return 0.10; // 30 days
   }
 
   function durationMs(d) {
@@ -1438,10 +1258,6 @@ Min 10 blocks · no maximum
     if (fitReset) {
       zoom = 1;
       hqZoom = 1;
-      clearTimeout(zoomTimer);
-      if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
-      zoomAnim = null;
-      stage.style.transform = 'none';
     }
     applyZoomHQ();
     if (fitReset) {
@@ -1466,13 +1282,10 @@ Min 10 blocks · no maximum
 
   function layoutWall() {
     const wrap = $('wallWrap');
-    // Visual size always = base * zoom (no double-scale)
-    const w = baseW * zoom;
-    const h = baseH * zoom;
-    sizeW = w;
-    sizeH = h;
-    cell = baseCell * zoom;
     const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
+    // sizeW/sizeH are already at zoom resolution after HQ redraw
+    const w = sizeW;
+    const h = sizeH;
     if (wrap) {
       wrap.style.width = Math.ceil(w + pad * 2) + 'px';
       wrap.style.height = Math.ceil(h + pad * 2) + 'px';
@@ -1483,39 +1296,45 @@ Min 10 blocks · no maximum
     stage.style.height = h + 'px';
     stage.style.transform = 'none';
     stage.style.margin = '0';
-    // Canvas always fills stage (CSS 100%) — don't set conflicting pixel sizes
-    canvas.style.width = sizeW + 'px';
-    canvas.style.height = sizeH + 'px';
   }
 
-  let zoomSettling = false;
-  let zoomGesture = false;
-
   function applyZoomSmooth() {
-    // Layout grows with zoom; bitmap stays until HQ settle (no CSS scale = no hit-test bug)
+    // Temporary CSS scale for fluid feel; settle redraw makes it sharp
     zoom = Math.max(1, Math.min(12, zoom));
-    layoutWall();
+    const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
+    const wrap = $('wallWrap');
+    const w = baseW * zoom;
+    const h = baseH * zoom;
+    if (wrap) {
+      wrap.style.width = Math.ceil(w + pad * 2) + 'px';
+      wrap.style.height = Math.ceil(h + pad * 2) + 'px';
+    }
+    stage.style.left = pad + 'px';
+    stage.style.top = pad + 'px';
+    stage.style.width = baseW + 'px';
+    stage.style.height = baseH + 'px';
+    stage.style.transformOrigin = '0 0';
+    stage.style.transition = 'none'; // driven by rAF
+    stage.style.transform = 'scale(' + zoom + ')';
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
   }
 
   function applyZoomHQ() {
     zoom = Math.max(1, Math.min(12, zoom));
     hqZoom = zoom;
-    zoomSettling = false;
-    zoomGesture = false;
+    // Draw at TRUE zoomed resolution — sharp blocks, no blur
+    cell = baseCell * zoom;
+    sizeW = baseW * zoom;
+    sizeH = baseH * zoom;
     if (!baseW || !baseH) return;
-    layoutWall();
-    // Draw buffer matches visual size
-    const dpr = 1; // always 1 — pointer cells match pixels
-    canvas.width = Math.max(1, Math.round(sizeW * dpr));
-    canvas.height = Math.max(1, Math.round(sizeH * dpr));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(sizeW * dpr);
+    canvas.height = Math.round(sizeH * dpr);
     canvas.style.width = sizeW + 'px';
     canvas.style.height = sizeH + 'px';
-    canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    stage.style.transform = 'none';
-    stage.style.willChange = 'auto';
+    layoutWall();
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
     draw();
     syncMediaOverlays();
@@ -1523,11 +1342,10 @@ Min 10 blocks · no maximum
 
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
-    zoomSettling = true;
-    zoomTimer = setTimeout(() => applyZoomHQ(), 180);
+    zoomTimer = setTimeout(() => applyZoomHQ(), 120);
   }
 
-  let zoomAnim = null;
+  let zoomAnim = null; // { from, to, start, dur, px, py, lx, ly }
 
   function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
@@ -1537,48 +1355,44 @@ Min 10 blocks · no maximum
     const prev = zoom;
     zoom = Math.max(1, Math.min(12, level));
     applyZoomSmooth();
-    // Keep focus under cursor (lx/ly in stage local coords at prev zoom)
+    // Keep focus point under cursor / center
     if (lx != null && ly != null && px != null && py != null) {
       const srect2 = stage.getBoundingClientRect();
-      // lx was measured in CSS pixels of stage content at previous zoom
-      const scale = zoom / (prev || 1);
-      viewport.scrollLeft += (srect2.left + lx * scale) - px;
-      viewport.scrollTop += (srect2.top + ly * scale) - py;
+      viewport.scrollLeft += (srect2.left + lx * zoom) - px;
+      viewport.scrollTop += (srect2.top + ly * zoom) - py;
     }
   }
 
   function tickZoomAnim(now) {
     if (!zoomAnim) return;
-    const tt = Math.min(1, (now - zoomAnim.start) / zoomAnim.dur);
-    const e = easeOutCubic(tt);
+    const t = Math.min(1, (now - zoomAnim.start) / zoomAnim.dur);
+    const e = easeOutCubic(t);
     const level = zoomAnim.from + (zoomAnim.to - zoomAnim.from) * e;
     applyZoomAt(level, zoomAnim.px, zoomAnim.py, zoomAnim.lx, zoomAnim.ly);
-    if (tt < 1) {
+    if (t < 1) {
       zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
     } else {
       zoom = zoomAnim.to;
       zoomAnim = null;
-      scheduleZoomHQ();
+      applyZoomHQ();
     }
   }
 
   function bumpZoom(d, clientX, clientY, instant) {
-    const prevTarget = zoomAnim ? zoomAnim.to : zoom;
-    const next = Math.max(1, Math.min(12, prevTarget + d));
-    if (Math.abs(next - prevTarget) < 0.0005) return;
-
-    zoomGesture = true;
-    clearTimeout(zoomTimer);
+    const prev = zoomAnim ? zoomAnim.to : zoom;
+    const next = Math.max(1, Math.min(12, prev + d));
+    if (Math.abs(next - prev) < 0.0005) return;
 
     const vrect = viewport.getBoundingClientRect();
     const hasPointer = clientX != null && clientY != null && isFinite(clientX) && isFinite(clientY);
     const px = hasPointer ? clientX : (vrect.left + vrect.width / 2);
     const py = hasPointer ? clientY : (vrect.top + vrect.height / 2);
 
+    // Local coords relative to current visual zoom
     const srect = stage.getBoundingClientRect();
-    // local coords in current visual stage pixels
-    const lx = (px - srect.left);
-    const ly = (py - srect.top);
+    const curZ = zoom || 1;
+    const lx = (px - srect.left) / curZ;
+    const ly = (py - srect.top) / curZ;
 
     if (instant) {
       if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
@@ -1588,12 +1402,13 @@ Min 10 blocks · no maximum
       return;
     }
 
+    // Smooth animated zoom
     if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
     zoomAnim = {
       from: zoom,
       to: next,
       start: performance.now(),
-      dur: 140,
+      dur: 220,
       px, py, lx, ly,
       raf: null
     };
@@ -1685,8 +1500,8 @@ Min 10 blocks · no maximum
     c.beginPath();
     c.rect(x, y, w, h);
     c.clip();
-    // Pixel-wall look: nearest-neighbor, no blur
-    c.imageSmoothingEnabled = false;
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = 'high';
     c.drawImage(img, dx, dy, dw, dh);
     c.restore();
   }
@@ -1749,7 +1564,8 @@ function getImg(src) {
     tctx.imageSmoothingQuality = 'high';
     tctx.drawImage(img, 0, 0, nw, nh, 0, 0, tc.width, tc.height);
 
-    c.imageSmoothingEnabled = false;
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = 'high';
     c.drawImage(tc, 0, 0, tc.width, tc.height, dx, dy, dw, dh);
 
     // Thin pixel-block frame
@@ -1786,11 +1602,11 @@ function getImg(src) {
       }
     }
 
-    // Pixel grid — every block visible when zoomed (crisp, no blur)
-    if (vis >= 1.2) {
-      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.55)' : (vis >= 3 ? 'rgba(139, 90, 43, 0.4)' : 'rgba(139, 90, 43, 0.22)');
+    // Individual block lines — stronger when zoomed so each block is clear
+    if (vis >= 1.5) {
+      ctx.strokeStyle = vis >= 4 ? 'rgba(139, 90, 43, 0.35)' : 'rgba(139, 90, 43, 0.2)';
       ctx.lineWidth = 1;
-      const step = 1; // always full grid when zoomed enough
+      const step = vis >= 3 ? 1 : 2;
       ctx.beginPath();
       for (let c = 0; c <= COLS; c += step) {
         const x = Math.floor(c * cell) + 0.5;
@@ -1863,40 +1679,48 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // Selection highlight (canvas) + DOM boxes stay in sync
+    // Selection on top — clear teal, easy to see
     if (selected.size) {
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
       selected.forEach(k => {
         if (sold.has(k)) return;
         const [c, r] = k.split(',').map(Number);
-        ctx.fillRect(c * cell, r * cell, cell, cell);
-        if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
-        if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
+        const x = c * cell, y = r * cell;
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+        ctx.fillRect(x, y, cell, cell);
+        sMinC = Math.min(sMinC, c); sMaxC = Math.max(sMaxC, c);
+        sMinR = Math.min(sMinR, r); sMaxR = Math.max(sMaxR, r);
       });
       if (sMaxC >= sMinC) {
+        const bx = sMinC * cell;
+        const by = sMinR * cell;
+        const bw = (sMaxC - sMinC + 1) * cell;
+        const bh = (sMaxR - sMinR + 1) * cell;
+        // Outer bold border
         ctx.strokeStyle = '#047857';
-        ctx.lineWidth = Math.max(2, cell * 0.3);
-        ctx.strokeRect(sMinC * cell + 0.5, sMinR * cell + 0.5,
-          (sMaxC - sMinC + 1) * cell - 1, (sMaxR - sMinR + 1) * cell - 1);
+        ctx.lineWidth = Math.max(2.5, cell * 0.35);
+        ctx.strokeRect(bx + 1, by + 1, bw - 2, bh - 2);
+        // Inner light edge
+        ctx.strokeStyle = '#ecfdf5';
+        ctx.lineWidth = Math.max(1, cell * 0.12);
+        ctx.strokeRect(bx + 3, by + 3, Math.max(0, bw - 6), Math.max(0, bh - 6));
       }
     }
-    if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
+
+    // Dragging preview box
+    if (dragging) {
       const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
-      ctx.fillRect(minC * cell, minR * cell, (maxC - minC + 1) * cell, (maxR - minR + 1) * cell);
+      const dx = minC * cell, dy = minR * cell;
+      const dw = (maxC - minC + 1) * cell, dh = (maxR - minR + 1) * cell;
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+      ctx.fillRect(dx, dy, dw, dh);
       ctx.strokeStyle = '#047857';
-      ctx.lineWidth = Math.max(2, cell * 0.25);
-      ctx.setLineDash([4, 3]);
-      ctx.strokeRect(minC * cell + 0.5, minR * cell + 0.5,
-        (maxC - minC + 1) * cell - 1, (maxR - minR + 1) * cell - 1);
+      ctx.lineWidth = Math.max(2, cell * 0.3);
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(dx + 1, dy + 1, dw - 2, dh - 2);
       ctx.setLineDash([]);
     }
-
-
-
-    
 
     // Live preview: show how image will look on selection before claim
     if (selected.size && pendingMedia && pendingType !== 'video') {
@@ -1935,21 +1759,21 @@ function getImg(src) {
   }
 
   function pos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const cx = (e.touches && e.touches[0] ? e.touches[0].clientX : null) ??
-               (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : null) ??
-               e.clientX;
-    const cy = (e.touches && e.touches[0] ? e.touches[0].clientY : null) ??
-               (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : null) ??
-               e.clientY;
-    if (cx == null || cy == null || rect.width <= 0 || rect.height <= 0) return { c: 0, r: 0 };
-    let c = Math.floor((cx - rect.left) / rect.width * COLS);
-    let r = Math.floor((cy - rect.top) / rect.height * ROWS);
-    if (c < 0) c = 0;
-    if (r < 0) r = 0;
-    if (c >= COLS) c = COLS - 1;
-    if (r >= ROWS) r = ROWS - 1;
-    return { c, r };
+    try {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return { c: 0, r: 0 };
+      const cx = e.clientX ?? e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX;
+      const cy = e.clientY ?? e.touches?.[0]?.clientY ?? e.changedTouches?.[0]?.clientY;
+      if (cx == null || cy == null) return { c: 0, r: 0 };
+      const x = (cx - rect.left) / rect.width;
+      const y = (cy - rect.top) / rect.height;
+      return {
+        c: Math.max(0, Math.min(COLS - 1, Math.floor(x * COLS))),
+        r: Math.max(0, Math.min(ROWS - 1, Math.floor(y * ROWS)))
+      };
+    } catch (err) {
+      return { c: 0, r: 0 };
+    }
   }
 
   function purgeSelectedOwned() {
@@ -2007,25 +1831,42 @@ function getImg(src) {
 
   function applyDrag() {
     if (!Number.isFinite(startC) || !Number.isFinite(curC)) return;
-    const minC = Math.max(0, Math.min(startC, curC));
-    const maxC = Math.min(COLS - 1, Math.max(startC, curC));
-    const minR = Math.max(0, Math.min(startR, curR));
-    const maxR = Math.min(ROWS - 1, Math.max(startR, curR));
+    let minC = Math.max(0, Math.min(startC, curC));
+    let maxC = Math.min(COLS - 1, Math.max(startC, curC));
+    let minR = Math.max(0, Math.min(startR, curR));
+    let maxR = Math.min(ROWS - 1, Math.max(startR, curR));
+    if (maxC < minC || maxR < minR) return;
+
+    // Only solid rectangles — shrink box until every cell is free (or empty)
+    let blocked = 0;
+    for (let c = minC; c <= maxC; c++)
+      for (let r = minR; r <= maxR; r++)
+        if (sold.has(c + ',' + r)) blocked++;
+
+    // No max size — any free rectangle allowed
+
     const next = new Set();
+    blocked = 0;
     for (let c = minC; c <= maxC; c++) {
       for (let r = minR; r <= maxR; r++) {
         const k = c + ',' + r;
-        if (!sold.has(k)) next.add(k);
+        if (sold.has(k)) { blocked++; continue; }
+        next.add(k);
       }
     }
+    // If any owned inside, selection is not a solid free rectangle — still show free cells but warn
     selected = next;
-    try { draw(); } catch (e) {}
-    try { updateFloat(); } catch (e) {}
+    if (blocked > 0 && tip) {
+      tip.style.display = 'block';
+      tip.innerHTML = '<strong>RECTANGLE</strong>contains ' + blocked + ' owned — pick a free area';
+    }
+    try { draw(); } catch (err) { console.warn(err); }
+    try { updateFloat(); } catch (err) { console.warn(err); }
   }
 
-  function updateFloat() {
+    function updateFloat() {
     purgeSelectedOwned();
-        const n = selected.size;
+    const n = selected.size;
     if (n > 0) {
       const issues = typeof selectionIssues === 'function'? selectionIssues() : [];
       $('selCount').textContent = issues.length
@@ -2040,12 +1881,9 @@ function getImg(src) {
   }
 
   function onDown(e) {
-    if (!buyMode) return;
-    // In buy mode always select (ignore drag tool). Space still pans.
-    if (spaceHeld || (e.button != null && e.button !== 0)) return;
-    try { e.preventDefault(); } catch (err) {}
+    if (!buyMode) return; // VIEW ONLY - no selecting
+    if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
     const p = pos(e);
-    
     const key = p.c + ',' + p.r;
     if (sold.has(key)) {
       dragging = false;
@@ -2119,7 +1957,7 @@ function getImg(src) {
   canvas.addEventListener('touchstart', e => { onDown(e); e.preventDefault(); }, { passive: false });
   window.addEventListener('touchmove', e => { onMove(e); if (dragging) e.preventDefault(); }, { passive: false });
   window.addEventListener('touchend', onUp);
-  canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  canvas.addEventListener('mouseleave', () => tip.style.display = 'none');
   canvas.addEventListener('click', e => {
     // Ignore click that ends a drag-select (second select used to break here)
     if (dragging || didDrag) {
@@ -2183,7 +2021,7 @@ function getImg(src) {
     draw();
   };
 
-  if ($('exportBtn')) $('exportBtn').onclick = () => {
+  $('exportBtn').onclick = () => {
     const ex = document.createElement('canvas');
     const s = 2;
     ex.width = sizeW * s;
@@ -3253,24 +3091,13 @@ function clearPending() {
     }
   }
 
-  function openAdminPanel() {
+  if ($('adminBtn')) $('adminBtn').onclick = () => {
     try {
       const saved = localStorage.getItem('hpw_admin_key');
       if (saved && $('adminKeyInput')) $('adminKeyInput').value = saved;
     } catch (e) {}
-    if ($('adminModal')) $('adminModal').style.display = 'flex';
-  }
-  // Secret: Ctrl+Shift+A or URL ?admin=1 (owner only)
-  window.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-      e.preventDefault();
-      openAdminPanel();
-    }
-  });
-  if (new URLSearchParams(location.search).get('admin') === '1') {
-    setTimeout(openAdminPanel, 400);
-  }
-  if ($('adminBtn')) $('adminBtn').onclick = () => openAdminPanel();
+    $('adminModal').style.display = 'flex';
+  };
   if ($('adminCloseBtn')) $('adminCloseBtn').onclick = () => { $('adminModal').style.display = 'none'; };
   if ($('adminLoadBtn')) $('adminLoadBtn').onclick = () => adminLoadClaims();
   if ($('adminClearBtn')) $('adminClearBtn').onclick = async () => {
@@ -3306,8 +3133,6 @@ function clearPending() {
 
   function setBuyMode(on) {
     buyMode = on;
-    document.body.classList.toggle('buy-on', !!on);
-    if (!on) {  try {  } catch(e) {} }
     const btn = $('buyModeBtn');
     if (btn) {
       btn.textContent = on ? '✓ VIEW MODE' : '★ BUY PIXELS ★';
@@ -3527,8 +3352,8 @@ function clearPending() {
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
       // Pinch / ctrl+wheel → zoom to pointer
-      let delta = -e.deltaY * 0.008;
-      delta = Math.max(-0.25, Math.min(0.25, delta));
+      let delta = -e.deltaY * 0.012;
+      delta = Math.max(-0.4, Math.min(0.4, delta));
       bumpZoom(delta, e.clientX, e.clientY, true); // continuous = instant steps, still HQ settle
     } else {
       // Two-finger scroll / mouse wheel → pan

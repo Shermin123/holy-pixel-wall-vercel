@@ -9,7 +9,6 @@ const ROOT = __dirname;
 const DB_FILE = path.join(ROOT, 'data', 'claims.json');
 const MIN = 10;
 const PERM_PIXEL_CAP = 1000;
-// Set ADMIN_KEY in Render Environment — required to delete/edit any claim
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 fs.mkdirSync(path.join(ROOT, 'data'), { recursive: true });
@@ -112,7 +111,7 @@ function priceUnit(d) {
   if (d === 'permanent') return 50;
   if (d === '6month') return 10;
   if (d === '3month') return 1;
-  return 0.10; // 30 days
+  return 0.50; // 30 days
 }
 
 function json(res, code, obj) {
@@ -173,7 +172,7 @@ const server = http.createServer(async (req, res) => {
       const unit = priceUnit(data.duration || '1month');
       const totalCents = Math.round(cells.length * unit * 100);
       if (totalCents < 50) return json(res, 400, { ok: false, error: 'Amount too small for Stripe (min $0.50)' });
-      const publicUrl = (process.env.PUBLIC_URL || 'https://holy-pixel-wall.onrender.com').replace(/\/$/, '');
+      const publicUrl = (process.env.PUBLIC_URL || 'https://www.holypixelwall.com').replace(/\/$/, '');
 
       const params = new URLSearchParams();
       params.append('mode', 'payment');
@@ -215,6 +214,7 @@ const server = http.createServer(async (req, res) => {
         minR = Math.min(minR, r); maxR = Math.max(maxR, r);
       });
 
+      db.regions = db.regions || [];
       db.regions.push({
         id: crypto.randomUUID(),
         name: String(data.name || 'ANON').slice(0, 40),
@@ -239,19 +239,14 @@ const server = http.createServer(async (req, res) => {
       return json(res, 201, { ok: true });
     }
 
-    // ---- ADMIN: list / delete / clear claims (requires ADMIN_KEY) ----
     function requireAdmin(data) {
-      if (!ADMIN_KEY) return 'Set ADMIN_KEY env var on Render first';
+      if (!ADMIN_KEY) return 'Set ADMIN_KEY env var first';
       const key = (data && data.key) || url.searchParams.get('key') || '';
       if (!key || key !== ADMIN_KEY) return 'Invalid admin key';
       return null;
     }
 
     if (p === '/api/admin/list' && req.method === 'GET') {
-      const err = requireAdmin({});
-      if (err && url.searchParams.get('key') !== ADMIN_KEY) {
-        return json(res, 401, { ok: false, error: err || 'Unauthorized' });
-      }
       if (!ADMIN_KEY || url.searchParams.get('key') !== ADMIN_KEY) {
         return json(res, 401, { ok: false, error: 'Unauthorized' });
       }
@@ -294,8 +289,7 @@ const server = http.createServer(async (req, res) => {
       if (data.confirm !== 'DELETE_ALL') {
         return json(res, 400, { ok: false, error: 'Send confirm: DELETE_ALL' });
       }
-      const db = { regions: [] };
-      const ok = await save(db);
+      const ok = await save({ regions: [] });
       if (!ok) return json(res, 500, { ok: false, error: 'Save failed' });
       return json(res, 200, { ok: true, remaining: 0 });
     }

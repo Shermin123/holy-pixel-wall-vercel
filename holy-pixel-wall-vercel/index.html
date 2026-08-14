@@ -1336,18 +1336,31 @@ Min 10 blocks · no maximum
     stage.style.margin = '0';
   }
 
-  // ===== Zoom: smooth CSS + cursor-centered + sharp settle =====
+  // ===== Refined zoom smoothing (cursor-locked + damped) =====
+  const ZOOM_MIN = 1;
+  const ZOOM_MAX = 12;
+  const ZOOM_SMOOTH = 0.22;      // higher = snappier follow of target
+  const ZOOM_STOP_EPS = 0.0015;  // when |target-zoom| below this → settle HQ
+  const ZOOM_HQ_DELAY = 140;     // ms quiet before sharp redraw
+
   let zoomRaf = 0;
-  let zoomPending = null;
+  let zoomTarget = 1;
+  let zoomAnchor = null; // { bx, by, mx, my } locked while gesturing
+  let zoomLastInput = 0;
   let zoomAnim = null;
+  let zoomRunning = false;
 
   function padForZoom(z) {
     z = z || zoom;
     return z <= 1.02 ? 6 : Math.max(36, Math.round(28 * z));
   }
 
+  function clampZoom(z) {
+    return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  }
+
   function applyZoomSmooth() {
-    zoom = Math.max(1, Math.min(12, zoom));
+    zoom = clampZoom(zoom);
     const pad = padForZoom(zoom);
     const wrap = $('wallWrap');
     const w = baseW * zoom;
@@ -1371,7 +1384,8 @@ Min 10 blocks · no maximum
   }
 
   function applyZoomHQ() {
-    zoom = Math.max(1, Math.min(12, zoom));
+    zoom = clampZoom(zoom);
+    zoomTarget = zoom;
     hqZoom = zoom;
     cell = baseCell * zoom;
     sizeW = baseW * zoom;
@@ -1397,14 +1411,15 @@ Min 10 blocks · no maximum
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
     zoomTimer = setTimeout(() => {
-      zoomPending = null;
+      if (Math.abs(zoomTarget - zoom) > ZOOM_STOP_EPS) return; // still moving
+      zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
+      zoomRunning = false;
       applyZoomHQ();
-    }, 160);
+    }, ZOOM_HQ_DELAY);
   }
 
   function ensureSmoothLayer() {
-    // Drop HQ bitmap so CSS scale is cheap and correct
     if (parseFloat(canvas.style.width) > baseW + 1 || stage.style.transform === 'none') {
       const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
       cell = baseCell;
@@ -1421,96 +1436,149 @@ Min 10 blocks · no maximum
     }
   }
 
-  // Map pointer → base (unscaled) stage coordinates
   function pointerToBase(clientX, clientY, z) {
     const vrect = viewport.getBoundingClientRect();
     const mx = clientX - vrect.left;
     const my = clientY - vrect.top;
     const pad = padForZoom(z);
-    const bx = (viewport.scrollLeft + mx - pad) / z;
-    const by = (viewport.scrollTop + my - pad) / z;
-    return { bx, by, mx, my };
+    return {
+      bx: (viewport.scrollLeft + mx - pad) / z,
+      by: (viewport.scrollTop + my - pad) / z,
+      mx, my
+    };
   }
 
-  // Keep the same base point under the cursor after zoom changes
   function scrollToKeepBase(bx, by, z, mx, my) {
     const pad = padForZoom(z);
     viewport.scrollLeft = pad + bx * z - mx;
     viewport.scrollTop = pad + by * z - my;
   }
 
-  function setZoomAtCursor(newZoom, clientX, clientY) {
-    newZoom = Math.max(1, Math.min(12, newZoom));
-    const oldZoom = zoom || 1;
+  // Exponential ease toward target; lock world point under cursor
+  function zoomSmoothFrame(now) {
+    zoomRaf = 0;
+    const dt = Math.min(32, Math.max(8, now - (zoomLastInput || now)));
+    // Frame-rate independent smoothing
+    const alpha = 1 - Math.pow(1 - ZOOM_SMOOTH, dt / 16.67);
+    const prev = zoom;
+    const next = prev + (zoomTarget - prev) * alpha;
 
+    if (zoomAnchor) {
+      ensureSmoothLayer();
+      zoom = clampZoom(next);
+      applyZoomSmooth();
+      scrollToKeepBase(zoomAnchor.bx, zoomAnchor.by, zoom, zoomAnchor.mx, zoomAnchor.my);
+    } else {
+      ensureSmoothLayer();
+      zoom = clampZoom(next);
+      applyZoomSmooth();
+    }
+
+    const still = Math.abs(zoomTarget - zoom) > ZOOM_STOP_EPS;
+    if (still) {
+      zoomRaf = requestAnimationFrame(zoomSmoothFrame);
+    } else {
+      zoom = clampZoom(zoomTarget);
+      applyZoomSmooth();
+      if (zoomAnchor) {
+        scrollToKeepBase(zoomAnchor.bx, zoomAnchor.by, zoom, zoomAnchor.mx, zoomAnchor.my);
+      }
+      zoomRunning = false;
+      scheduleZoomHQ();
+    }
+  }
+
+  function startZoomLoop() {
+    if (zoomRunning) return;
+    zoomRunning = true;
+    zoomLastInput = performance.now();
+    zoomRaf = requestAnimationFrame(zoomSmoothFrame);
+  }
+
+  function setZoomAnchor(clientX, clientY) {
     const vrect = viewport.getBoundingClientRect();
     const hasP = clientX != null && clientY != null && isFinite(clientX) && isFinite(clientY);
     const cx = hasP ? clientX : (vrect.left + vrect.width / 2);
     const cy = hasP ? clientY : (vrect.top + vrect.height / 2);
-
-    const { bx, by, mx, my } = pointerToBase(cx, cy, oldZoom);
-
-    ensureSmoothLayer();
-    zoom = newZoom;
-    applyZoomSmooth();
-    scrollToKeepBase(bx, by, zoom, mx, my);
+    zoomAnchor = pointerToBase(cx, cy, zoom || 1);
   }
 
-  function flushZoomFrame() {
-    zoomRaf = 0;
-    if (!zoomPending) return;
-    const p = zoomPending;
-    zoomPending = null;
-    setZoomAtCursor(p.level, p.clientX, p.clientY);
-  }
-
-  function easeOutCubic(tt) {
-    return 1 - Math.pow(1 - tt, 3);
+  function easeOutQuint(t) {
+    return 1 - Math.pow(1 - t, 5);
   }
 
   function tickZoomAnim(now) {
     if (!zoomAnim) return;
     const tt = Math.min(1, (now - zoomAnim.start) / zoomAnim.dur);
-    const e = easeOutCubic(tt);
-    const level = zoomAnim.from + (zoomAnim.to - zoomAnim.from) * e;
-    setZoomAtCursor(level, zoomAnim.clientX, zoomAnim.clientY);
+    const e = easeOutQuint(tt);
+    // interpolate in log-space for perceptually even zoom
+    const logFrom = Math.log(zoomAnim.from);
+    const logTo = Math.log(zoomAnim.to);
+    const level = Math.exp(logFrom + (logTo - logFrom) * e);
+    zoomTarget = level;
+    if (!zoomAnchor) setZoomAnchor(zoomAnim.clientX, zoomAnim.clientY);
+    ensureSmoothLayer();
+    zoom = clampZoom(level);
+    applyZoomSmooth();
+    if (zoomAnchor) {
+      scrollToKeepBase(zoomAnchor.bx, zoomAnchor.by, zoom, zoomAnchor.mx, zoomAnchor.my);
+    }
     if (tt < 1) {
       zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
     } else {
-      zoom = zoomAnim.to;
+      zoom = clampZoom(zoomAnim.to);
+      zoomTarget = zoom;
       zoomAnim = null;
       scheduleZoomHQ();
     }
   }
 
   function bumpZoom(d, clientX, clientY, instant) {
-    const prevTarget = (zoomPending && zoomPending.level) || (zoomAnim ? zoomAnim.to : zoom);
-    const next = Math.max(1, Math.min(12, prevTarget + d));
-    if (Math.abs(next - prevTarget) < 0.0005) return;
+    // Multiplicative zoom feels natural (same % change at any level)
+    const factor = instant
+      ? Math.exp(d * 0.85)           // wheel/pinch: smooth continuous
+      : (d > 0 ? 1.25 : 1 / 1.25);   // buttons: stepped
+
+    if (zoomAnim && zoomAnim.raf) {
+      cancelAnimationFrame(zoomAnim.raf);
+      zoomAnim = null;
+    }
 
     clearTimeout(zoomTimer);
+    zoomLastInput = performance.now();
 
     if (instant) {
-      // Wheel / pinch: one update per animation frame, always toward cursor
-      if (zoomAnim && zoomAnim.raf) {
-        cancelAnimationFrame(zoomAnim.raf);
-        zoomAnim = null;
+      // Continuous gesture: damp toward target, cursor locked
+      if (!zoomAnchor) setZoomAnchor(clientX, clientY);
+      else {
+        // Update only screen offset if cursor moved; keep world point
+        const vrect = viewport.getBoundingClientRect();
+        if (clientX != null && clientY != null) {
+          zoomAnchor.mx = clientX - vrect.left;
+          zoomAnchor.my = clientY - vrect.top;
+        }
       }
-      zoomPending = { level: next, clientX, clientY };
-      if (!zoomRaf) zoomRaf = requestAnimationFrame(flushZoomFrame);
+      zoomTarget = clampZoom(zoomTarget * factor);
+      // also accept additive-style tiny nudges from old callers
+      if (Math.abs(d) < 0.5 && Math.abs(factor - 1) < 0.01) {
+        zoomTarget = clampZoom(zoomTarget + d);
+      }
+      startZoomLoop();
       scheduleZoomHQ();
       return;
     }
 
-    // +/- buttons: short eased zoom toward cursor / center
-    if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
+    // Button: log-space eased animation to a discrete target
+    const from = zoom;
+    const to = clampZoom(from * factor);
+    if (Math.abs(to - from) < 0.0005) return;
+    setZoomAnchor(clientX, clientY);
+    zoomTarget = to;
     zoomAnim = {
-      from: zoom,
-      to: next,
+      from, to,
       start: performance.now(),
-      dur: 160,
-      clientX,
-      clientY,
+      dur: 220,
+      clientX, clientY,
       raf: null
     };
     zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
@@ -3499,10 +3567,11 @@ function clearPending() {
     e.preventDefault();
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
-      // Pinch / ctrl+wheel → zoom to pointer
-      let delta = -e.deltaY * 0.01;
-      delta = Math.max(-0.28, Math.min(0.28, delta));
-      bumpZoom(delta, e.clientX, e.clientY, true); // continuous = instant steps, still HQ settle
+      // Pinch / ctrl+wheel → smooth zoom toward cursor (log-scale delta)
+      let delta = -e.deltaY * 0.009;
+      if (e.deltaMode === 1) delta *= 0.15; // line mode
+      delta = Math.max(-0.35, Math.min(0.35, delta));
+      bumpZoom(delta, e.clientX, e.clientY, true);
     } else {
       // Two-finger scroll / mouse wheel → pan
       const speed = e.deltaMode === 1 ? 24 : 1;

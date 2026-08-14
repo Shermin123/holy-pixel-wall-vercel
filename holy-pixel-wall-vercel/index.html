@@ -1327,8 +1327,8 @@ Min 10 blocks · no maximum
 
   function layoutWall() {
     const wrap = $('wallWrap');
-    const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
-    // sizeW/sizeH are already at zoom resolution after HQ redraw
+    // Fixed pad — must match zoom system so grid never slides
+    const pad = (typeof Z_PAD === 'number') ? Z_PAD : 40;
     const w = sizeW;
     const h = sizeH;
     if (wrap) {
@@ -1343,56 +1343,42 @@ Min 10 blocks · no maximum
     stage.style.margin = '0';
   }
 
-  // ===== Professional zoom =====
-  // During gesture: base bitmap + CSS scale (smooth, one layer only)
-  // After settle: one HQ redraw (sharp cells, same visual size → no jump)
-  // Always keeps the point under the cursor fixed.
+  // ===== Stable zoom (grid locked under cursor) =====
+  // Fixed padding so grid lines never slide when zoom changes.
   const Z_MIN = 1, Z_MAX = 12;
+  const Z_PAD = 40;
   let zoomRaf = 0;
   let zoomTarget = 1;
-  let zoomAnchor = null; // { bx, by, mx, my } in base units + viewport offset
+  let zoomAnchor = null;
   let zoomGesturing = false;
-
-  function zPad(z) {
-    z = z || 1;
-    return z <= 1.02 ? 8 : Math.max(32, Math.round(20 * z));
-  }
+  let baseReady = false;
 
   function zClamp(z) {
     return Math.max(Z_MIN, Math.min(Z_MAX, z));
   }
 
-  /** Layout wrap + stage for CSS-scaled base wall */
   function layoutCSS(z) {
-    const pad = zPad(z);
+    z = zClamp(z);
     const wrap = $('wallWrap');
     if (wrap) {
-      wrap.style.width = Math.ceil(baseW * z + pad * 2) + 'px';
-      wrap.style.height = Math.ceil(baseH * z + pad * 2) + 'px';
+      wrap.style.width = Math.ceil(baseW * z + Z_PAD * 2) + 'px';
+      wrap.style.height = Math.ceil(baseH * z + Z_PAD * 2) + 'px';
     }
-    stage.style.left = pad + 'px';
-    stage.style.top = pad + 'px';
+    stage.style.left = Z_PAD + 'px';
+    stage.style.top = Z_PAD + 'px';
     stage.style.width = baseW + 'px';
     stage.style.height = baseH + 'px';
     stage.style.transformOrigin = '0 0';
     stage.style.transition = 'none';
     stage.style.transform = 'scale(' + z + ')';
-        stage.style.imageRendering = 'pixelated';
     stage.style.overflow = 'hidden';
     canvas.style.width = baseW + 'px';
     canvas.style.height = baseH + 'px';
     canvas.style.imageRendering = 'pixelated';
   }
 
-  /** Ensure canvas buffer is the BASE wall (not HQ). Call before any CSS scale. */
   function ensureBaseBuffer() {
-    const need = Math.round(baseW);
-    if (Math.round(parseFloat(canvas.style.width)) === need &&
-        canvas.width > 0 &&
-        Math.abs(hqZoom - 1) < 0.01 &&
-        stage.style.transform !== 'none' && stage.style.transform !== '') {
-      return;
-    }
+    if (baseReady && Math.abs(hqZoom - 1) < 0.001) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     cell = baseCell;
     sizeW = baseW;
@@ -1406,6 +1392,8 @@ Min 10 blocks · no maximum
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     gridCacheKey = '';
+    draw();
+    baseReady = true;
   }
 
   function applyZoomSmooth() {
@@ -1419,6 +1407,7 @@ Min 10 blocks · no maximum
     zoom = zClamp(zoom);
     zoomTarget = zoom;
     zoomGesturing = false;
+    baseReady = false;
     hqZoom = zoom;
     cell = baseCell * zoom;
     sizeW = baseW * zoom;
@@ -1432,15 +1421,14 @@ Min 10 blocks · no maximum
     canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    // Same visual size as CSS scale(z) of base — no layout jump
-    const pad = zPad(zoom);
+
     const wrap = $('wallWrap');
     if (wrap) {
-      wrap.style.width = Math.ceil(sizeW + pad * 2) + 'px';
-      wrap.style.height = Math.ceil(sizeH + pad * 2) + 'px';
+      wrap.style.width = Math.ceil(sizeW + Z_PAD * 2) + 'px';
+      wrap.style.height = Math.ceil(sizeH + Z_PAD * 2) + 'px';
     }
-    stage.style.left = pad + 'px';
-    stage.style.top = pad + 'px';
+    stage.style.left = Z_PAD + 'px';
+    stage.style.top = Z_PAD + 'px';
     stage.style.width = sizeW + 'px';
     stage.style.height = sizeH + 'px';
     stage.style.transform = 'none';
@@ -1454,10 +1442,15 @@ Min 10 blocks · no maximum
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
     zoomTimer = setTimeout(() => {
-      if (zoomRaf) return; // still animating
-      zoomAnchor = null;
+      if (zoomRaf) return;
+      const a = zoomAnchor;
       applyZoomHQ();
-    }, 140);
+      if (a) {
+        viewport.scrollLeft = Z_PAD + a.bx * zoom - a.mx;
+        viewport.scrollTop = Z_PAD + a.by * zoom - a.my;
+      }
+      zoomAnchor = null;
+    }, 120);
   }
 
   function anchorAt(clientX, clientY) {
@@ -1466,26 +1459,25 @@ Min 10 blocks · no maximum
     const cy = (clientY != null && isFinite(clientY)) ? clientY : vr.top + vr.height * 0.5;
     const mx = cx - vr.left;
     const my = cy - vr.top;
-    const pad = zPad(zoom);
     const z = zoom || 1;
     zoomAnchor = {
-      bx: (viewport.scrollLeft + mx - pad) / z,
-      by: (viewport.scrollTop + my - pad) / z,
-      mx, my
+      bx: (viewport.scrollLeft + mx - Z_PAD) / z,
+      by: (viewport.scrollTop + my - Z_PAD) / z,
+      mx: mx,
+      my: my
     };
   }
 
   function keepAnchor() {
     if (!zoomAnchor) return;
-    const pad = zPad(zoom);
-    viewport.scrollLeft = pad + zoomAnchor.bx * zoom - zoomAnchor.mx;
-    viewport.scrollTop = pad + zoomAnchor.by * zoom - zoomAnchor.my;
+    viewport.scrollLeft = Z_PAD + zoomAnchor.bx * zoom - zoomAnchor.mx;
+    viewport.scrollTop = Z_PAD + zoomAnchor.by * zoom - zoomAnchor.my;
   }
 
   function zoomFrame() {
     zoomRaf = 0;
     const delta = zoomTarget - zoom;
-    if (Math.abs(delta) < 0.0015) {
+    if (Math.abs(delta) < 0.001) {
       zoom = zoomTarget;
       applyZoomSmooth();
       keepAnchor();
@@ -1493,8 +1485,7 @@ Min 10 blocks · no maximum
       scheduleZoomHQ();
       return;
     }
-    // Smooth exponential ease (stable across refresh rates)
-    zoom += delta * 0.25;
+    zoom += delta * 0.28;
     applyZoomSmooth();
     keepAnchor();
     zoomRaf = requestAnimationFrame(zoomFrame);
@@ -1504,16 +1495,16 @@ Min 10 blocks · no maximum
     clearTimeout(zoomTimer);
     zoomGesturing = true;
 
-    // Multiplicative zoom — even feel at 100% or 500%
     let factor;
     if (continuous) {
-      factor = Math.exp(Math.max(-0.32, Math.min(0.32, d)));
+      factor = Math.exp(Math.max(-0.3, Math.min(0.3, d)));
     } else {
       factor = d > 0 ? 1.25 : 0.8;
     }
 
-    if (!zoomAnchor) anchorAt(clientX, clientY);
-    else if (clientX != null && isFinite(clientX)) {
+    if (!zoomAnchor) {
+      anchorAt(clientX, clientY);
+    } else if (clientX != null && isFinite(clientX)) {
       const vr = viewport.getBoundingClientRect();
       zoomAnchor.mx = clientX - vr.left;
       zoomAnchor.my = clientY - vr.top;
@@ -1687,7 +1678,7 @@ function getImg(src) {
   function visibleCellRange() {
     // Map viewport scroll → cell indices (only draw what's on screen)
     try {
-      const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
+      const pad = (typeof Z_PAD === 'number') ? Z_PAD : 40;
       const sl = viewport.scrollLeft - pad;
       const st = viewport.scrollTop - pad;
       const vw = viewport.clientWidth;
@@ -1758,19 +1749,18 @@ function getImg(src) {
     const vis = cell;
     const { c0, r0, c1, r1 } = visibleCellRange();
 
-        // 2) Fine pixel lines - ONLY when NOT zooming (clean)
-        // 2) Fine pixel lines - always visible, clean when zooming
-    if (vis >= 1.15) {
-      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.65)' : 'rgba(61, 43, 26, 0.35)';
-      ctx.lineWidth = Math.max(0.5, 1 / (window.devicePixelRatio || 1));
+    // 2) Fine pixel lines when zoomed in (viewport only)
+    if (vis >= 1.2) {
+      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.45)' : 'rgba(139, 90, 43, 0.28)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
       for (let c = c0; c <= c1 + 1; c++) {
-        const x = Math.round(c * cell); // NO +0.5 = no break when scaled
+        const x = Math.floor(c * cell) + 0.5;
         ctx.moveTo(x, r0 * cell);
         ctx.lineTo(x, (r1 + 1) * cell);
       }
       for (let r = r0; r <= r1 + 1; r++) {
-        const y = Math.round(r * cell);
+        const y = Math.floor(r * cell) + 0.5;
         ctx.moveTo(c0 * cell, y);
         ctx.lineTo((c1 + 1) * cell, y);
       }
@@ -1942,7 +1932,7 @@ function getImg(src) {
     if (!r) return;
     const cx = ((r.minC + r.maxC + 1) / 2) * baseCell * zoom;
     const cy = ((r.minR + r.maxR + 1) / 2) * baseCell * zoom;
-    const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
+    const pad = (typeof Z_PAD === "number") ? Z_PAD : 40;
     viewport.scrollLeft = Math.max(0, pad + cx - viewport.clientWidth / 2);
     viewport.scrollTop = Math.max(0, pad + cy - viewport.clientHeight / 2);
   }

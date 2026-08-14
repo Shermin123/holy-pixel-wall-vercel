@@ -1403,7 +1403,6 @@ Min 10 blocks · no maximum
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     gridCacheKey = '';
-    draw();
   }
 
   function applyZoomSmooth() {
@@ -3504,7 +3503,7 @@ function clearPending() {
     e.preventDefault();
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
-      let delta = -e.deltaY * 0.012;
+      let delta = -e.deltaY * 0.004;
       if (e.deltaMode === 1) delta *= 0.1;
       delta = Math.max(-0.28, Math.min(0.28, delta));
       bumpZoom(delta, e.clientX, e.clientY, true);

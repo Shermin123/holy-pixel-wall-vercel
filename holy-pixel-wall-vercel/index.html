@@ -430,9 +430,9 @@
   canvas {
     display: block;
     background: #fffdf8;
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
+    image-rendering: pixelated !important;
+    image-rendering: -moz-crisp-edges !important;
+    image-rendering: crisp-edges !important;
   }
 
   .media-layer {
@@ -1332,8 +1332,12 @@ Min 10 blocks · no maximum
     stage.style.margin = '0';
   }
 
+  // ===== requestAnimationFrame zoom + draw pipeline =====
+  let zoomRaf = 0;
+  let zoomPending = null; // { level, px, py, lx, ly }
+  let zoomAnimating = false;
+
   function applyZoomSmooth() {
-    // Temporary CSS scale for fluid feel; settle redraw makes it sharp
     zoom = Math.max(1, Math.min(12, zoom));
     const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
     const wrap = $('wallWrap');
@@ -1348,26 +1352,30 @@ Min 10 blocks · no maximum
     stage.style.width = baseW + 'px';
     stage.style.height = baseH + 'px';
     stage.style.transformOrigin = '0 0';
-    stage.style.transition = 'none'; // driven by rAF
+    stage.style.transition = 'none';
+    stage.style.willChange = 'transform';
     stage.style.transform = 'scale(' + zoom + ')';
+    canvas.style.imageRendering = 'pixelated';
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
   }
 
   function applyZoomHQ() {
     zoom = Math.max(1, Math.min(12, zoom));
     hqZoom = zoom;
-    // Draw at TRUE zoomed resolution — sharp blocks, no blur
     cell = baseCell * zoom;
     sizeW = baseW * zoom;
     sizeH = baseH * zoom;
     if (!baseW || !baseH) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(sizeW * dpr);
-    canvas.height = Math.round(sizeH * dpr);
+    const dpr = zoom >= 4 ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+    canvas.width = Math.max(1, Math.round(sizeW * dpr));
+    canvas.height = Math.max(1, Math.round(sizeH * dpr));
     canvas.style.width = sizeW + 'px';
     canvas.style.height = sizeH + 'px';
+    canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
+    stage.style.transform = 'none';
+    stage.style.willChange = 'auto';
     layoutWall();
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
     draw();
@@ -1376,73 +1384,117 @@ Min 10 blocks · no maximum
 
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(() => applyZoomHQ(), 120);
+    zoomTimer = setTimeout(() => {
+      zoomPending = null;
+      if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
+      applyZoomHQ();
+    }, 180);
   }
 
-  let zoomAnim = null; // { from, to, start, dur, px, py, lx, ly }
-
-  function easeOutCubic(t) {
-    return 1 - Math.pow(1 - t, 3);
+  function ensureSmoothLayer() {
+    if (canvas.style.width && parseFloat(canvas.style.width) > baseW + 1) {
+      cell = baseCell;
+      sizeW = baseW;
+      sizeH = baseH;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.max(1, Math.round(baseW * dpr));
+      canvas.height = Math.max(1, Math.round(baseH * dpr));
+      canvas.style.width = baseW + 'px';
+      canvas.style.height = baseH + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      draw();
+      hqZoom = 1;
+    }
   }
 
   function applyZoomAt(level, px, py, lx, ly) {
     const prev = zoom;
     zoom = Math.max(1, Math.min(12, level));
     applyZoomSmooth();
-    // Keep focus point under cursor / center
     if (lx != null && ly != null && px != null && py != null) {
       const srect2 = stage.getBoundingClientRect();
-      viewport.scrollLeft += (srect2.left + lx * zoom) - px;
-      viewport.scrollTop += (srect2.top + ly * zoom) - py;
+      const scale = (prev > 0.001) ? (zoom / prev) : 1;
+      // lx/ly stored in pre-scale local stage space
+      viewport.scrollLeft += (srect2.left + lx * (zoom / (prev || zoom))) - px;
+      viewport.scrollTop += (srect2.top + ly * (zoom / (prev || zoom))) - py;
     }
+  }
+
+  // One zoom update per animation frame (coalesces wheel/pinch spam)
+  function flushZoomFrame() {
+    zoomRaf = 0;
+    if (!zoomPending) return;
+    const p = zoomPending;
+    zoomPending = null;
+    applyZoomAt(p.level, p.px, p.py, p.lx, p.ly);
+  }
+
+  function queueZoomLevel(level, px, py, lx, ly) {
+    zoomPending = { level, px, py, lx, ly };
+    if (!zoomRaf) zoomRaf = requestAnimationFrame(flushZoomFrame);
+  }
+
+  let zoomAnim = null;
+
+  function easeOutCubic(tt) {
+    return 1 - Math.pow(1 - tt, 3);
   }
 
   function tickZoomAnim(now) {
     if (!zoomAnim) return;
-    const t = Math.min(1, (now - zoomAnim.start) / zoomAnim.dur);
-    const e = easeOutCubic(t);
+    const tt = Math.min(1, (now - zoomAnim.start) / zoomAnim.dur);
+    const e = easeOutCubic(tt);
     const level = zoomAnim.from + (zoomAnim.to - zoomAnim.from) * e;
     applyZoomAt(level, zoomAnim.px, zoomAnim.py, zoomAnim.lx, zoomAnim.ly);
-    if (t < 1) {
+    if (tt < 1) {
       zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
     } else {
       zoom = zoomAnim.to;
       zoomAnim = null;
-      applyZoomHQ();
+      zoomAnimating = false;
+      scheduleZoomHQ();
     }
   }
 
   function bumpZoom(d, clientX, clientY, instant) {
-    const prev = zoomAnim ? zoomAnim.to : zoom;
-    const next = Math.max(1, Math.min(12, prev + d));
-    if (Math.abs(next - prev) < 0.0005) return;
+    const prevTarget = (zoomPending && zoomPending.level) || (zoomAnim ? zoomAnim.to : zoom);
+    const next = Math.max(1, Math.min(12, prevTarget + d));
+    if (Math.abs(next - prevTarget) < 0.0005) return;
+
+    clearTimeout(zoomTimer);
+    ensureSmoothLayer();
 
     const vrect = viewport.getBoundingClientRect();
     const hasPointer = clientX != null && clientY != null && isFinite(clientX) && isFinite(clientY);
     const px = hasPointer ? clientX : (vrect.left + vrect.width / 2);
     const py = hasPointer ? clientY : (vrect.top + vrect.height / 2);
 
-    // Local coords relative to current visual zoom
     const srect = stage.getBoundingClientRect();
     const curZ = zoom || 1;
     const lx = (px - srect.left) / curZ;
     const ly = (py - srect.top) / curZ;
 
     if (instant) {
-      if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
-      zoomAnim = null;
-      applyZoomAt(next, px, py, lx, ly);
+      // Continuous zoom (wheel/pinch): rAF-coalesced, no per-event layout thrash
+      if (zoomAnim && zoomAnim.raf) {
+        cancelAnimationFrame(zoomAnim.raf);
+        zoomAnim = null;
+        zoomAnimating = false;
+      }
+      queueZoomLevel(next, px, py, lx, ly);
       scheduleZoomHQ();
       return;
     }
 
-    // Smooth animated zoom
+    // Button zoom: short eased rAF animation
     if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
+    zoomAnimating = true;
     zoomAnim = {
       from: zoom,
       to: next,
       start: performance.now(),
-      dur: 220,
+      dur: 150,
       px, py, lx, ly,
       raf: null
     };
@@ -1510,6 +1562,9 @@ Min 10 blocks · no maximum
     });
   }
 
+  // Prefer scheduleDraw() over direct draw() during interaction
+  function drawSoon() { scheduleDraw(); }
+
   
   // Draw image to fully cover (w,h) with zoom scale and focus (fx,fy in 0..1)
   function drawCoverCrop(c, img, x, y, w, h, scale, fx, fy) {
@@ -1534,8 +1589,7 @@ Min 10 blocks · no maximum
     c.beginPath();
     c.rect(x, y, w, h);
     c.clip();
-    c.imageSmoothingEnabled = true;
-    c.imageSmoothingQuality = 'high';
+    c.imageSmoothingEnabled = false;
     c.drawImage(img, dx, dy, dw, dh);
     c.restore();
   }
@@ -1598,8 +1652,7 @@ function getImg(src) {
     tctx.imageSmoothingQuality = 'high';
     tctx.drawImage(img, 0, 0, nw, nh, 0, 0, tc.width, tc.height);
 
-    c.imageSmoothingEnabled = true;
-    c.imageSmoothingQuality = 'high';
+    c.imageSmoothingEnabled = false;
     c.drawImage(tc, 0, 0, tc.width, tc.height, dx, dy, dw, dh);
 
     // Thin pixel-block frame
@@ -1636,17 +1689,16 @@ function getImg(src) {
       }
     }
 
-    // Individual block lines — stronger when zoomed so each block is clear
-    if (vis >= 1.5) {
-      ctx.strokeStyle = vis >= 4 ? 'rgba(139, 90, 43, 0.35)' : 'rgba(139, 90, 43, 0.2)';
+    // Every single pixel cell when zoomed — crisp pixel look
+    if (vis >= 1.15) {
+      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.55)' : (vis >= 2.5 ? 'rgba(139, 90, 43, 0.4)' : 'rgba(139, 90, 43, 0.22)');
       ctx.lineWidth = 1;
-      const step = vis >= 3 ? 1 : 2;
       ctx.beginPath();
-      for (let c = 0; c <= COLS; c += step) {
+      for (let c = 0; c <= COLS; c++) {
         const x = Math.floor(c * cell) + 0.5;
         ctx.moveTo(x, 0); ctx.lineTo(x, sizeH);
       }
-      for (let r = 0; r <= ROWS; r += step) {
+      for (let r = 0; r <= ROWS; r++) {
         const y = Math.floor(r * cell) + 0.5;
         ctx.moveTo(0, y); ctx.lineTo(sizeW, y);
       }
@@ -3386,8 +3438,8 @@ function clearPending() {
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
       // Pinch / ctrl+wheel → zoom to pointer
-      let delta = -e.deltaY * 0.012;
-      delta = Math.max(-0.4, Math.min(0.4, delta));
+      let delta = -e.deltaY * 0.008;
+      delta = Math.max(-0.22, Math.min(0.22, delta));
       bumpZoom(delta, e.clientX, e.clientY, true); // continuous = instant steps, still HQ settle
     } else {
       // Two-finger scroll / mouse wheel → pan

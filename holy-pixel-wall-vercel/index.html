@@ -1336,38 +1336,23 @@ Min 10 blocks · no maximum
     stage.style.margin = '0';
   }
 
-  // ===== Refined zoom smoothing (cursor-locked + damped) =====
-  const ZOOM_MIN = 1;
-  const ZOOM_MAX = 12;
-  const ZOOM_SMOOTH = 0.22;      // higher = snappier follow of target
-  const ZOOM_STOP_EPS = 0.0015;  // when |target-zoom| below this → settle HQ
-  const ZOOM_HQ_DELAY = 140;     // ms quiet before sharp redraw
-
+  // ===== Clean zoom (cursor-centered) =====
+  const Z_MIN = 1, Z_MAX = 12;
   let zoomRaf = 0;
   let zoomTarget = 1;
-  let zoomAnchor = null; // { bx, by, mx, my } locked while gesturing
-  let zoomLastInput = 0;
-  let zoomAnim = null;
-  let zoomRunning = false;
+  let zoomAnchor = null; // { bx, by, mx, my }
 
   function padForZoom(z) {
-    z = z || zoom;
-    return z <= 1.02 ? 6 : Math.max(36, Math.round(28 * z));
-  }
-
-  function clampZoom(z) {
-    return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    return (z || zoom) <= 1.02 ? 6 : Math.max(28, Math.round(24 * (z || zoom)));
   }
 
   function applyZoomSmooth() {
-    zoom = clampZoom(zoom);
+    zoom = Math.max(Z_MIN, Math.min(Z_MAX, zoom));
     const pad = padForZoom(zoom);
     const wrap = $('wallWrap');
-    const w = baseW * zoom;
-    const h = baseH * zoom;
     if (wrap) {
-      wrap.style.width = Math.ceil(w + pad * 2) + 'px';
-      wrap.style.height = Math.ceil(h + pad * 2) + 'px';
+      wrap.style.width = Math.ceil(baseW * zoom + pad * 2) + 'px';
+      wrap.style.height = Math.ceil(baseH * zoom + pad * 2) + 'px';
     }
     stage.style.left = pad + 'px';
     stage.style.top = pad + 'px';
@@ -1375,7 +1360,6 @@ Min 10 blocks · no maximum
     stage.style.height = baseH + 'px';
     stage.style.transformOrigin = '0 0';
     stage.style.transition = 'none';
-    stage.style.willChange = 'transform';
     stage.style.transform = 'scale(' + zoom + ')';
     canvas.style.width = baseW + 'px';
     canvas.style.height = baseH + 'px';
@@ -1384,14 +1368,14 @@ Min 10 blocks · no maximum
   }
 
   function applyZoomHQ() {
-    zoom = clampZoom(zoom);
+    zoom = Math.max(Z_MIN, Math.min(Z_MAX, zoom));
     zoomTarget = zoom;
     hqZoom = zoom;
     cell = baseCell * zoom;
     sizeW = baseW * zoom;
     sizeH = baseH * zoom;
     if (!baseW || !baseH) return;
-    const dpr = zoom >= 4 ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+    const dpr = zoom >= 3.5 ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
     canvas.width = Math.max(1, Math.round(sizeW * dpr));
     canvas.height = Math.max(1, Math.round(sizeH * dpr));
     canvas.style.width = sizeW + 'px';
@@ -1400,7 +1384,6 @@ Min 10 blocks · no maximum
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     stage.style.transform = 'none';
-    stage.style.willChange = 'auto';
     layoutWall();
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
     gridCacheKey = '';
@@ -1411,177 +1394,85 @@ Min 10 blocks · no maximum
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
     zoomTimer = setTimeout(() => {
-      if (Math.abs(zoomTarget - zoom) > ZOOM_STOP_EPS) return; // still moving
       zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
-      zoomRunning = false;
       applyZoomHQ();
-    }, ZOOM_HQ_DELAY);
+    }, 150);
   }
 
-  function ensureSmoothLayer() {
-    if (parseFloat(canvas.style.width) > baseW + 1 || stage.style.transform === 'none') {
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-      cell = baseCell;
-      sizeW = baseW;
-      sizeH = baseH;
-      canvas.width = Math.max(1, Math.round(baseW * dpr));
-      canvas.height = Math.max(1, Math.round(baseH * dpr));
-      canvas.style.width = baseW + 'px';
-      canvas.style.height = baseH + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.imageSmoothingEnabled = false;
-      hqZoom = 1;
-      draw();
-    }
+  function toBaseLayer() {
+    if (parseFloat(canvas.style.width) <= baseW + 1 && stage.style.transform !== 'none') return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+    cell = baseCell; sizeW = baseW; sizeH = baseH;
+    canvas.width = Math.max(1, Math.round(baseW * dpr));
+    canvas.height = Math.max(1, Math.round(baseH * dpr));
+    canvas.style.width = baseW + 'px';
+    canvas.style.height = baseH + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    hqZoom = 1;
+    draw();
   }
 
-  function pointerToBase(clientX, clientY, z) {
-    const vrect = viewport.getBoundingClientRect();
-    const mx = clientX - vrect.left;
-    const my = clientY - vrect.top;
-    const pad = padForZoom(z);
-    return {
-      bx: (viewport.scrollLeft + mx - pad) / z,
-      by: (viewport.scrollTop + my - pad) / z,
+  function anchorAt(clientX, clientY) {
+    const vr = viewport.getBoundingClientRect();
+    const cx = (clientX != null && isFinite(clientX)) ? clientX : vr.left + vr.width / 2;
+    const cy = (clientY != null && isFinite(clientY)) ? clientY : vr.top + vr.height / 2;
+    const mx = cx - vr.left;
+    const my = cy - vr.top;
+    const pad = padForZoom(zoom);
+    zoomAnchor = {
+      bx: (viewport.scrollLeft + mx - pad) / zoom,
+      by: (viewport.scrollTop + my - pad) / zoom,
       mx, my
     };
   }
 
-  function scrollToKeepBase(bx, by, z, mx, my) {
-    const pad = padForZoom(z);
-    viewport.scrollLeft = pad + bx * z - mx;
-    viewport.scrollTop = pad + by * z - my;
+  function keepAnchor() {
+    if (!zoomAnchor) return;
+    const pad = padForZoom(zoom);
+    viewport.scrollLeft = pad + zoomAnchor.bx * zoom - zoomAnchor.mx;
+    viewport.scrollTop = pad + zoomAnchor.by * zoom - zoomAnchor.my;
   }
 
-  // Exponential ease toward target; lock world point under cursor
-  function zoomSmoothFrame(now) {
+  function zoomFrame() {
     zoomRaf = 0;
-    const dt = Math.min(32, Math.max(8, now - (zoomLastInput || now)));
-    // Frame-rate independent smoothing
-    const alpha = 1 - Math.pow(1 - ZOOM_SMOOTH, dt / 16.67);
-    const prev = zoom;
-    const next = prev + (zoomTarget - prev) * alpha;
-
-    if (zoomAnchor) {
-      ensureSmoothLayer();
-      zoom = clampZoom(next);
+    const diff = zoomTarget - zoom;
+    if (Math.abs(diff) < 0.002) {
+      zoom = zoomTarget;
       applyZoomSmooth();
-      scrollToKeepBase(zoomAnchor.bx, zoomAnchor.by, zoom, zoomAnchor.mx, zoomAnchor.my);
-    } else {
-      ensureSmoothLayer();
-      zoom = clampZoom(next);
-      applyZoomSmooth();
-    }
-
-    const still = Math.abs(zoomTarget - zoom) > ZOOM_STOP_EPS;
-    if (still) {
-      zoomRaf = requestAnimationFrame(zoomSmoothFrame);
-    } else {
-      zoom = clampZoom(zoomTarget);
-      applyZoomSmooth();
-      if (zoomAnchor) {
-        scrollToKeepBase(zoomAnchor.bx, zoomAnchor.by, zoom, zoomAnchor.mx, zoomAnchor.my);
-      }
-      zoomRunning = false;
-      scheduleZoomHQ();
-    }
-  }
-
-  function startZoomLoop() {
-    if (zoomRunning) return;
-    zoomRunning = true;
-    zoomLastInput = performance.now();
-    zoomRaf = requestAnimationFrame(zoomSmoothFrame);
-  }
-
-  function setZoomAnchor(clientX, clientY) {
-    const vrect = viewport.getBoundingClientRect();
-    const hasP = clientX != null && clientY != null && isFinite(clientX) && isFinite(clientY);
-    const cx = hasP ? clientX : (vrect.left + vrect.width / 2);
-    const cy = hasP ? clientY : (vrect.top + vrect.height / 2);
-    zoomAnchor = pointerToBase(cx, cy, zoom || 1);
-  }
-
-  function easeOutQuint(t) {
-    return 1 - Math.pow(1 - t, 5);
-  }
-
-  function tickZoomAnim(now) {
-    if (!zoomAnim) return;
-    const tt = Math.min(1, (now - zoomAnim.start) / zoomAnim.dur);
-    const e = easeOutQuint(tt);
-    // interpolate in log-space for perceptually even zoom
-    const logFrom = Math.log(zoomAnim.from);
-    const logTo = Math.log(zoomAnim.to);
-    const level = Math.exp(logFrom + (logTo - logFrom) * e);
-    zoomTarget = level;
-    if (!zoomAnchor) setZoomAnchor(zoomAnim.clientX, zoomAnim.clientY);
-    ensureSmoothLayer();
-    zoom = clampZoom(level);
-    applyZoomSmooth();
-    if (zoomAnchor) {
-      scrollToKeepBase(zoomAnchor.bx, zoomAnchor.by, zoom, zoomAnchor.mx, zoomAnchor.my);
-    }
-    if (tt < 1) {
-      zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
-    } else {
-      zoom = clampZoom(zoomAnim.to);
-      zoomTarget = zoom;
-      zoomAnim = null;
-      scheduleZoomHQ();
-    }
-  }
-
-  function bumpZoom(d, clientX, clientY, instant) {
-    // Multiplicative zoom feels natural (same % change at any level)
-    const factor = instant
-      ? Math.exp(d * 0.85)           // wheel/pinch: smooth continuous
-      : (d > 0 ? 1.25 : 1 / 1.25);   // buttons: stepped
-
-    if (zoomAnim && zoomAnim.raf) {
-      cancelAnimationFrame(zoomAnim.raf);
-      zoomAnim = null;
-    }
-
-    clearTimeout(zoomTimer);
-    zoomLastInput = performance.now();
-
-    if (instant) {
-      // Continuous gesture: damp toward target, cursor locked
-      if (!zoomAnchor) setZoomAnchor(clientX, clientY);
-      else {
-        // Update only screen offset if cursor moved; keep world point
-        const vrect = viewport.getBoundingClientRect();
-        if (clientX != null && clientY != null) {
-          zoomAnchor.mx = clientX - vrect.left;
-          zoomAnchor.my = clientY - vrect.top;
-        }
-      }
-      zoomTarget = clampZoom(zoomTarget * factor);
-      // also accept additive-style tiny nudges from old callers
-      if (Math.abs(d) < 0.5 && Math.abs(factor - 1) < 0.01) {
-        zoomTarget = clampZoom(zoomTarget + d);
-      }
-      startZoomLoop();
+      keepAnchor();
       scheduleZoomHQ();
       return;
     }
+    // smooth exponential approach
+    zoom += diff * 0.28;
+    applyZoomSmooth();
+    keepAnchor();
+    zoomRaf = requestAnimationFrame(zoomFrame);
+  }
 
-    // Button: log-space eased animation to a discrete target
-    const from = zoom;
-    const to = clampZoom(from * factor);
-    if (Math.abs(to - from) < 0.0005) return;
-    setZoomAnchor(clientX, clientY);
-    zoomTarget = to;
-    zoomAnim = {
-      from, to,
-      start: performance.now(),
-      dur: 220,
-      clientX, clientY,
-      raf: null
-    };
-    zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
+  function bumpZoom(d, clientX, clientY, instant) {
+    clearTimeout(zoomTimer);
+
+    // multiplicative zoom (clean feel at every level)
+    let factor;
+    if (instant) {
+      factor = Math.exp(Math.max(-0.4, Math.min(0.4, d)));
+    } else {
+      factor = d > 0 ? 1.3 : 1 / 1.3;
+    }
+
+    if (!zoomAnchor) anchorAt(clientX, clientY);
+    else if (clientX != null && clientY != null) {
+      const vr = viewport.getBoundingClientRect();
+      zoomAnchor.mx = clientX - vr.left;
+      zoomAnchor.my = clientY - vr.top;
+    }
+
+    toBaseLayer();
+    zoomTarget = Math.max(Z_MIN, Math.min(Z_MAX, zoomTarget * factor));
+    if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
   }
 
   function detectMediaType(src, mime) {
@@ -3567,10 +3458,9 @@ function clearPending() {
     e.preventDefault();
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
-      // Pinch / ctrl+wheel → smooth zoom toward cursor (log-scale delta)
-      let delta = -e.deltaY * 0.009;
-      if (e.deltaMode === 1) delta *= 0.15; // line mode
-      delta = Math.max(-0.35, Math.min(0.35, delta));
+      let delta = -e.deltaY * 0.01;
+      if (e.deltaMode === 1) delta *= 0.12;
+      delta = Math.max(-0.3, Math.min(0.3, delta));
       bumpZoom(delta, e.clientX, e.clientY, true);
     } else {
       // Two-finger scroll / mouse wheel → pan

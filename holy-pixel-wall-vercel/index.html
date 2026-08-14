@@ -1705,6 +1705,8 @@ function getImg(src) {
     g.fillStyle = '#fffdf8';
     g.fillRect(0, 0, sizeW, sizeH);
     const SEC = SECTION;
+
+    // Checkerboard sections
     for (let sc = 0; sc < COLS; sc += SEC) {
       for (let sr = 0; sr < ROWS; sr += SEC) {
         if (((sc / SEC) + (sr / SEC)) % 2 === 0) {
@@ -1717,22 +1719,46 @@ function getImg(src) {
         }
       }
     }
-    // Section lines only in cache (fine cell lines drawn live for visibility)
-    g.strokeStyle = 'rgba(92, 61, 30, 0.4)';
-    g.lineWidth = 1.5;
+
+    // Fine cell grid — baked in so CSS zoom still shows lines
+    if (cell >= 0.8) {
+      g.strokeStyle = cell >= 4 ? 'rgba(139, 90, 43, 0.35)' : 'rgba(139, 90, 43, 0.22)';
+      g.lineWidth = 1;
+      g.beginPath();
+      for (let c = 0; c <= COLS; c++) {
+        const x = Math.floor(c * cell) + 0.5;
+        g.moveTo(x, 0);
+        g.lineTo(x, sizeH);
+      }
+      for (let r = 0; r <= ROWS; r++) {
+        const y = Math.floor(r * cell) + 0.5;
+        g.moveTo(0, y);
+        g.lineTo(sizeW, y);
+      }
+      g.stroke();
+    }
+
+    // Stronger 10×10 section lines on top
+    g.strokeStyle = 'rgba(92, 61, 30, 0.55)';
+    g.lineWidth = cell >= 3 ? 2 : 1.5;
     g.beginPath();
     for (let c = 0; c <= COLS; c += SEC) {
       const x = Math.floor(c * cell) + 0.5;
-      g.moveTo(x, 0); g.lineTo(x, sizeH);
+      g.moveTo(x, 0);
+      g.lineTo(x, sizeH);
     }
     for (let r = 0; r <= ROWS; r += SEC) {
       const y = Math.floor(r * cell) + 0.5;
-      g.moveTo(0, y); g.lineTo(sizeW, y);
+      g.moveTo(0, y);
+      g.lineTo(sizeW, y);
     }
     g.stroke();
+
+    // Outer frame
     g.strokeStyle = '#3d2b1a';
     g.lineWidth = 2;
     g.strokeRect(1, 1, sizeW - 2, sizeH - 2);
+
     gridCacheCanvas = off;
     return off;
   }
@@ -1749,10 +1775,10 @@ function getImg(src) {
     const vis = cell;
     const { c0, r0, c1, r1 } = visibleCellRange();
 
-    // 2) Fine pixel lines when zoomed in (viewport only)
-    if (vis >= 1.2) {
-      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.45)' : 'rgba(139, 90, 43, 0.28)';
-      ctx.lineWidth = 1;
+    // 2) Reinforce fine lines when zoomed (always visible)
+    if (vis >= 1.0) {
+      ctx.strokeStyle = vis >= 6 ? 'rgba(61, 43, 26, 0.5)' : 'rgba(139, 90, 43, 0.32)';
+      ctx.lineWidth = vis >= 4 ? 1.25 : 1;
       ctx.beginPath();
       for (let c = c0; c <= c1 + 1; c++) {
         const x = Math.floor(c * cell) + 0.5;
@@ -1760,6 +1786,23 @@ function getImg(src) {
         ctx.lineTo(x, (r1 + 1) * cell);
       }
       for (let r = r0; r <= r1 + 1; r++) {
+        const y = Math.floor(r * cell) + 0.5;
+        ctx.moveTo(c0 * cell, y);
+        ctx.lineTo((c1 + 1) * cell, y);
+      }
+      ctx.stroke();
+
+      // Section lines on top in view
+      ctx.strokeStyle = 'rgba(92, 61, 30, 0.6)';
+      ctx.lineWidth = vis >= 3 ? 2 : 1.5;
+      ctx.beginPath();
+      const SEC = SECTION;
+      for (let c = Math.floor(c0 / SEC) * SEC; c <= c1 + 1; c += SEC) {
+        const x = Math.floor(c * cell) + 0.5;
+        ctx.moveTo(x, r0 * cell);
+        ctx.lineTo(x, (r1 + 1) * cell);
+      }
+      for (let r = Math.floor(r0 / SEC) * SEC; r <= r1 + 1; r += SEC) {
         const y = Math.floor(r * cell) + 0.5;
         ctx.moveTo(c0 * cell, y);
         ctx.lineTo((c1 + 1) * cell, y);

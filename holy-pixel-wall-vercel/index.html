@@ -1759,17 +1759,20 @@ function getImg(src) {
     const { c0, r0, c1, r1 } = visibleCellRange();
 
         // 2) Fine pixel lines - ONLY when NOT zooming (clean)
-    if (vis >= 2.5 && !zoomGesturing && hqZoom > 1.01) {
-      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.55)' : (vis >= 2.5 ? 'rgba(139, 90, 43, 0.4)' : 'rgba(139, 90, 43, 0.22)');
-      ctx.lineWidth = 1;
+        // 2) Fine pixel lines - always visible, clean when zooming
+    if (vis >= 1.15) {
+      ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.65)' : 'rgba(61, 43, 26, 0.35)';
+      ctx.lineWidth = Math.max(0.5, 1 / (window.devicePixelRatio || 1));
       ctx.beginPath();
       for (let c = c0; c <= c1 + 1; c++) {
-        const x = Math.floor(c * cell) + 0.5;
-        ctx.moveTo(x, r0 * cell); ctx.lineTo(x, (r1 + 1) * cell);
+        const x = Math.round(c * cell); // NO +0.5 = no break when scaled
+        ctx.moveTo(x, r0 * cell);
+        ctx.lineTo(x, (r1 + 1) * cell);
       }
       for (let r = r0; r <= r1 + 1; r++) {
-        const y = Math.floor(r * cell) + 0.5;
-        ctx.moveTo(c0 * cell, y); ctx.lineTo((c1 + 1) * cell, y);
+        const y = Math.round(r * cell);
+        ctx.moveTo(c0 * cell, y);
+        ctx.lineTo((c1 + 1) * cell, y);
       }
       ctx.stroke();
     }

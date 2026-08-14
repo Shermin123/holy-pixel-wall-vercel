@@ -426,6 +426,8 @@
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
     image-rendering: crisp-edges;
+      will-change: transform;
+  backface-visibility: hidden;
   }
 
   canvas {
@@ -1375,6 +1377,7 @@ Min 10 blocks · no maximum
     stage.style.transformOrigin = '0 0';
     stage.style.transition = 'none';
     stage.style.transform = 'scale(' + z + ')';
+        stage.style.imageRendering = 'pixelated';
     stage.style.overflow = 'hidden';
     canvas.style.width = baseW + 'px';
     canvas.style.height = baseH + 'px';
@@ -1755,8 +1758,8 @@ function getImg(src) {
     const vis = cell;
     const { c0, r0, c1, r1 } = visibleCellRange();
 
-    // 2) Fine pixel lines only in viewport when zoomed (big win)
-    if (vis >= 1.15) {
+        // 2) Fine pixel lines - ONLY when NOT zooming (clean)
+    if (vis >= 2.5 && !zoomGesturing && hqZoom > 1.01) {
       ctx.strokeStyle = vis >= 5 ? 'rgba(61, 43, 26, 0.55)' : (vis >= 2.5 ? 'rgba(139, 90, 43, 0.4)' : 'rgba(139, 90, 43, 0.22)');
       ctx.lineWidth = 1;
       ctx.beginPath();

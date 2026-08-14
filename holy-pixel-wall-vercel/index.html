@@ -406,6 +406,7 @@
     position: relative;
     margin: 0 auto;
     box-sizing: content-box;
+    background: #fffdf8;
   }
 
   .stage {
@@ -418,10 +419,10 @@
     box-shadow: 3px 3px 0 rgba(92,61,30,0.25);
     outline: none;
     line-height: 0;
-    will-change: transform;
     background: #fffdf8;
     margin: 0;
     transform-origin: 0 0;
+    overflow: hidden;
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
     image-rendering: crisp-edges;
@@ -1336,34 +1337,63 @@ Min 10 blocks · no maximum
     stage.style.margin = '0';
   }
 
-  // ===== Clean zoom (cursor-centered) =====
+  // ===== Clean zoom (one scale only, cursor-locked) =====
   const Z_MIN = 1, Z_MAX = 12;
   let zoomRaf = 0;
   let zoomTarget = 1;
-  let zoomAnchor = null; // { bx, by, mx, my }
+  let zoomAnchor = null;
+  let zoomOnBase = false; // true while CSS-scaling base bitmap
 
   function padForZoom(z) {
     return (z || zoom) <= 1.02 ? 6 : Math.max(28, Math.round(24 * (z || zoom)));
   }
 
-  function applyZoomSmooth() {
-    zoom = Math.max(Z_MIN, Math.min(Z_MAX, zoom));
-    const pad = padForZoom(zoom);
+  function layoutScaled(z) {
+    const pad = padForZoom(z);
     const wrap = $('wallWrap');
     if (wrap) {
-      wrap.style.width = Math.ceil(baseW * zoom + pad * 2) + 'px';
-      wrap.style.height = Math.ceil(baseH * zoom + pad * 2) + 'px';
+      wrap.style.width = Math.ceil(baseW * z + pad * 2) + 'px';
+      wrap.style.height = Math.ceil(baseH * z + pad * 2) + 'px';
     }
     stage.style.left = pad + 'px';
     stage.style.top = pad + 'px';
-    stage.style.width = baseW + 'px';
-    stage.style.height = baseH + 'px';
+    stage.style.margin = '0';
     stage.style.transformOrigin = '0 0';
     stage.style.transition = 'none';
-    stage.style.transform = 'scale(' + zoom + ')';
+  }
+
+  // Put wall on BASE bitmap + CSS scale (never mix with HQ size)
+  function enterSmoothZoom() {
+    if (zoomOnBase) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+    cell = baseCell;
+    sizeW = baseW;
+    sizeH = baseH;
+    canvas.width = Math.max(1, Math.round(baseW * dpr));
+    canvas.height = Math.max(1, Math.round(baseH * dpr));
     canvas.style.width = baseW + 'px';
     canvas.style.height = baseH + 'px';
     canvas.style.imageRendering = 'pixelated';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    stage.style.width = baseW + 'px';
+    stage.style.height = baseH + 'px';
+    hqZoom = 1;
+    gridCacheKey = '';
+    draw();
+    zoomOnBase = true;
+  }
+
+  function applyZoomSmooth() {
+    zoom = Math.max(Z_MIN, Math.min(Z_MAX, zoom));
+    enterSmoothZoom();
+    layoutScaled(zoom);
+    stage.style.width = baseW + 'px';
+    stage.style.height = baseH + 'px';
+    stage.style.transform = 'scale(' + zoom + ')';
+    // Force canvas to base — prevents double-scale glitch
+    canvas.style.width = baseW + 'px';
+    canvas.style.height = baseH + 'px';
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
   }
 
@@ -1371,6 +1401,7 @@ Min 10 blocks · no maximum
     zoom = Math.max(Z_MIN, Math.min(Z_MAX, zoom));
     zoomTarget = zoom;
     hqZoom = zoom;
+    zoomOnBase = false;
     cell = baseCell * zoom;
     sizeW = baseW * zoom;
     sizeH = baseH * zoom;
@@ -1384,6 +1415,8 @@ Min 10 blocks · no maximum
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     stage.style.transform = 'none';
+    stage.style.width = sizeW + 'px';
+    stage.style.height = sizeH + 'px';
     layoutWall();
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
     gridCacheKey = '';
@@ -1397,21 +1430,7 @@ Min 10 blocks · no maximum
       zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
       applyZoomHQ();
-    }, 150);
-  }
-
-  function toBaseLayer() {
-    if (parseFloat(canvas.style.width) <= baseW + 1 && stage.style.transform !== 'none') return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-    cell = baseCell; sizeW = baseW; sizeH = baseH;
-    canvas.width = Math.max(1, Math.round(baseW * dpr));
-    canvas.height = Math.max(1, Math.round(baseH * dpr));
-    canvas.style.width = baseW + 'px';
-    canvas.style.height = baseH + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    hqZoom = 1;
-    draw();
+    }, 120);
   }
 
   function anchorAt(clientX, clientY) {
@@ -1422,8 +1441,8 @@ Min 10 blocks · no maximum
     const my = cy - vr.top;
     const pad = padForZoom(zoom);
     zoomAnchor = {
-      bx: (viewport.scrollLeft + mx - pad) / zoom,
-      by: (viewport.scrollTop + my - pad) / zoom,
+      bx: (viewport.scrollLeft + mx - pad) / (zoom || 1),
+      by: (viewport.scrollTop + my - pad) / (zoom || 1),
       mx, my
     };
   }
@@ -1445,8 +1464,7 @@ Min 10 blocks · no maximum
       scheduleZoomHQ();
       return;
     }
-    // smooth exponential approach
-    zoom += diff * 0.28;
+    zoom += diff * 0.3;
     applyZoomSmooth();
     keepAnchor();
     zoomRaf = requestAnimationFrame(zoomFrame);
@@ -1454,23 +1472,18 @@ Min 10 blocks · no maximum
 
   function bumpZoom(d, clientX, clientY, instant) {
     clearTimeout(zoomTimer);
-
-    // multiplicative zoom (clean feel at every level)
     let factor;
     if (instant) {
-      factor = Math.exp(Math.max(-0.4, Math.min(0.4, d)));
+      factor = Math.exp(Math.max(-0.35, Math.min(0.35, d)));
     } else {
       factor = d > 0 ? 1.3 : 1 / 1.3;
     }
-
     if (!zoomAnchor) anchorAt(clientX, clientY);
     else if (clientX != null && clientY != null) {
       const vr = viewport.getBoundingClientRect();
       zoomAnchor.mx = clientX - vr.left;
       zoomAnchor.my = clientY - vr.top;
     }
-
-    toBaseLayer();
     zoomTarget = Math.max(Z_MIN, Math.min(Z_MAX, zoomTarget * factor));
     if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
   }

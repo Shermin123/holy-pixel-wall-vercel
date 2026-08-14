@@ -9,6 +9,52 @@
 
 <style>
   
+
+  /* Clean top bar */
+  header {
+    min-height: 56px;
+    padding: 8px 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-mid {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .price-chip {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.42rem;
+    color: #5c3d0e;
+    background: linear-gradient(180deg, #fff6c8, #f0c14b);
+    border: 2px solid var(--gold);
+    padding: 8px 12px;
+    box-shadow: 2px 2px 0 #5c3d1e;
+    white-space: nowrap;
+  }
+  .center-badge, .price-hero, .live-tag, .willow {
+    display: none !important;
+  }
+  .brand p {
+    font-size: 0.8rem;
+    margin-top: 2px;
+  }
+  .header-right {
+    margin-left: 0;
+  }
+  .toolbar {
+    padding: 6px 10px;
+    gap: 5px;
+  }
+  @media (max-width: 700px) {
+    .brand p { display: none; }
+    .price-chip { font-size: 0.34rem; padding: 6px 8px; }
+  }
+
   :root {
     --bg: #faf6ee;
     --surface: #fffdf8;
@@ -765,44 +811,32 @@
 <header>
   <div class="brand">
     <h1>HOLY PIXEL WALL</h1>
-    <p>Claim your place on the Holy Pixel Wall</p>
+    <p>Own a piece of the internet wall</p>
   </div>
-  <div class="price-hero" title="Price">
-    <span class="price-main">1 PIXEL = $0.10</span>
-  </div>
-  <button class="buy-cta" id="buyModeBtn" type="button">★ BUY PIXELS ★</button>
-  <div class="center-badge">
-    <div class="hw-banner"><span class="hw-text">CLAIM PIXELS</span></div>
+  <div class="header-mid">
+    <div class="price-chip">1 PIXEL = $0.10</div>
+    <button class="buy-cta" id="buyModeBtn" type="button">★ BUY PIXELS ★</button>
   </div>
   <div class="header-right">
-    <div class="live-tag" title="People viewing the wall right now">
-      <span class="live-dot"></span>
-      <div class="live-label">
-        <em>● LIVE</em>
-        <span><span id="viewerCount">27842</span> ONLINE</span>
-      </div>
-    </div>
-    <div class="willow" id="willow" title="Wish Stick">
-      <svg width="22" height="22" viewBox="0 0 100 100">
-        <path d="M48 90 Q52 50 44 20 Q42 12 48 8 Q54 15 52 30 Q58 60 52 90Z" fill="#8b5a2b"/>
-        <circle cx="48" cy="10" r="6" fill="#d4a017"/>
-      </svg>
-      <span>WISH</span>
-    </div>
     <div class="counter">
-      <div class="counter-label">SOLD</div>
+      <div class="counter-label">CLAIMED</div>
       <div class="counter-num" id="counterText">0/—</div>
       <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
     </div>
   </div>
+  <!-- kept for JS (hidden) -->
+  <div class="price-hero" style="display:none" aria-hidden="true"><span class="price-main">1 PIXEL = $0.10</span></div>
+  <div class="live-tag" style="display:none" aria-hidden="true"><span id="viewerCount">0</span></div>
+  <div class="willow" id="willow" style="display:none" aria-hidden="true"></div>
+  <div class="center-badge" style="display:none" aria-hidden="true"></div>
 </header>
 
 <div class="toolbar">
-  <button class="tool-btn tool-active" id="toolSelect" type="button" title="Select pixels">SELECT</button>
-  <button class="tool-btn" id="toolDrag" type="button" title="Drag to move around">DRAG</button>
-  <button class="tool-btn" id="toolDev" type="button" title="Developer: edit claims on click">DEV</button>
-  <button class="tool-btn" id="toolUndo" type="button" title="Undo selection (Ctrl+Z)">UNDO</button>
-  <button class="tool-btn" id="toolClaims" type="button" title="List claims on this device">MY CLAIMS</button>
+  <button class="tool-btn" id="toolSelect" type="button" style="display:none">SELECT</button>
+  <button class="tool-btn" id="toolDrag" type="button" style="display:none">DRAG</button>
+  <button class="tool-btn" id="toolDev" type="button" style="display:none">DEV</button>
+  <button class="tool-btn" id="toolUndo" type="button" title="Undo selection">UNDO</button>
+  <button class="tool-btn" id="toolClaims" type="button" title="My claims">MY CLAIMS</button>
   <button class="tool-btn" id="zoomOut">−</button>
   <span id="zoomLvl" style="font-family:'Press Start 2P',monospace;font-size:0.4rem;color:var(--dark);min-width:42px;text-align:center">100%</span>
   <button class="tool-btn" id="zoomIn">+</button>

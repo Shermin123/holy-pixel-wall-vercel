@@ -1336,14 +1336,19 @@ Min 10 blocks · no maximum
     stage.style.margin = '0';
   }
 
-  // ===== requestAnimationFrame zoom + draw pipeline =====
+  // ===== Zoom: smooth CSS + cursor-centered + sharp settle =====
   let zoomRaf = 0;
-  let zoomPending = null; // { level, px, py, lx, ly }
-  let zoomAnimating = false;
+  let zoomPending = null;
+  let zoomAnim = null;
+
+  function padForZoom(z) {
+    z = z || zoom;
+    return z <= 1.02 ? 6 : Math.max(36, Math.round(28 * z));
+  }
 
   function applyZoomSmooth() {
     zoom = Math.max(1, Math.min(12, zoom));
-    const pad = zoom <= 1.02 ? 6 : Math.max(36, Math.round(28 * zoom));
+    const pad = padForZoom(zoom);
     const wrap = $('wallWrap');
     const w = baseW * zoom;
     const h = baseH * zoom;
@@ -1359,6 +1364,8 @@ Min 10 blocks · no maximum
     stage.style.transition = 'none';
     stage.style.willChange = 'transform';
     stage.style.transform = 'scale(' + zoom + ')';
+    canvas.style.width = baseW + 'px';
+    canvas.style.height = baseH + 'px';
     canvas.style.imageRendering = 'pixelated';
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
   }
@@ -1382,7 +1389,7 @@ Min 10 blocks · no maximum
     stage.style.willChange = 'auto';
     layoutWall();
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(zoom * 100) + '%';
-    gridCacheKey = ""; // force grid rebuild at new size
+    gridCacheKey = '';
     draw();
     syncMediaOverlays();
   }
@@ -1393,54 +1400,69 @@ Min 10 blocks · no maximum
       zoomPending = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
       applyZoomHQ();
-    }, 180);
+    }, 160);
   }
 
   function ensureSmoothLayer() {
-    if (canvas.style.width && parseFloat(canvas.style.width) > baseW + 1) {
+    // Drop HQ bitmap so CSS scale is cheap and correct
+    if (parseFloat(canvas.style.width) > baseW + 1 || stage.style.transform === 'none') {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
       cell = baseCell;
       sizeW = baseW;
       sizeH = baseH;
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       canvas.width = Math.max(1, Math.round(baseW * dpr));
       canvas.height = Math.max(1, Math.round(baseH * dpr));
       canvas.style.width = baseW + 'px';
       canvas.style.height = baseH + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.imageSmoothingEnabled = false;
-      draw();
       hqZoom = 1;
+      draw();
     }
   }
 
-  function applyZoomAt(level, px, py, lx, ly) {
-    const prev = zoom;
-    zoom = Math.max(1, Math.min(12, level));
+  // Map pointer → base (unscaled) stage coordinates
+  function pointerToBase(clientX, clientY, z) {
+    const vrect = viewport.getBoundingClientRect();
+    const mx = clientX - vrect.left;
+    const my = clientY - vrect.top;
+    const pad = padForZoom(z);
+    const bx = (viewport.scrollLeft + mx - pad) / z;
+    const by = (viewport.scrollTop + my - pad) / z;
+    return { bx, by, mx, my };
+  }
+
+  // Keep the same base point under the cursor after zoom changes
+  function scrollToKeepBase(bx, by, z, mx, my) {
+    const pad = padForZoom(z);
+    viewport.scrollLeft = pad + bx * z - mx;
+    viewport.scrollTop = pad + by * z - my;
+  }
+
+  function setZoomAtCursor(newZoom, clientX, clientY) {
+    newZoom = Math.max(1, Math.min(12, newZoom));
+    const oldZoom = zoom || 1;
+
+    const vrect = viewport.getBoundingClientRect();
+    const hasP = clientX != null && clientY != null && isFinite(clientX) && isFinite(clientY);
+    const cx = hasP ? clientX : (vrect.left + vrect.width / 2);
+    const cy = hasP ? clientY : (vrect.top + vrect.height / 2);
+
+    const { bx, by, mx, my } = pointerToBase(cx, cy, oldZoom);
+
+    ensureSmoothLayer();
+    zoom = newZoom;
     applyZoomSmooth();
-    if (lx != null && ly != null && px != null && py != null) {
-      const srect2 = stage.getBoundingClientRect();
-      const scale = (prev > 0.001) ? (zoom / prev) : 1;
-      // lx/ly stored in pre-scale local stage space
-      viewport.scrollLeft += (srect2.left + lx * (zoom / (prev || zoom))) - px;
-      viewport.scrollTop += (srect2.top + ly * (zoom / (prev || zoom))) - py;
-    }
+    scrollToKeepBase(bx, by, zoom, mx, my);
   }
 
-  // One zoom update per animation frame (coalesces wheel/pinch spam)
   function flushZoomFrame() {
     zoomRaf = 0;
     if (!zoomPending) return;
     const p = zoomPending;
     zoomPending = null;
-    applyZoomAt(p.level, p.px, p.py, p.lx, p.ly);
+    setZoomAtCursor(p.level, p.clientX, p.clientY);
   }
-
-  function queueZoomLevel(level, px, py, lx, ly) {
-    zoomPending = { level, px, py, lx, ly };
-    if (!zoomRaf) zoomRaf = requestAnimationFrame(flushZoomFrame);
-  }
-
-  let zoomAnim = null;
 
   function easeOutCubic(tt) {
     return 1 - Math.pow(1 - tt, 3);
@@ -1451,13 +1473,12 @@ Min 10 blocks · no maximum
     const tt = Math.min(1, (now - zoomAnim.start) / zoomAnim.dur);
     const e = easeOutCubic(tt);
     const level = zoomAnim.from + (zoomAnim.to - zoomAnim.from) * e;
-    applyZoomAt(level, zoomAnim.px, zoomAnim.py, zoomAnim.lx, zoomAnim.ly);
+    setZoomAtCursor(level, zoomAnim.clientX, zoomAnim.clientY);
     if (tt < 1) {
       zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
     } else {
       zoom = zoomAnim.to;
       zoomAnim = null;
-      zoomAnimating = false;
       scheduleZoomHQ();
     }
   }
@@ -1468,39 +1489,28 @@ Min 10 blocks · no maximum
     if (Math.abs(next - prevTarget) < 0.0005) return;
 
     clearTimeout(zoomTimer);
-    ensureSmoothLayer();
-
-    const vrect = viewport.getBoundingClientRect();
-    const hasPointer = clientX != null && clientY != null && isFinite(clientX) && isFinite(clientY);
-    const px = hasPointer ? clientX : (vrect.left + vrect.width / 2);
-    const py = hasPointer ? clientY : (vrect.top + vrect.height / 2);
-
-    const srect = stage.getBoundingClientRect();
-    const curZ = zoom || 1;
-    const lx = (px - srect.left) / curZ;
-    const ly = (py - srect.top) / curZ;
 
     if (instant) {
-      // Continuous zoom (wheel/pinch): rAF-coalesced, no per-event layout thrash
+      // Wheel / pinch: one update per animation frame, always toward cursor
       if (zoomAnim && zoomAnim.raf) {
         cancelAnimationFrame(zoomAnim.raf);
         zoomAnim = null;
-        zoomAnimating = false;
       }
-      queueZoomLevel(next, px, py, lx, ly);
+      zoomPending = { level: next, clientX, clientY };
+      if (!zoomRaf) zoomRaf = requestAnimationFrame(flushZoomFrame);
       scheduleZoomHQ();
       return;
     }
 
-    // Button zoom: short eased rAF animation
+    // +/- buttons: short eased zoom toward cursor / center
     if (zoomAnim && zoomAnim.raf) cancelAnimationFrame(zoomAnim.raf);
-    zoomAnimating = true;
     zoomAnim = {
       from: zoom,
       to: next,
       start: performance.now(),
-      dur: 150,
-      px, py, lx, ly,
+      dur: 160,
+      clientX,
+      clientY,
       raf: null
     };
     zoomAnim.raf = requestAnimationFrame(tickZoomAnim);
@@ -3042,8 +3052,8 @@ function clearPending() {
       name: nm,
       desc: ($('desc').value || '').trim().slice(0, 120),
       duration: $('duration').value,
-      media: pendingMedia,
-      mediaType: pendingType,
+      media: pendingMedia || '',
+      mediaType: pendingType || 'image',
       fit: 'cover',
       cropScale: crop.scale,
       cropX: crop.x,
@@ -3052,29 +3062,44 @@ function clearPending() {
       linkType: ($('linkType') && $('linkType').value) || 'none',
       paid: keys.length * price()
     };
-    try { sessionStorage.setItem('hpw_pending_claim', JSON.stringify(payload)); } catch (e) {}
+
+    // Media too large for API?
+    if (payload.media && payload.media.length > 1200000) {
+      toast('IMAGE TOO LARGE — TRY A SMALLER FILE', 'error');
+      return;
+    }
 
     const btn = $('confirmBtn');
     const msg = $('payment-message');
     if (msg) msg.textContent = '';
     paying = true;
     btn.disabled = true;
-    btn.textContent = 'OPENING PAY…';
-    if ($('payHint')) $('payHint').textContent = 'Redirecting to secure Stripe Checkout…';
+    btn.textContent = 'SAVING…';
 
-    apiFetch('/api/checkout', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      timeout: 30000
-    }, 'Checkout')
-      .then(data => {
+    (async () => {
+      try {
+        // Save full claim (with image) in IndexedDB — survives Stripe redirect
+        await idbSet('pending', payload);
+        try { sessionStorage.setItem('hpw_pending_flag', '1'); } catch (e) {}
+        // Checkout only needs pricing fields (no huge media body)
+        const checkoutBody = {
+          cells: payload.cells,
+          duration: payload.duration,
+          name: payload.name
+        };
+        btn.textContent = 'OPENING PAY…';
+        if ($('payHint')) $('payHint').textContent = 'Redirecting to secure Stripe Checkout…';
+        const data = await apiFetch('/api/checkout', {
+          method: 'POST',
+          body: JSON.stringify(checkoutBody),
+          timeout: 30000
+        }, 'Checkout');
         if (data && data.url) {
           window.location.href = data.url;
           return;
         }
         throw new Error((data && data.error) || 'Could not start checkout');
-      })
-      .catch(err => {
+      } catch (err) {
         paying = false;
         btn.disabled = false;
         btn.textContent = 'PAY & CLAIM';
@@ -3082,7 +3107,8 @@ function clearPending() {
         setPayError(mtxt);
         toast(mtxt, 'error');
         try { refreshClaimValidation(); } catch (e) {}
-      });
+      }
+    })();
   };
 
   window.addEventListener('keydown', e => {
@@ -3474,8 +3500,8 @@ function clearPending() {
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey) {
       // Pinch / ctrl+wheel → zoom to pointer
-      let delta = -e.deltaY * 0.008;
-      delta = Math.max(-0.22, Math.min(0.22, delta));
+      let delta = -e.deltaY * 0.01;
+      delta = Math.max(-0.28, Math.min(0.28, delta));
       bumpZoom(delta, e.clientX, e.clientY, true); // continuous = instant steps, still HQ settle
     } else {
       // Two-finger scroll / mouse wheel → pan
@@ -3611,30 +3637,38 @@ let scrollDrawRaf = 0;
     // Back from Stripe success
     const params = new URLSearchParams(location.search);
     if (params.get('paid') === '1') {
-      const raw = sessionStorage.getItem('hpw_pending_claim');
-      if (raw) {
-        try {
-          const payload = JSON.parse(raw);
+      try {
+        let payload = await idbGet('pending');
+        if (!payload) {
+          // legacy fallback
+          try {
+            const raw = sessionStorage.getItem('hpw_pending_claim');
+            if (raw) payload = JSON.parse(raw);
+          } catch (e) {}
+        }
+        if (payload && payload.cells && payload.cells.length) {
           await apiFetch('/api/claim', {
             method: 'POST',
             body: JSON.stringify(payload),
-            timeout: 30000
+            timeout: 60000
           }, 'Claim');
-          sessionStorage.removeItem('hpw_pending_claim');
+          try { await idbDel('pending'); } catch (e) {}
+          try { sessionStorage.removeItem('hpw_pending_claim'); sessionStorage.removeItem('hpw_pending_flag'); } catch (e) {}
           history.replaceState({}, '', '/');
           await pullWall();
           toast('Payment OK — pixels claimed', 'ok');
-        } catch (e) {
-          toast(friendlyError(e, 'Claim failed after payment — contact support'), 'error');
+        } else {
+          history.replaceState({}, '', '/');
+          toast('PAYMENT RECEIVED — claim data missing, contact support', 'error');
         }
-      } else {
-        history.replaceState({}, '', '/');
-        toast('PAYMENT RECEIVED');
+      } catch (e) {
+        toast(friendlyError(e, 'Claim failed after payment — contact support'), 'error');
       }
     } else if (params.get('canceled') === '1') {
       history.replaceState({}, '', '/');
       toast('PAYMENT CANCELED');
-      try { sessionStorage.removeItem('hpw_pending_claim'); } catch (e) {}
+      try { await idbDel('pending'); } catch (e) {}
+      try { sessionStorage.removeItem('hpw_pending_claim'); sessionStorage.removeItem('hpw_pending_flag'); } catch (e) {}
     }
   })();
 

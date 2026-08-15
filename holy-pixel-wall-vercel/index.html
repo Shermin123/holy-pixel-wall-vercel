@@ -1270,6 +1270,65 @@ Min 10 blocks · no maximum
 
   const PERM_PIXEL_CAP = 1000; // max permanent pixels on the whole wall
 
+
+  // IndexedDB — holds pending claim + image across Stripe redirect
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      try {
+        const req = indexedDB.open('hpw_claims', 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('pending')) {
+            db.createObjectStore('pending');
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('IndexedDB open failed'));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  function idbSet(key, value) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction('pending', 'readwrite');
+        tx.objectStore('pending').put(value, key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed'));
+      } catch (e) {
+        reject(e);
+      }
+    }));
+  }
+
+  function idbGet(key) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction('pending', 'readonly');
+        const req = tx.objectStore('pending').get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('IndexedDB read failed'));
+      } catch (e) {
+        reject(e);
+      }
+    }));
+  }
+
+  function idbDel(key) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction('pending', 'readwrite');
+        tx.objectStore('pending').delete(key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB delete failed'));
+      } catch (e) {
+        reject(e);
+      }
+    }));
+  }
+
   function price() {
     const d = ($('duration') && $('duration').value) || '1month';
     if (d === 'permanent') return 50;
@@ -3173,7 +3232,23 @@ function clearPending() {
     (async () => {
       try {
         // Save full claim (with image) in IndexedDB — survives Stripe redirect
-        await idbSet('pending', payload);
+        try {
+          await idbSet('pending', payload);
+        } catch (idbErr) {
+          console.warn('IndexedDB save failed', idbErr);
+          // Fallback: sessionStorage without huge media if needed
+          try {
+            sessionStorage.setItem('hpw_pending_claim', JSON.stringify(payload));
+          } catch (e2) {
+            try {
+              const slim = Object.assign({}, payload, { media: '' });
+              sessionStorage.setItem('hpw_pending_claim', JSON.stringify(slim));
+              toast('Image too large to cache — claim may miss image after pay', 'error');
+            } catch (e3) {
+              throw new Error('Could not save claim data before payment');
+            }
+          }
+        }
         try { sessionStorage.setItem('hpw_pending_flag', '1'); } catch (e) {}
         // Checkout only needs pricing fields (no huge media body)
         const checkoutBody = {

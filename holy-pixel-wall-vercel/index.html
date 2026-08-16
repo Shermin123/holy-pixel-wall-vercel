@@ -120,9 +120,7 @@
     box-shadow: 2px 2px 0 #5c3d1e;
     white-space: nowrap;
   }
-  .center-badge, .price-hero, .live-tag, .willow {
-    display: none !important;
-  }
+  .center-badge, .price-hero, .live-tag, 
   .brand p {
     font-size: 0.8rem;
     margin-top: 2px;
@@ -187,7 +185,7 @@
   }
   .brand { flex: 0 0 auto; min-width: 120px; }
   .header-right { flex: 0 0 auto; margin-left: auto; }
-  .center-badge { flex: 1 1 auto; display: flex; justify-content: center; }
+  
   .price-badge { flex: 0 1 auto; }
 
   .brand h1 {
@@ -205,18 +203,7 @@
   .price-badge {
     display: none;
   }
-  .price-hero {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 8px 16px;
-    background: linear-gradient(135deg, #fff9e6 0%, #ffe8a3 45%, #f0c14b 100%);
-    border: 3px solid var(--gold);
-    box-shadow: 0 0 0 2px #fff, 4px 4px 0 rgba(92,61,30,0.35);
-    min-width: 140px;
-  }
+  
   .price-hero .price-label {
     font-family: 'Press Start 2P', monospace;
     font-size: 0.36rem;
@@ -251,33 +238,14 @@
     align-items: center;
     gap: 8px;
   }
-  .hw-banner {
-    background: linear-gradient(90deg, #c47a3a, #d4a017, #e6c04a);
-    padding: 7px 16px;
-    border: var(--line-gold);
-    box-shadow: var(--pixel-shadow);
-    animation: bannerShift 1.6s steps(2) infinite, pixelPulse 2s steps(2) infinite;
-  }
+  
   .hw-text {
     font-family: 'Press Start 2P', monospace;
     font-size: 0.5rem;
     color: #2c221e;
     display: inline-block;
   }
-  .live-tag {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    background: #eef8ee;
-    border: 3px solid var(--success);
-    box-shadow: var(--pixel-shadow);
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.4rem;
-    color: #1e5c28;
-    animation: viewerGlow 1.4s steps(2) infinite;
-    letter-spacing: 0.5px;
-  }
+  
   .live-tag .live-label {
     display: flex;
     flex-direction: column;
@@ -294,36 +262,18 @@
     color: #146b28;
     animation: countPop 2s steps(2) infinite;
   }
-  .live-dot {
-    width: 12px; height: 12px;
-    background: var(--success);
-    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--success);
-    animation: pixelBlink 0.8s steps(2) infinite;
-    flex-shrink: 0;
-  }
-  @keyframes blink { 50% { opacity: 0.25; } }
+  
+  
 
   @keyframes pixelBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.3; } }
-  @keyframes pixelPulse {
-    0%, 100% { box-shadow: 3px 3px 0 #5c3d1e; }
-    50% { box-shadow: 5px 5px 0 #5c3d1e, 0 0 0 2px var(--gold); }
-  }
-  @keyframes bannerShift {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.08); }
-  }
-  @keyframes viewerGlow {
-    0%, 100% { box-shadow: 3px 3px 0 #5c3d1e, 0 0 0 0 rgba(61,139,74,0.4); }
-    50% { box-shadow: 3px 3px 0 #5c3d1e, 0 0 0 6px rgba(61,139,74,0.15); }
-  }
+  
+  
+  
   @keyframes countPop {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.06); }
   }
-  @keyframes gridDrift {
-    0% { background-position: 0 0, 0 0; }
-    100% { background-position: 12px 12px, 12px 12px; }
-  }
+  
   @keyframes borderFlicker {
     0%, 100% { border-color: var(--gold); }
     50% { border-color: #e6c04a; }
@@ -587,26 +537,8 @@
   .btn-claim:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 #3d2b1a; }
   .btn-claim:active { transform: translate(2px,2px); box-shadow: none; }
 
-  .mascot {
-    position: fixed;
-    bottom: 18px;
-    left: 18px;
-    width: 56px;
-    height: 56px;
-    background: var(--panel);
-    border: 4px solid var(--gold);
-    box-shadow: 4px 4px 0 #3d2b1a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 90;
-    cursor: pointer;
-    animation: bob 1.2s steps(2) infinite;
-  }
-  @keyframes bob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
-  }
+  
+  
   .mascot:hover { transform: scale(1.1); }
   .mascot svg { width: 40px; height: 40px; }
 
@@ -1166,7 +1098,7 @@ Min 10 blocks · no maximum
   const toastEl = $('toast');
 
   // Adaptive grid: more columns on desktop (landscape), more rows on phone (portrait)
-  let COLS = 250, ROWS = 200, TOTAL = 50000;
+  let COLS = 1000, ROWS = 500, TOTAL = 500000;
   let selected = new Set();
   const selectHistory = [];
   const MAX_HISTORY = 20;
@@ -1200,29 +1132,23 @@ Min 10 blocks · no maximum
 
 
   function computeGrid() {
-    // ~50,000 square blocks — expand into free side space
+    // ~500,000 pixels — shape follows screen, snapped to 10
     const vw = Math.max(viewport.clientWidth, 120);
     const vh = Math.max(viewport.clientHeight, 120);
     const aspect = vw / vh;
-    const TARGET = 50000;
+    const TARGET = 500000;
     let cols = Math.round(Math.sqrt(TARGET * aspect));
     let rows = Math.round(TARGET / cols);
-    // Snap to 10 so section grid lines up evenly
-    cols = Math.max(100, Math.min(400, Math.round(cols / 10) * 10));
-    rows = Math.max(100, Math.min(400, Math.round(rows / 10) * 10));
-    while (cols * rows > 52000 && rows >= 110) rows -= 10;
-    while (cols * rows < 48000 && cols <= 390) cols += 10;
+    cols = Math.max(500, Math.min(1200, Math.round(cols / 10) * 10));
+    rows = Math.max(300, Math.min(1000, Math.round(rows / 10) * 10));
+    while (cols * rows > 520000 && rows >= 320) rows -= 10;
+    while (cols * rows < 480000 && cols <= 1180) cols += 10;
     COLS = cols;
     ROWS = rows;
     TOTAL = COLS * ROWS;
   }
 
-  const quotes = [
-    { t: "STAY STRONG", x: "Even storms cannot break deep roots. You are stronger than you think." },
-    { t: "KEEP GOING", x: "Every quiet step builds something great. You are right on time." },
-    { t: "SHINE ON", x: "Your inner fire cannot be put out. Chase what lights you up." },
-    { t: "NEW DAY", x: "Setbacks make space for better things. Tomorrow is a fresh map." }
-  ];
+  
 
   function toast(msg, kind) {
     if (!toastEl) return;
@@ -1411,7 +1337,7 @@ Min 10 blocks · no maximum
       localStorage.setItem(STORE, JSON.stringify({
         regions: regions.map(r => {
           const copy = { ...r };
-          if (copy.media && copy.media.startsWith('data:') && copy.media.length > 2500000) {
+          if (copy.media && copy.media.startsWith('data:') && copy.media.length > 25000000) {
             copy.media = '';
           }
           return copy;
@@ -3344,13 +3270,6 @@ function clearPending() {
     if (e.key === 'ArrowUp') { viewport.scrollTop -= panStep; e.preventDefault(); }
     if (e.key === 'ArrowDown') { viewport.scrollTop += panStep; e.preventDefault(); }
   });
-
-  $('willow').onclick = () => {
-    const q = quotes[Math.floor(Math.random() * quotes.length)];
-    $('motTitle').textContent = q.t;
-    $('motText').textContent = q.x;
-    $('motModal').style.display = 'flex';
-  };
   $('motClose').onclick = () => $('motModal').style.display = 'none';
 
   setInterval(() => {
@@ -3373,12 +3292,7 @@ function clearPending() {
     }
   }, 30000);
 
-  setInterval(() => {
-    let v = parseInt($('viewerCount').textContent) || 27842;
-    v += Math.floor(Math.random() * 5) - 2;
-    if (v < 25000) v = 27842;
-    $('viewerCount').textContent = v;
-  }, 3000);
+  
 
   if ($('helpBtn')) $('helpBtn').onclick = () => { $('helpModal').style.display = 'flex'; };
   if ($('helpClose')) $('helpClose').onclick = () => { $('helpModal').style.display = 'none'; };

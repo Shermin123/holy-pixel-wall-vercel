@@ -1426,66 +1426,93 @@ Min 10 blocks · no maximum
     if (typeof layoutAtZoom === 'function') layoutAtZoom(zoom || 1);
   }
 
-  // ===== Smooth zoom (CSS only — no HQ switch = no glitch) =====
+  // ===== Smooth zoom (layout-sized, no transform glitch) =====
+  // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
+  // Wrap size always matches what you see — nothing jumps off-screen.
   const Z_MIN = 1, Z_MAX = 14;
   const Z_PAD = 48;
   let zoomRaf = 0;
   let zoomTarget = 1;
-  let zoomAnchor = null; // { bx, by, mx, my }
+  let zoomAnchor = null; // { bx, by, mx, my } in base-pixel space
 
   function zClamp(z) {
-    return Math.max(Z_MIN, Math.min(Z_MAX, z));
+    z = Number(z);
+    if (!isFinite(z) || z < Z_MIN) return Z_MIN;
+    if (z > Z_MAX) return Z_MAX;
+    return z;
+  }
+
+  function clampScroll() {
+    const maxX = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    const maxY = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+    if (viewport.scrollLeft < 0) viewport.scrollLeft = 0;
+    if (viewport.scrollTop < 0) viewport.scrollTop = 0;
+    if (viewport.scrollLeft > maxX) viewport.scrollLeft = maxX;
+    if (viewport.scrollTop > maxY) viewport.scrollTop = maxY;
   }
 
   function layoutAtZoom(z) {
     z = zClamp(z);
+    zoom = z;
     const wrap = $('wallWrap');
     const w = baseW * z;
     const h = baseH * z;
+    if (!isFinite(w) || !isFinite(h) || w < 1 || h < 1) return;
+
+    sizeW = w;
+    sizeH = h;
+    cell = baseCell * z;
+
     if (wrap) {
       wrap.style.width = Math.ceil(w + Z_PAD * 2) + 'px';
       wrap.style.height = Math.ceil(h + Z_PAD * 2) + 'px';
     }
+    // Stage fills the scaled layout box — NO transform:scale (avoids disappear bugs)
     stage.style.left = Z_PAD + 'px';
     stage.style.top = Z_PAD + 'px';
-    stage.style.width = baseW + 'px';
-    stage.style.height = baseH + 'px';
+    stage.style.width = w + 'px';
+    stage.style.height = h + 'px';
     stage.style.margin = '0';
-    stage.style.transformOrigin = '0 0';
-    stage.style.transition = 'none';
-    stage.style.willChange = 'transform';
-    stage.style.transform = 'scale(' + z + ')';
+    stage.style.transform = 'none';
     stage.style.overflow = 'hidden';
-    canvas.style.width = baseW + 'px';
-    canvas.style.height = baseH + 'px';
+
+    // Bitmap stays baseW×baseH; browser scales CSS size with pixelated rendering
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
     canvas.style.imageRendering = 'pixelated';
+
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
   }
 
-  /** Draw wall once at fit resolution; zoom is pure CSS scale */
   function paintBase() {
-    if (!baseW || !baseH) return;
+    if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Internal resolution stays at fit-size (sharp enough, stable)
+    canvas.width = Math.max(1, Math.round(baseW * dpr));
+    canvas.height = Math.max(1, Math.round(baseH * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    // draw() uses logical size baseW×baseH via cell=baseCell temporarily
+    const savedCell = cell;
+    const savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
     sizeH = baseH;
     hqZoom = 1;
-    canvas.width = Math.max(1, Math.round(baseW * dpr));
-    canvas.height = Math.max(1, Math.round(baseH * dpr));
-    canvas.style.width = baseW + 'px';
-    canvas.style.height = baseH + 'px';
-    canvas.style.imageRendering = 'pixelated';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
     gridCacheKey = '';
-    draw();
+    try {
+      draw();
+    } finally {
+      cell = savedCell || baseCell * (zoom || 1);
+      sizeW = savedW || baseW * (zoom || 1);
+      sizeH = savedH || baseH * (zoom || 1);
+    }
+    layoutAtZoom(zoom || 1);
     syncMediaOverlays();
   }
 
   function applyZoomHQ() {
-    // Compatibility: no mode switch — just paint base + scale
     paintBase();
-    layoutAtZoom(zoom);
   }
 
   function applyZoomSmooth() {
@@ -1493,7 +1520,6 @@ Min 10 blocks · no maximum
   }
 
   function scheduleZoomHQ() {
-    // no-op — we never rebuild bitmap on zoom settle
     clearTimeout(zoomTimer);
   }
 
@@ -1514,22 +1540,25 @@ Min 10 blocks · no maximum
 
   function keepAnchor() {
     if (!zoomAnchor) return;
-    viewport.scrollLeft = Z_PAD + zoomAnchor.bx * zoom - zoomAnchor.mx;
-    viewport.scrollTop = Z_PAD + zoomAnchor.by * zoom - zoomAnchor.my;
+    const z = zoom || 1;
+    viewport.scrollLeft = Z_PAD + zoomAnchor.bx * z - zoomAnchor.mx;
+    viewport.scrollTop = Z_PAD + zoomAnchor.by * z - zoomAnchor.my;
+    clampScroll();
   }
 
   function zoomFrame() {
     zoomRaf = 0;
-    const diff = zoomTarget - zoom;
-    if (Math.abs(diff) < 0.0015) {
-      zoom = zoomTarget;
+    const target = zClamp(zoomTarget);
+    const diff = target - zoom;
+    if (Math.abs(diff) < 0.002) {
+      zoom = target;
       layoutAtZoom(zoom);
       keepAnchor();
       zoomAnchor = null;
+      clampScroll();
       return;
     }
-    // Smooth ease toward target
-    zoom += diff * 0.28;
+    zoom += diff * 0.32;
     layoutAtZoom(zoom);
     keepAnchor();
     zoomRaf = requestAnimationFrame(zoomFrame);
@@ -1538,10 +1567,12 @@ Min 10 blocks · no maximum
   function bumpZoom(d, clientX, clientY, continuous) {
     let factor;
     if (continuous) {
-      factor = Math.exp(Math.max(-0.28, Math.min(0.28, d)));
+      const clamped = Math.max(-0.25, Math.min(0.25, d));
+      factor = Math.exp(clamped);
     } else {
-      factor = d > 0 ? 1.22 : 1 / 1.22;
+      factor = d > 0 ? 1.2 : 1 / 1.2;
     }
+    if (!isFinite(factor) || factor <= 0) return;
 
     if (!zoomAnchor) anchorAt(clientX, clientY);
     else if (clientX != null && isFinite(clientX)) {
@@ -1734,14 +1765,20 @@ function getImg(src) {
   }
 
   function rebuildGridCache() {
-    const key = COLS + 'x' + ROWS + ':' + sizeW + 'x' + sizeH + ':' + cell.toFixed(4);
+    // Always cache at base resolution (zoom is CSS size only)
+    const bw = baseW || sizeW;
+    const bh = baseH || sizeH;
+    const bc = baseCell || cell;
+    const key = COLS + 'x' + ROWS + ':' + bw + 'x' + bh + ':' + (bc).toFixed(4);
     if (gridCacheCanvas && gridCacheKey === key) return gridCacheCanvas;
     gridCacheKey = key;
     const off = document.createElement('canvas');
-    off.width = Math.max(1, Math.ceil(sizeW));
-    off.height = Math.max(1, Math.ceil(sizeH));
+    off.width = Math.max(1, Math.ceil(bw));
+    off.height = Math.max(1, Math.ceil(bh));
     const g = off.getContext('2d');
     g.imageSmoothingEnabled = false;
+    // local aliases used below
+    const sizeW = bw, sizeH = bh, cell = bc;
 
     const SEC = SECTION;
 
@@ -1804,15 +1841,19 @@ function getImg(src) {
   }
 
   function draw() {
-    if (!ctx || !sizeW || !sizeH || !cell) return;
-    // Transform already set in applyZoomHQ; keep in sync
+    if (!ctx || !baseW || !baseH || !baseCell) return;
+    // Canvas buffer is always base resolution; CSS scales it for zoom
+    const drawCell = baseCell;
+    const drawW = baseW;
+    const drawH = baseH;
     ctx.imageSmoothingEnabled = false;
 
     // 1) Blit cached checker + section grid (fast)
     const grid = rebuildGridCache();
-    ctx.drawImage(grid, 0, 0, sizeW, sizeH);
+    ctx.drawImage(grid, 0, 0, drawW, drawH);
 
-    const vis = cell;
+    const vis = drawCell;
+    // Visible range in cell indices — account for CSS/layout zoom
     const { c0, r0, c1, r1 } = visibleCellRange();
 
     // 2) Grid comes from cache — no extra overlapping strokes (stays clean when zooming)
@@ -1821,9 +1862,9 @@ function getImg(src) {
     // 3) Claimed regions — skip off-screen, solid rects when possible
     regions.forEach(r => {
       if (r.maxC < c0 || r.minC > c1 || r.maxR < r0 || r.minR > r1) return;
-      const x0 = r.minC * cell, y0 = r.minR * cell;
-      const w = (r.maxC - r.minC + 1) * cell;
-      const h = (r.maxR - r.minR + 1) * cell;
+      const x0 = r.minC * drawCell, y0 = r.minR * drawCell;
+      const w = (r.maxC - r.minC + 1) * drawCell;
+      const h = (r.maxR - r.minR + 1) * drawCell;
       const expected = (r.maxC - r.minC + 1) * (r.maxR - r.minR + 1);
       const solid = !r.cells || r.cells.length === expected || r.pixels === expected;
 
@@ -1834,7 +1875,7 @@ function getImg(src) {
         for (let c = r.minC; c <= r.maxC; c++) {
           for (let row = r.minR; row <= r.maxR; row++) {
             if (sold.get(c + ',' + row) === r) {
-              ctx.rect(c * cell, row * cell, cell, cell);
+              ctx.rect(c * drawCell, row * drawCell, cell, cell);
               any = true;
             }
           }
@@ -1855,7 +1896,7 @@ function getImg(src) {
         for (let c = r.minC; c <= r.maxC; c++)
           for (let row = r.minR; row <= r.maxR; row++)
             if ((c + row) % 2 === 0)
-              ctx.fillRect(c * cell, row * cell, cell, cell);
+              ctx.fillRect(c * drawCell, row * drawCell, cell, cell);
       }
       ctx.strokeStyle = '#3a2a1a';
       ctx.lineWidth = Math.max(1.5, Math.min(3, cell * 0.2));
@@ -1873,14 +1914,14 @@ function getImg(src) {
         if (c < c0 || c > c1 || r < r0 || r > r1) {
           // still expand bounds for border
         } else {
-          ctx.fillRect(c * cell, r * cell, cell, cell);
+          ctx.fillRect(c * drawCell, r * drawCell, cell, cell);
         }
         if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
         if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
       });
       if (sMaxC >= sMinC) {
-        const bx = sMinC * cell, by = sMinR * cell;
-        const bw = (sMaxC - sMinC + 1) * cell, bh = (sMaxR - sMinR + 1) * cell;
+        const bx = sMinC * drawCell, by = sMinR * drawCell;
+        const bw = (sMaxC - sMinC + 1) * drawCell, bh = (sMaxR - sMinR + 1) * drawCell;
         ctx.strokeStyle = '#047857';
         ctx.lineWidth = Math.max(2, Math.min(3.5, cell * 0.25));
         ctx.strokeRect(bx + 1, by + 1, bw - 2, bh - 2);
@@ -1894,8 +1935,8 @@ function getImg(src) {
     if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
       const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
-      const dx = minC * cell, dy = minR * cell;
-      const dw = (maxC - minC + 1) * cell, dh = (maxR - minR + 1) * cell;
+      const dx = minC * drawCell, dy = minR * drawCell;
+      const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
       ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
       ctx.fillRect(dx, dy, dw, dh);
       ctx.strokeStyle = '#047857';
@@ -1915,8 +1956,8 @@ function getImg(src) {
         minR = Math.min(minR, r); maxR = Math.max(maxR, r);
       });
       if (maxC >= minC) {
-        const x = minC * cell, y = minR * cell;
-        const w = (maxC - minC + 1) * cell, h = (maxR - minR + 1) * cell;
+        const x = minC * drawCell, y = minR * drawCell;
+        const w = (maxC - minC + 1) * drawCell, h = (maxR - minR + 1) * drawCell;
         const img = getImg(pendingMedia);
         ctx.save();
         ctx.globalAlpha = 0.92;

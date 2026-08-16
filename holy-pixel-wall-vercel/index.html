@@ -1064,12 +1064,16 @@
 <div class="tip" id="tip"></div>
 
 <div class="overlay" id="ownersModal">
-  <div class="modal" style="max-width:460px">
+  <div class="modal" style="max-width:480px">
     <div class="modal-head">
       <h3>OWNERS</h3>
-      <p>Who owns the wall — sorted by pixels</p>
+      <p>Leaderboard & permanent history log</p>
     </div>
-    <div class="modal-body" id="ownersList" style="max-height:55vh;overflow:auto">
+    <div style="display:flex;gap:6px;padding:10px 18px 0;background:var(--panel);border-bottom:2px solid var(--border)">
+      <button type="button" class="tool-btn tool-active" id="ownersTabBoard" style="flex:1">LEADERBOARD</button>
+      <button type="button" class="tool-btn" id="ownersTabLog" style="flex:1">HISTORY LOG</button>
+    </div>
+    <div class="modal-body" id="ownersList" style="max-height:50vh;overflow:auto">
       <p style="color:var(--muted)">Loading…</p>
     </div>
     <div class="modal-foot">
@@ -3459,14 +3463,12 @@ function clearPending() {
 
 
   function buildOwnerStats() {
-    const map = new Map(); // name -> { name, pixels, claims, desc }
+    const map = new Map();
     regions.forEach(r => {
       if (!r || expired(r)) return;
       const name = (r.name || 'Anonymous').trim() || 'Anonymous';
       const px = r.pixels || (r.cells && r.cells.length) || 0;
-      if (!map.has(name)) {
-        map.set(name, { name, pixels: 0, claims: 0, desc: r.desc || '' });
-      }
+      if (!map.has(name)) map.set(name, { name, pixels: 0, claims: 0, desc: r.desc || '' });
       const o = map.get(name);
       o.pixels += px;
       o.claims += 1;
@@ -3475,34 +3477,83 @@ function clearPending() {
     return Array.from(map.values()).sort((a, b) => b.pixels - a.pixels || a.name.localeCompare(b.name));
   }
 
-  function showOwnersBoard() {
+  function renderOwnerBoard() {
     const list = $('ownersList');
-    const modal = $('ownersModal');
-    if (!list || !modal) return;
+    if (!list) return;
     const stats = buildOwnerStats();
     if (!stats.length) {
       list.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No owners yet — be the first.</p>';
-    } else {
-      const totalPx = stats.reduce((s, o) => s + o.pixels, 0);
-      list.innerHTML =
-        '<p style="color:var(--muted);margin-bottom:10px;font-size:0.95rem">' +
-        stats.length + ' owner' + (stats.length === 1 ? '' : 's') + ' · ' + totalPx + ' pixels claimed</p>' +
-        stats.map((o, i) => {
-          const rank = i + 1;
-          const safe = o.name.replace(/</g, '&lt;');
-          return '<div style="display:flex;align-items:center;gap:10px;border:2px solid var(--border);padding:10px;margin-bottom:8px;background:#fff">' +
-            '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--gold);min-width:28px">#' + rank + '</div>' +
-            '<div style="flex:1;min-width:0">' +
-            '<strong style="color:var(--dark)">' + safe + '</strong>' +
-            (o.desc ? '<div style="color:var(--muted);font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(o.desc).replace(/</g, '&lt;') + '</div>' : '') +
-            '<div style="color:var(--muted);font-size:0.85rem">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
-            '</div>' +
-            '<div style="font-family:Press Start 2P,monospace;font-size:0.45rem;color:var(--dark);white-space:nowrap">' + o.pixels + ' PX</div>' +
-            '</div>';
-        }).join('');
+      return;
     }
+    const totalPx = stats.reduce((s, o) => s + o.pixels, 0);
+    list.innerHTML =
+      '<p style="color:var(--muted);margin-bottom:10px;font-size:0.95rem">' +
+      stats.length + ' owner' + (stats.length === 1 ? '' : 's') + ' · ' + totalPx + ' pixels claimed</p>' +
+      stats.map((o, i) => {
+        const safe = o.name.replace(/</g, '&lt;');
+        return '<div style="display:flex;align-items:center;gap:10px;border:2px solid var(--border);padding:10px;margin-bottom:8px;background:#fff">' +
+          '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--gold);min-width:28px">#' + (i + 1) + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+          '<strong style="color:var(--dark)">' + safe + '</strong>' +
+          (o.desc ? '<div style="color:var(--muted);font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(o.desc).replace(/</g, '&lt;') + '</div>' : '') +
+          '<div style="color:var(--muted);font-size:0.85rem">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
+          '</div>' +
+          '<div style="font-family:Press Start 2P,monospace;font-size:0.45rem;color:var(--dark);white-space:nowrap">' + o.pixels + ' PX</div>' +
+          '</div>';
+      }).join('');
+  }
+
+  async function renderOwnerHistory() {
+    const list = $('ownersList');
+    if (!list) return;
+    list.innerHTML = '<p style="color:var(--muted)">Loading history…</p>';
+    try {
+      const data = await apiFetch('/api/history', { timeout: 15000 }, 'History');
+      const rows = data.history || [];
+      if (!rows.length) {
+        list.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No history yet.</p>';
+        return;
+      }
+      list.innerHTML = rows.map(h => {
+        const when = h.claimedAt ? new Date(h.claimedAt).toLocaleString() : '—';
+        const ev = h.event === 'removed' ? 'REMOVED' : 'CLAIMED';
+        const col = h.event === 'removed' ? 'var(--danger)' : 'var(--success)';
+        const safe = String(h.name || 'ANON').replace(/</g, '&lt;');
+        return '<div style="border:2px solid var(--border);padding:10px;margin-bottom:8px;background:#fff">' +
+          '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center">' +
+          '<strong style="color:var(--dark)">' + safe + '</strong>' +
+          '<span style="font-family:Press Start 2P,monospace;font-size:0.35rem;color:' + col + '">' + ev + '</span>' +
+          '</div>' +
+          '<div style="color:var(--muted);font-size:0.9rem;margin-top:4px">' +
+          (h.pixels || 0) + ' px · ' + (h.duration || '') +
+          (h.paid ? ' · $' + Number(h.paid).toFixed(2) : '') +
+          '<br>' + when +
+          '</div></div>';
+      }).join('');
+    } catch (e) {
+      list.innerHTML = '<p style="color:var(--danger)">Could not load history. ' + friendlyError(e, '') + '</p>';
+    }
+  }
+
+  function showOwnersBoard() {
+    const modal = $('ownersModal');
+    if (!modal) return;
+    $('ownersTabBoard')?.classList.add('tool-active');
+    $('ownersTabLog')?.classList.remove('tool-active');
+    renderOwnerBoard();
     modal.style.display = 'flex';
   }
+
+  if ($('ownersTabBoard')) $('ownersTabBoard').onclick = () => {
+    $('ownersTabBoard').classList.add('tool-active');
+    $('ownersTabLog')?.classList.remove('tool-active');
+    renderOwnerBoard();
+  };
+  if ($('ownersTabLog')) $('ownersTabLog').onclick = () => {
+    $('ownersTabLog').classList.add('tool-active');
+    $('ownersTabBoard')?.classList.remove('tool-active');
+    renderOwnerHistory();
+  };
 
   if ($('ownersBtn')) $('ownersBtn').onclick = () => showOwnersBoard();
   if ($('ownersClose')) $('ownersClose').onclick = () => { $('ownersModal').style.display = 'none'; };

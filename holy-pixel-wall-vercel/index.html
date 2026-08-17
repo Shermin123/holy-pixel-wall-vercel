@@ -1673,8 +1673,9 @@ Min 10 blocks · no maximum
     c.beginPath();
     c.rect(x, y, w, h);
     c.clip();
-    c.imageSmoothingEnabled = false;
-    c.drawImage(img, dx, dy, dw, dh);
+    c.imageSmoothingEnabled = true;
+c.imageSmoothingQuality = 'high';
+c.drawImage(img, dx, dy, dw, dh);
     c.restore();
   }
 
@@ -2757,7 +2758,7 @@ function clearPending() {
       const img = new Image();
       img.onload = () => {
         try {
-          const maxSide = 1600;
+          const maxSide = 4096;
           let w = img.naturalWidth || img.width;
           let h = img.naturalHeight || img.height;
           if (!w || !h) {
@@ -2781,7 +2782,7 @@ function clearPending() {
           const hasAlpha = type === 'image/png' || type === 'image/webp';
           const out = hasAlpha
             ? c.toDataURL('image/png')
-            : c.toDataURL('image/jpeg', 0.92);
+            : c.toDataURL('image/jpeg', 0.97);
           URL.revokeObjectURL(url);
           resolve(out);
         } catch (err) {

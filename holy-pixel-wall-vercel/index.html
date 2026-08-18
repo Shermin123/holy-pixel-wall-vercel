@@ -4188,6 +4188,12 @@ let scrollDrawRaf = 0;
   }
 
   if ($('adminBtn')) $('adminBtn').onclick = () => openAdmin();
+  document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    openAdmin();
+  }
+});
   if ($('adminClose')) $('adminClose').onclick = () => { $('adminModal').style.display = 'none'; };
   if ($('adminModal')) $('adminModal').addEventListener('click', e => {
     if (e.target === $('adminModal')) $('adminModal').style.display = 'none';

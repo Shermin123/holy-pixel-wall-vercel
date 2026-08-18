@@ -1904,12 +1904,9 @@ function getImg(src) {
         const by = sMinR * drawCell;
         const bw = (sMaxC - sMinC + 1) * drawCell;
         const bh = (sMaxR - sMinR + 1) * drawCell;
-        // Very light tint so grid lines stay visible
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
-        ctx.fillRect(bx, by, bw, bh);
-        // Thin outline only — no solid green block
-        ctx.strokeStyle = 'rgba(4, 120, 87, 0.85)';
-        ctx.lineWidth = Math.max(1, Math.min(2, drawCell * 0.12));
+        // Outline only — fully see-through so every grid line stays visible
+        ctx.strokeStyle = '#059669';
+        ctx.lineWidth = Math.max(1.5, Math.min(2.5, drawCell * 0.18));
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
       }
     }
@@ -1920,12 +1917,11 @@ function getImg(src) {
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
       const dx = minC * drawCell, dy = minR * drawCell;
       const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
-      ctx.fillRect(dx, dy, dw, dh);
-      ctx.strokeStyle = '#047857';
-      ctx.lineWidth = Math.max(2, Math.min(3, cell * 0.2));
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(dx + 1, dy + 1, dw - 2, dh - 2);
+      // Drag preview: outline only (no green fill)
+      ctx.strokeStyle = '#059669';
+      ctx.lineWidth = Math.max(1.5, Math.min(2.5, drawCell * 0.18));
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
       ctx.setLineDash([]);
     }
 

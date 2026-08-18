@@ -467,9 +467,8 @@
   canvas {
     display: block;
     background: #fffdf8;
-    image-rendering: pixelated !important;
-    image-rendering: -moz-crisp-edges !important;
-    image-rendering: crisp-edges !important;
+    /* auto = smoother uploaded photos when zoomed; grid is drawn crisp in JS */
+    image-rendering: auto;
   }
 
   .media-layer {
@@ -836,7 +835,7 @@
     <p>Own a piece of the internet wall</p>
   </div>
   <div class="header-mid">
-    <div class="price-chip">1 PIXEL = $1</div>
+    <div class="price-chip">1 PIXEL = $0.10</div>
     <button class="buy-cta" id="buyModeBtn" type="button">★ BUY PIXELS ★</button>
   </div>
   <div class="header-right">
@@ -908,10 +907,10 @@
       <div class="field">
         <label>DURATION</label>
         <select id="duration">
-          <option value="1month">30 DAYS — $1 / PIXEL</option>
-          <option value="3month">3 MONTHS — $2.50 / PIXEL</option>
-          <option value="6month">6 MONTHS — $5 / PIXEL</option>
-          <option value="permanent">PERMANENT — $25 / PIXEL (limited)</option>
+          <option value="1day">1 DAY — $0.10 / PIXEL</option>
+          <option value="3month">3 MONTHS — $0.50 / PIXEL</option>
+          <option value="6month">6 MONTHS — $1 / PIXEL</option>
+          <option value="permanent">PERMANENT — $10 / PIXEL (limited)</option>
         </select>
       </div>
       <div class="field" style="display:flex;gap:10px">
@@ -1029,7 +1028,7 @@
     <div class="modal-body" style="font-size:1rem;line-height:1.45;color:var(--muted)">
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">1.</strong> Drag to select free pixels.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">2.</strong> Add your name and a photo (tap to upload). Optional link & description.</p>
-      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $1 / pixel for 30 days, $1 for 3 months, $10 for 6 months, or $50 permanent (max 1000 permanent pixels on the wall).</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.10 / pixel for 1 day.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">4.</strong> Your pixels stay locked — others cannot take them until time ends.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">Hover</strong> any claim to see owner, description, and time left.</p>
             <p style="margin-top:12px;font-size:0.9rem"><strong style="color:var(--dark)">Photo tip:</strong> Use a clear JPG or PNG under 2MB. It fills your block automatically.</p>
@@ -1284,11 +1283,11 @@ Min 10 blocks · no maximum
   }
 
   function price() {
-    const d = ($('duration') && $('duration').value) || '1month';
-    if (d === 'permanent') return 25;
-    if (d === '6month') return 5;
-    if (d === '3month') return 2.5;
-    return 1; // 30 days — $1 per pixel
+    const d = ($('duration') && $('duration').value) || '1day';
+    if (d === 'permanent') return 10;
+    if (d === '6month') return 1;
+    if (d === '3month') return 0.50;
+    return 0.10; // 1 day
   }
 
   function durationMs(d) {
@@ -1296,10 +1295,9 @@ Min 10 blocks · no maximum
     if (d === '6month') return MS_DAY * 182;
     if (d === '3month') return MS_DAY * 90;
     if (d === '1month') return MS_DAY * 30;
-    // legacy
     if (d === '1day') return MS_DAY;
     if (d === 'daily') return MS_DAY * 10;
-    return MS_DAY * 30;
+    return MS_DAY; // default 1 day
   }
 
   function permanentPixelsUsed() {
@@ -1486,11 +1484,15 @@ Min 10 blocks · no maximum
 
   function paintBase() {
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
+    // Higher internal res so uploaded images stay clear when zoomed
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    // Internal resolution stays at fit-size (sharp enough, stable)
-    canvas.width = Math.max(1, Math.round(baseW * dpr));
-    canvas.height = Math.max(1, Math.round(baseH * dpr));
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const minLong = 2200;
+    const long = Math.max(baseW, baseH);
+    const boost = long < minLong ? (minLong / long) : 1;
+    const scale = dpr * Math.min(boost, 2.5);
+    canvas.width = Math.max(1, Math.round(baseW * scale));
+    canvas.height = Math.max(1, Math.round(baseH * scale));
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = false;
     // draw() uses logical size baseW×baseH via cell=baseCell temporarily
     const savedCell = cell;
@@ -1658,15 +1660,12 @@ Min 10 blocks · no maximum
     fy = fy == null ? 0.5 : fy;
     const nw = img.naturalWidth, nh = img.naturalHeight;
     const ir = nw / nh, br = w / h;
-    // base cover size
     let bw, bh;
     if (ir > br) { bh = h; bw = h * ir; }
     else { bw = w; bh = w / ir; }
     const dw = bw * scale, dh = bh * scale;
-    // focus: point (fx,fy) on image maps toward center of box
     let dx = x + (w - dw) * fx;
     let dy = y + (h - dh) * fy;
-    // clamp so cover never shows gaps
     dx = Math.min(x, Math.max(x + w - dw, dx));
     dy = Math.min(y, Math.max(y + h - dh, dy));
     c.save();
@@ -1674,10 +1673,11 @@ Min 10 blocks · no maximum
     c.rect(x, y, w, h);
     c.clip();
     c.imageSmoothingEnabled = true;
-c.imageSmoothingQuality = 'high';
-c.drawImage(img, dx, dy, dw, dh);
+    if (c.imageSmoothingQuality) c.imageSmoothingQuality = 'high';
+    c.drawImage(img, dx, dy, dw, dh);
     c.restore();
   }
+
 
 function getImg(src) {
     if (!src) return null;
@@ -1705,47 +1705,28 @@ function getImg(src) {
     const nw = img.naturalWidth;
     const nh = img.naturalHeight;
     let dw, dh, dx, dy;
-    if (mode === 'fill') {
+    if (mode === 'fill' || mode === 'stretch') {
       dw = w; dh = h; dx = x; dy = y;
     } else {
       const ir = nw / nh;
       const br = w / h;
-      if (mode === 'cover') {
-        if (ir > br) { dh = h; dw = h * ir; }
-        else { dw = w; dh = w / ir; }
-      } else {
+      if (mode === 'contain') {
         if (ir > br) { dw = w; dh = w / ir; }
         else { dh = h; dw = h * ir; }
+      } else {
+        // cover (default)
+        if (ir > br) { dh = h; dw = h * ir; }
+        else { dw = w; dh = w / ir; }
       }
       dx = x + (w - dw) / 2;
       dy = y + (h - dh) / 2;
     }
-
-    // High-clarity draw with crisp edges (pixel-wall friendly, not muddy)
-    const maxSide = 1024;
-    let sw = nw, sh = nh;
-    if (sw > maxSide || sh > maxSide) {
-      const sc = maxSide / Math.max(sw, sh);
-      sw = Math.round(sw * sc);
-      sh = Math.round(sh * sc);
-    }
-    const tc = document.createElement('canvas');
-    tc.width = Math.max(1, sw);
-    tc.height = Math.max(1, sh);
-    const tctx = tc.getContext('2d');
-    tctx.imageSmoothingEnabled = true;
-    tctx.imageSmoothingQuality = 'high';
-    tctx.drawImage(img, 0, 0, nw, nh, 0, 0, tc.width, tc.height);
-
-    c.imageSmoothingEnabled = false;
-    c.drawImage(tc, 0, 0, tc.width, tc.height, dx, dy, dw, dh);
-
-    // Thin pixel-block frame
-    c.strokeStyle = 'rgba(61, 43, 26, 0.35)';
-    c.lineWidth = 1;
-    c.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    c.imageSmoothingEnabled = true;
+    if (c.imageSmoothingQuality) c.imageSmoothingQuality = 'high';
+    c.drawImage(img, dx, dy, dw, dh);
     c.restore();
   }
+
 
   function visibleCellRange() {
     // Map viewport scroll → cell indices (only draw what's on screen)
@@ -2310,7 +2291,7 @@ function getImg(src) {
     setVal('desc', r.desc || '');
     const dur = $('duration');
     if (dur) {
-      dur.value = ['permanent','6month','3month','1month'].includes(r.duration)
+      dur.value = ['permanent','6month','3month','1day','1month'].includes(r.duration)
         ? r.duration
         : '1month';
       dur.disabled = true;
@@ -2745,9 +2726,16 @@ function clearPending() {
   // Resize large images so they stay sharp but save cleanly (no storage errors)
   function optimizeImageFile(file) {
     return new Promise((resolve, reject) => {
-      const type = file.type || '';
-      // Keep GIFs as-is so animation is preserved
+      const type = (file.type || '').toLowerCase();
       if (type === 'image/gif') {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('read'));
+        reader.readAsDataURL(file);
+        return;
+      }
+      // Keep small PNG/WebP lossless
+      if ((type === 'image/png' || type === 'image/webp') && file.size <= 2e6) {
         const reader = new FileReader();
         reader.onload = e => resolve(e.target.result);
         reader.onerror = () => reject(new Error('read'));
@@ -2758,42 +2746,37 @@ function clearPending() {
       const img = new Image();
       img.onload = () => {
         try {
-          const maxSide = 4096;
+          const maxSide = 2560;
           let w = img.naturalWidth || img.width;
           let h = img.naturalHeight || img.height;
-          if (!w || !h) {
-            URL.revokeObjectURL(url);
-            reject(new Error('bad image'));
-            return;
-          }
+          if (!w || !h) { URL.revokeObjectURL(url); reject(new Error('bad image')); return; }
           if (w > maxSide || h > maxSide) {
-            const scale = maxSide / Math.max(w, h);
-            w = Math.round(w * scale);
-            h = Math.round(h * scale);
+            const sc = maxSide / Math.max(w, h);
+            w = Math.round(w * sc);
+            h = Math.round(h * sc);
           }
           const c = document.createElement('canvas');
           c.width = w;
           c.height = h;
           const cx = c.getContext('2d');
           cx.imageSmoothingEnabled = true;
-          cx.imageSmoothingQuality = 'high';
+          if (cx.imageSmoothingQuality) cx.imageSmoothingQuality = 'high';
           cx.drawImage(img, 0, 0, w, h);
-          // Prefer PNG for logos with transparency; JPEG for photos
-          const hasAlpha = type === 'image/png' || type === 'image/webp';
-          const out = hasAlpha
-            ? c.toDataURL('image/png')
-            : c.toDataURL('image/jpeg', 0.97);
           URL.revokeObjectURL(url);
+          let out;
+          if (type === 'image/png') {
+            out = c.toDataURL('image/png');
+            if (out.length > 2.5e6) out = c.toDataURL('image/jpeg', 0.95);
+          } else {
+            out = c.toDataURL('image/jpeg', 0.95);
+          }
           resolve(out);
         } catch (err) {
-          URL.revokeObjectURL(url);
+          try { URL.revokeObjectURL(url); } catch (e) {}
           reject(err);
         }
       };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error('decode'));
-      };
+      img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} reject(new Error('load')); };
       img.src = url;
     });
   }

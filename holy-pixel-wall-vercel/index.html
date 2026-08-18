@@ -467,8 +467,10 @@
   canvas {
     display: block;
     background: #fffdf8;
-    /* auto = smoother uploaded photos when zoomed; grid is drawn crisp in JS */
-    image-rendering: auto;
+    /* pixelated = selection + grid stay aligned when CSS-zoomed */
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
   }
 
   .media-layer {
@@ -1888,28 +1890,26 @@ function getImg(src) {
 
     // 4) Selection highlight
     if (selected.size) {
+      // Bounding box of selection in cell indices (base canvas units only)
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
       selected.forEach(k => {
         if (sold.has(k)) return;
         const [c, r] = k.split(',').map(Number);
-        if (c < c0 || c > c1 || r < r0 || r > r1) {
-          // still expand bounds for border
-        } else {
-          ctx.fillRect(c * drawCell, r * drawCell, cell, cell);
-        }
+        if (!Number.isFinite(c) || !Number.isFinite(r)) return;
         if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
         if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
       });
-      if (sMaxC >= sMinC) {
-        const bx = sMinC * drawCell, by = sMinR * drawCell;
-        const bw = (sMaxC - sMinC + 1) * drawCell, bh = (sMaxR - sMinR + 1) * drawCell;
+      if (sMaxC >= sMinC && sMaxR >= sMinR) {
+        const bx = sMinC * drawCell;
+        const by = sMinR * drawCell;
+        const bw = (sMaxC - sMinC + 1) * drawCell;
+        const bh = (sMaxR - sMinR + 1) * drawCell;
+        // One fill + one border — exact cell edges (no inset, no layout `cell`)
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.38)';
+        ctx.fillRect(bx, by, bw, bh);
         ctx.strokeStyle = '#047857';
-        ctx.lineWidth = Math.max(2, Math.min(3.5, cell * 0.25));
-        ctx.strokeRect(bx + 1, by + 1, bw - 2, bh - 2);
-        ctx.strokeStyle = '#ecfdf5';
-        ctx.lineWidth = Math.max(1, Math.min(2, cell * 0.1));
-        ctx.strokeRect(bx + 3, by + 3, Math.max(0, bw - 6), Math.max(0, bh - 6));
+        ctx.lineWidth = Math.max(1, Math.min(2.5, drawCell * 0.15));
+        ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
       }
     }
 
@@ -1971,8 +1971,12 @@ function getImg(src) {
       const cx = e.clientX ?? e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX;
       const cy = e.clientY ?? e.touches?.[0]?.clientY ?? e.changedTouches?.[0]?.clientY;
       if (cx == null || cy == null) return { c: 0, r: 0 };
-      const x = (cx - rect.left) / rect.width;
-      const y = (cy - rect.top) / rect.height;
+      // Normalize to 0..1 using visual (CSS-scaled) size — works at any zoom
+      let x = (cx - rect.left) / rect.width;
+      let y = (cy - rect.top) / rect.height;
+      // Tiny clamp so edges don't flip to next cell from subpixel bleed
+      x = Math.min(0.999999, Math.max(0, x));
+      y = Math.min(0.999999, Math.max(0, y));
       return {
         c: Math.max(0, Math.min(COLS - 1, Math.floor(x * COLS))),
         r: Math.max(0, Math.min(ROWS - 1, Math.floor(y * ROWS)))

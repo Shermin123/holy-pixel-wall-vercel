@@ -867,7 +867,7 @@
   <span class="tool-gap"></span>
   <button class="tool-btn" id="helpBtn" type="button">HOW IT WORKS</button>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
-  <button class="tool-btn" id="adminBtn" type="button" title="Admin control">ADMIN</button>
+  <!-- admin: Ctrl+Shift+A only -->
 </div>
 <div class="viewport" id="viewport">
   <div id="wallWrap">
@@ -1054,8 +1054,8 @@ Min 10 blocks · no maximum
 <div class="overlay" id="adminModal">
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
-      <h3>ADMIN — ALL CLAIMS</h3>
-      <p>Remove any image / claim. Keep your key private.</p>
+      <h3>ADMIN CONTROL</h3>
+      <p>Type your secret key, then Load Claims. Delete or focus any claim.</p>
     </div>
     <div class="modal-body">
       <div class="field">
@@ -3324,12 +3324,27 @@ function clearPending() {
     }
   }
 
+  
+  // Secret admin: Ctrl+Shift+A (hidden from public)
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+      e.preventDefault();
+      openAdmin();
+    }
+  });
+
   if ($('adminBtn')) $('adminBtn').onclick = () => {
     try {
       const saved = localStorage.getItem('hpw_admin_key');
       if (saved && $('adminKeyInput')) $('adminKeyInput').value = saved;
     } catch (e) {}
     $('adminModal').style.display = 'flex';
+    // Auto-load if key already saved
+    try {
+      const k = localStorage.getItem('hpw_admin_key');
+      if (k) adminLoadClaims();
+    } catch (e) {}
   };
   if ($('adminCloseBtn')) $('adminCloseBtn').onclick = () => { $('adminModal').style.display = 'none'; };
   if ($('adminLoadBtn')) $('adminLoadBtn').onclick = () => adminLoadClaims();

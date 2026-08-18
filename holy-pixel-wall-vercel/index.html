@@ -1055,7 +1055,7 @@ Min 10 blocks · no maximum
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
       <h3>ADMIN CONTROL</h3>
-      <p>Type your secret key, then Load Claims. Delete or focus any claim.</p>
+      <p>Type your secret key, then Load Claims. Edit any user image, name, link — or delete.</p>
     </div>
     <div class="modal-body">
       <div class="field">
@@ -3282,57 +3282,169 @@ function clearPending() {
     const key = getAdminKey();
     const box = $('adminList');
     if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
-    if (box) box.innerHTML = 'Loading…';
+    if (box) box.innerHTML = '<p style="color:var(--muted)">Loading all claims…</p>';
     try {
       const data = await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 20000 }, 'Admin list');
-      const regions = data.regions || [];
-      if (!regions.length) {
-        if (box) box.innerHTML = '<p style="color:var(--muted)">No claims yet.</p>';
+      const regionsList = data.regions || [];
+      if (!regionsList.length) {
+        if (box) box.innerHTML = '<p style="color:var(--muted)">No claims on the wall.</p>';
         return;
       }
-      if (box) {
-        box.innerHTML = regions.map(r => {
-          const when = r.claimedAt ? new Date(r.claimedAt).toLocaleString() : '—';
-          return '<div style="border:2px solid var(--border);padding:8px;margin-bottom:8px;background:#fff">' +
-            '<strong style="color:var(--dark)">' + (r.name || 'ANON') + '</strong> · ' + (r.pixels || 0) + ' px · ' + (r.duration || '') +
-            '<br><span style="color:var(--muted)">' + (r.desc || '') + '</span>' +
-            '<br><span style="color:var(--muted);font-size:0.85rem">' + when + (r.link ? ' · link set' : '') + (r.hasMedia ? ' · has image' : '') + '</span>' +
-            '<br><button type="button" class="btn btn-sec admin-del" data-id="' + r.id + '" style="margin-top:6px;border-color:var(--danger);color:var(--danger);font-size:0.35rem;padding:6px 10px">DELETE</button>' +
-            '</div>';
-        }).join('');
-        box.querySelectorAll('.admin-del').forEach(btn => {
-          btn.onclick = async () => {
-            if (!confirm('Delete this claim and free its pixels?')) return;
-            try {
-              await apiFetch('/api/admin/delete', {
-                method: 'POST',
-                body: JSON.stringify({ key: getAdminKey(), id: btn.dataset.id }),
-                timeout: 20000
-              }, 'Admin delete');
-              toast('CLAIM REMOVED', 'ok');
-              await pullWall();
-              adminLoadClaims();
-            } catch (e) {
-              toast(friendlyError(e, 'Delete failed'), 'error');
-            }
+      if (!box) return;
+      box.innerHTML = regionsList.map(r => {
+        const when = r.claimedAt ? new Date(r.claimedAt).toLocaleString() : '—';
+        const safeName = String(r.name || 'ANON').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        const safeDesc = String(r.desc || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        const safeLink = String(r.link || '').replace(/"/g, '&quot;');
+        const id = r.id || '';
+        return '<div class="admin-card" data-id="' + id + '" style="border:2px solid var(--border);padding:10px;margin-bottom:10px;background:#fff">' +
+          '<div class="admin-view">' +
+          '<strong style="color:var(--dark);font-size:1.15rem">' + safeName + '</strong> · ' + (r.pixels || 0) + ' px · ' + (r.duration || '') +
+          (r.paid != null ? ' · $' + Number(r.paid).toFixed(2) : '') +
+          '<br><span style="color:var(--muted)">' + safeDesc + '</span>' +
+          '<br><span style="color:var(--muted);font-size:0.85rem">' + when +
+          (r.link ? ' · has link' : '') + (r.hasMedia ? ' · has image' : ' · no image') + '</span>' +
+          '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' +
+          '<button type="button" class="btn btn-sec admin-edit" data-id="' + id + '" style="font-size:0.35rem;padding:6px 10px">EDIT</button>' +
+          '<button type="button" class="btn btn-sec admin-focus" data-id="' + id + '" style="font-size:0.35rem;padding:6px 10px">FOCUS</button>' +
+          '<button type="button" class="btn btn-sec admin-del" data-id="' + id + '" style="border-color:var(--danger);color:var(--danger);font-size:0.35rem;padding:6px 10px">DELETE</button>' +
+          '</div></div>' +
+          '<div class="admin-edit-form" style="display:none;margin-top:10px;border-top:2px solid var(--border);padding-top:10px">' +
+          '<div class="field"><label>NAME</label><input type="text" class="ae-name" value="' + safeName + '" maxlength="40"></div>' +
+          '<div class="field"><label>DESCRIPTION</label><input type="text" class="ae-desc" value="' + safeDesc + '" maxlength="120"></div>' +
+          '<div class="field"><label>LINK</label><input type="url" class="ae-link" value="' + safeLink + '" placeholder="https://"></div>' +
+          '<div class="field"><label>DURATION</label><select class="ae-duration">' +
+          '<option value="1day"' + (r.duration==='1day'?' selected':'') + '>1 day</option>' +
+          '<option value="3month"' + (r.duration==='3month'?' selected':'') + '>3 months</option>' +
+          '<option value="6month"' + (r.duration==='6month'?' selected':'') + '>6 months</option>' +
+          '<option value="1month"' + (r.duration==='1month'?' selected':'') + '>1 month</option>' +
+          '<option value="permanent"' + (r.duration==='permanent'?' selected':'') + '>permanent</option>' +
+          '</select></div>' +
+          '<div class="field"><label>REPLACE IMAGE (optional)</label>' +
+          '<input type="file" class="ae-file" accept="image/*,image/gif,video/*" style="font-size:0.9rem"></div>' +
+          '<label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:0.9rem">' +
+          '<input type="checkbox" class="ae-remove-media"> Remove current image</label>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          '<button type="button" class="btn btn-pri admin-save" data-id="' + id + '" style="font-size:0.35rem;padding:8px 12px">SAVE CHANGES</button>' +
+          '<button type="button" class="btn btn-sec admin-cancel" style="font-size:0.35rem;padding:8px 12px">CANCEL</button>' +
+          '</div></div></div>';
+      }).join('');
+
+      box.querySelectorAll('.admin-edit').forEach(btn => {
+        btn.onclick = () => {
+          const card = btn.closest('.admin-card');
+          if (!card) return;
+          card.querySelector('.admin-view').style.display = 'none';
+          card.querySelector('.admin-edit-form').style.display = 'block';
+        };
+      });
+      box.querySelectorAll('.admin-cancel').forEach(btn => {
+        btn.onclick = () => {
+          const card = btn.closest('.admin-card');
+          if (!card) return;
+          card.querySelector('.admin-view').style.display = 'block';
+          card.querySelector('.admin-edit-form').style.display = 'none';
+        };
+      });
+      box.querySelectorAll('.admin-save').forEach(btn => {
+        btn.onclick = async () => {
+          const card = btn.closest('.admin-card');
+          if (!card) return;
+          const id = btn.dataset.id;
+          const payload = {
+            key: getAdminKey(),
+            id: id,
+            name: card.querySelector('.ae-name').value.trim(),
+            desc: card.querySelector('.ae-desc').value.trim(),
+            link: card.querySelector('.ae-link').value.trim(),
+            duration: card.querySelector('.ae-duration').value
           };
-        });
-      }
+          if (card.querySelector('.ae-remove-media').checked) {
+            payload.removeMedia = true;
+          }
+          const fileInput = card.querySelector('.ae-file');
+          const file = fileInput && fileInput.files && fileInput.files[0];
+          btn.disabled = true;
+          btn.textContent = 'SAVING…';
+          try {
+            if (file) {
+              const isVid = (file.type || '').startsWith('video/');
+              if (isVid) {
+                const reader = new FileReader();
+                const dataUrl = await new Promise((res, rej) => {
+                  reader.onload = () => res(reader.result);
+                  reader.onerror = rej;
+                  reader.readAsDataURL(file);
+                });
+                payload.media = dataUrl;
+                payload.mediaType = 'video';
+              } else if (typeof optimizeImageFile === 'function') {
+                payload.media = await optimizeImageFile(file);
+                payload.mediaType = 'image';
+              } else {
+                const reader = new FileReader();
+                payload.media = await new Promise((res, rej) => {
+                  reader.onload = () => res(reader.result);
+                  reader.onerror = rej;
+                  reader.readAsDataURL(file);
+                });
+                payload.mediaType = 'image';
+              }
+            }
+            await apiFetch('/api/admin/update', {
+              method: 'POST',
+              body: JSON.stringify(payload),
+              timeout: 90000
+            }, 'Admin update');
+            toast('CLAIM UPDATED', 'ok');
+            await pullWall();
+            adminLoadClaims();
+          } catch (e) {
+            toast(friendlyError(e, 'Update failed'), 'error');
+            btn.disabled = false;
+            btn.textContent = 'SAVE CHANGES';
+          }
+        };
+      });
+      box.querySelectorAll('.admin-del').forEach(btn => {
+        btn.onclick = async () => {
+          if (!confirm('Delete this claim and free its pixels?')) return;
+          try {
+            await apiFetch('/api/admin/delete', {
+              method: 'POST',
+              body: JSON.stringify({ key: getAdminKey(), id: btn.dataset.id }),
+              timeout: 20000
+            }, 'Admin delete');
+            toast('CLAIM REMOVED', 'ok');
+            await pullWall();
+            adminLoadClaims();
+          } catch (e) {
+            toast(friendlyError(e, 'Delete failed'), 'error');
+          }
+        };
+      });
+      box.querySelectorAll('.admin-focus').forEach(btn => {
+        btn.onclick = () => {
+          const r = regions.find(x => x && x.id === btn.dataset.id);
+          if (!r) { toast('Not on wall — try refresh', 'error'); return; }
+          try {
+            const midC = ((r.minC || 0) + (r.maxC || 0)) / 2;
+            const midR = ((r.minR || 0) + (r.maxR || 0)) / 2;
+            const z = zoom || 1;
+            const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
+            viewport.scrollLeft = Math.max(0, pad + midC * (baseCell * z) - viewport.clientWidth / 2);
+            viewport.scrollTop = Math.max(0, pad + midR * (baseCell * z) - viewport.clientHeight / 2);
+            $('adminModal').style.display = 'none';
+            toast('FOCUSED: ' + (r.name || ''));
+          } catch (e) { console.warn(e); }
+        };
+      });
     } catch (e) {
-      if (box) box.innerHTML = '';
+      if (box) box.innerHTML = '<p style="color:var(--danger)">' + friendlyError(e, 'Load failed') + '</p>';
       toast(friendlyError(e, 'Admin load failed'), 'error');
     }
   }
 
-  
-  // Secret admin: Ctrl+Shift+A (hidden from public)
-  window.addEventListener('keydown', e => {
-    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-      if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
-      e.preventDefault();
-      openAdmin();
-    }
-  });
 
   if ($('adminBtn')) $('adminBtn').onclick = () => {
     try {

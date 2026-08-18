@@ -1904,11 +1904,12 @@ function getImg(src) {
         const by = sMinR * drawCell;
         const bw = (sMaxC - sMinC + 1) * drawCell;
         const bh = (sMaxR - sMinR + 1) * drawCell;
-        // One fill + one border — exact cell edges (no inset, no layout `cell`)
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.38)';
+        // Very light tint so grid lines stay visible
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
         ctx.fillRect(bx, by, bw, bh);
-        ctx.strokeStyle = '#047857';
-        ctx.lineWidth = Math.max(1, Math.min(2.5, drawCell * 0.15));
+        // Thin outline only — no solid green block
+        ctx.strokeStyle = 'rgba(4, 120, 87, 0.85)';
+        ctx.lineWidth = Math.max(1, Math.min(2, drawCell * 0.12));
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
       }
     }

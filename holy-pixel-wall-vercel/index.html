@@ -867,7 +867,7 @@
   <span class="tool-gap"></span>
   <button class="tool-btn" id="helpBtn" type="button">HOW IT WORKS</button>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
-  <button class="tool-btn" id="adminBtn" type="button" style="display:none">ADMIN</button>
+  <button class="tool-btn" id="adminBtn" type="button" title="Admin control">ADMIN</button>
 </div>
 <div class="viewport" id="viewport">
   <div id="wallWrap">
@@ -1926,57 +1926,30 @@ function getImg(src) {
     }
 
     // Live preview: show how image will look on selection before claim
-    // Live preview: show uploaded image only inside the selected pixels
-if (selected.size && pendingMedia && pendingType !== 'video') {
-  let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
-
-  selected.forEach(k => {
-    if (sold.has(k)) return;
-
-    const [c, r] = k.split(',').map(Number);
-    minC = Math.min(minC, c);
-    maxC = Math.max(maxC, c);
-    minR = Math.min(minR, r);
-    maxR = Math.max(maxR, r);
-  });
-
-  if (maxC >= minC && maxR >= minR) {
-    const x = minC * drawCell;
-    const y = minR * drawCell;
-    const w = (maxC - minC + 1) * drawCell;
-    const h = (maxR - minR + 1) * drawCell;
-
-    const img = getImg(pendingMedia);
-
-    ctx.save();
-
-    // Clip strictly to the selected area
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.clip();
-
-    if (img?.complete) {
-      drawCoverCrop(
-        ctx,
-        img,
-        x,
-        y,
-        w,
-        h,
-        crop.scale,
-        crop.x,
-        crop.y
-      );
+    if (selected.size && pendingMedia && pendingType !== 'video') {
+      let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
+      selected.forEach(k => {
+        if (sold.has(k)) return;
+        const [c, r] = k.split(',').map(Number);
+        minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+        minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+      });
+      if (maxC >= minC) {
+        const x = minC * drawCell, y = minR * drawCell;
+        const w = (maxC - minC + 1) * drawCell, h = (maxR - minR + 1) * drawCell;
+        const img = getImg(pendingMedia);
+        ctx.save();
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, w, h);
+        if (img?.complete) drawCoverCrop(ctx, img, x, y, w, h, crop.scale, crop.x, crop.y);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#1a1512';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        ctx.restore();
+      }
     }
-
-    ctx.restore();
-
-    // Clean black border around the uploaded image
-    ctx.strokeStyle = '#1a1512';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
-  }
-}
 
     // Clear border on ALL sides (top, right, bottom, left)
     ctx.strokeStyle = '#1a1512';
@@ -3955,6 +3928,191 @@ let scrollDrawRaf = 0;
       try { sessionStorage.removeItem('hpw_pending_claim'); sessionStorage.removeItem('hpw_pending_flag'); } catch (e) {}
     }
   })();
+
+    
+  // ===== ADMIN PANEL =====
+  const ADMIN_SESSION_KEY = 'hpw_admin_key';
+  function getAdminKey() {
+    try { return sessionStorage.getItem(ADMIN_SESSION_KEY) || ''; } catch (e) { return ''; }
+  }
+  function setAdminKey(k) {
+    try {
+      if (k) sessionStorage.setItem(ADMIN_SESSION_KEY, k);
+      else sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    } catch (e) {}
+  }
+
+  async function adminFetch(path, opts) {
+    const key = getAdminKey();
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    let body = opts.body;
+    if (opts.method === 'POST') {
+      const data = body ? JSON.parse(body) : {};
+      data.key = key;
+      opts.body = JSON.stringify(data);
+    }
+    const url = path + (path.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(key);
+    const res = await fetch(opts.method === 'GET' || !opts.method ? url : path, opts);
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + res.status));
+    return j;
+  }
+
+  function openAdmin() {
+    const modal = $('adminModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const key = getAdminKey();
+    if (key) {
+      $('adminLoginBox').style.display = 'none';
+      $('adminPanel').style.display = 'block';
+      loadAdminList();
+    } else {
+      $('adminLoginBox').style.display = 'block';
+      $('adminPanel').style.display = 'none';
+      if ($('adminKeyInput')) $('adminKeyInput').value = '';
+      if ($('adminLoginErr')) $('adminLoginErr').style.display = 'none';
+    }
+  }
+
+  async function loadAdminList() {
+    const list = $('adminList');
+    const stats = $('adminStats');
+    if (!list) return;
+    list.innerHTML = '<p style="color:var(--muted)">Loading…</p>';
+    try {
+      const data = await adminFetch('/api/admin/list', { method: 'GET' });
+      const rows = data.regions || [];
+      if (stats) stats.textContent = rows.length + ' claim' + (rows.length === 1 ? '' : 's') + ' on the wall';
+      if (!rows.length) {
+        list.innerHTML = '<p style="color:var(--muted);text-align:center;padding:16px">Wall is empty.</p>';
+        return;
+      }
+      list.innerHTML = rows.map(r => {
+        const id = r.id || '';
+        const name = String(r.name || 'ANON').replace(/</g, '&lt;');
+        const desc = String(r.desc || '').replace(/</g, '&lt;');
+        const when = r.claimedAt ? new Date(r.claimedAt).toLocaleString() : '—';
+        const px = r.pixels || 0;
+        const paid = r.paid != null ? ('$' + Number(r.paid).toFixed(2)) : '—';
+        return '<div style="border:2px solid var(--border);padding:10px;margin-bottom:8px;background:#fff">' +
+          '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+          '<div style="min-width:0;flex:1">' +
+          '<strong style="color:var(--dark);font-size:1.15rem">' + name + '</strong>' +
+          (desc ? '<div style="color:var(--muted);font-size:0.9rem">' + desc + '</div>' : '') +
+          '<div style="color:var(--muted);font-size:0.85rem;margin-top:4px">' +
+          px + ' px · ' + (r.duration || '') + ' · ' + paid + '<br>' + when +
+          (r.link ? '<br>Link: ' + String(r.link).replace(/</g, '&lt;') : '') +
+          (r.hasMedia ? '<br>Has image/video' : '') +
+          '</div></div>' +
+          '<div style="display:flex;flex-direction:column;gap:6px">' +
+          '<button type="button" class="btn btn-sec admin-focus" data-id="' + id + '" style="font-size:0.35rem;padding:6px 8px">FOCUS</button>' +
+          '<button type="button" class="btn admin-del" data-id="' + id + '" data-name="' + name + '" style="font-size:0.35rem;padding:6px 8px;background:var(--danger);color:#fff;border-color:#fff">DELETE</button>' +
+          '</div></div></div>';
+      }).join('');
+
+      list.querySelectorAll('.admin-del').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute('data-id');
+          const nm = btn.getAttribute('data-name') || 'claim';
+          if (!confirm('Delete claim by "' + nm + '"?\nThis cannot be undone.')) return;
+          try {
+            await adminFetch('/api/admin/delete', {
+              method: 'POST',
+              body: JSON.stringify({ id: id })
+            });
+            toast('DELETED', 'ok');
+            await loadAdminList();
+            await pullWall();
+          } catch (e) {
+            toast(friendlyError(e, 'Delete failed'), 'error');
+          }
+        };
+      });
+      list.querySelectorAll('.admin-focus').forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.getAttribute('data-id');
+          const r = regions.find(x => x && x.id === id);
+          if (!r) { toast('Claim not on local wall — refresh', 'error'); return; }
+          // Scroll stage toward claim center
+          try {
+            const midC = ((r.minC || 0) + (r.maxC || 0)) / 2;
+            const midR = ((r.minR || 0) + (r.maxR || 0)) / 2;
+            const z = zoom || 1;
+            const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
+            const x = pad + midC * (baseCell * z);
+            const y = pad + midR * (baseCell * z);
+            viewport.scrollLeft = Math.max(0, x - viewport.clientWidth / 2);
+            viewport.scrollTop = Math.max(0, y - viewport.clientHeight / 2);
+            $('adminModal').style.display = 'none';
+            toast('FOCUSED: ' + (r.name || ''), 'ok');
+          } catch (e) { console.warn(e); }
+        };
+      });
+    } catch (e) {
+      list.innerHTML = '<p style="color:var(--danger)">' + friendlyError(e, 'Failed to load') + '</p>';
+      if (String(e.message || '').toLowerCase().includes('unauth') || String(e.message || '').includes('Invalid')) {
+        setAdminKey('');
+        $('adminLoginBox').style.display = 'block';
+        $('adminPanel').style.display = 'none';
+      }
+    }
+  }
+
+  if ($('adminBtn')) $('adminBtn').onclick = () => openAdmin();
+  if ($('adminClose')) $('adminClose').onclick = () => { $('adminModal').style.display = 'none'; };
+  if ($('adminModal')) $('adminModal').addEventListener('click', e => {
+    if (e.target === $('adminModal')) $('adminModal').style.display = 'none';
+  });
+  if ($('adminLoginBtn')) $('adminLoginBtn').onclick = async () => {
+    const k = ($('adminKeyInput') && $('adminKeyInput').value || '').trim();
+    if (!k) {
+      $('adminLoginErr').style.display = 'block';
+      $('adminLoginErr').textContent = 'Enter your admin key';
+      return;
+    }
+    setAdminKey(k);
+    try {
+      await adminFetch('/api/admin/list', { method: 'GET' });
+      $('adminLoginBox').style.display = 'none';
+      $('adminPanel').style.display = 'block';
+      $('adminLoginErr').style.display = 'none';
+      loadAdminList();
+      toast('ADMIN UNLOCKED', 'ok');
+    } catch (e) {
+      setAdminKey('');
+      $('adminLoginErr').style.display = 'block';
+      $('adminLoginErr').textContent = 'Wrong key or server error';
+    }
+  };
+  if ($('adminKeyInput')) $('adminKeyInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') $('adminLoginBtn')?.click();
+  });
+  if ($('adminRefresh')) $('adminRefresh').onclick = () => loadAdminList();
+  if ($('adminLogout')) $('adminLogout').onclick = () => {
+    setAdminKey('');
+    $('adminLoginBox').style.display = 'block';
+    $('adminPanel').style.display = 'none';
+    toast('ADMIN LOCKED');
+  };
+  if ($('adminClearAll')) $('adminClearAll').onclick = async () => {
+    if (!confirm('DELETE ALL claims on the wall?\nType OK in the next box to confirm.')) return;
+    const ok = prompt('Type DELETE_ALL to confirm');
+    if (ok !== 'DELETE_ALL') { toast('Cancelled'); return; }
+    try {
+      await adminFetch('/api/admin/clear', {
+        method: 'POST',
+        body: JSON.stringify({ confirm: 'DELETE_ALL' })
+      });
+      toast('WALL CLEARED', 'ok');
+      await loadAdminList();
+      await pullWall();
+    } catch (e) {
+      toast(friendlyError(e, 'Clear failed'), 'error');
+    }
+  };
+
 
     setTimeout(() => toast('DRAG A RECTANGLE · MIN 10 BLOCKS · SCROLL TO MOVE · PINCH TO ZOOM'), 600);
 })();

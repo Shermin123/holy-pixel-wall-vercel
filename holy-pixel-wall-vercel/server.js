@@ -10,6 +10,7 @@ const DB_FILE = path.join(ROOT, 'data', 'claims.json');
 const MIN = 10;
 const PERM_PIXEL_CAP = 1000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const MAX_MEDIA_CHARS = 900000; // ~0.9MB base64 safety for Upstash
 
 fs.mkdirSync(path.join(ROOT, 'data'), { recursive: true });
 
@@ -36,13 +37,24 @@ async function upstashGet() {
 async function upstashSet(db) {
   try {
     const val = JSON.stringify(db);
+    if (val.length > 7_500_000) {
+      console.error('Upstash payload too large', val.length);
+      return false;
+    }
     const res = await fetch(UPSTASH_URL, {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + UPSTASH_TOKEN, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: 'Bearer ' + UPSTASH_TOKEN,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(['SET', 'wall_data', val])
     });
     const j = await res.json();
-    console.log('Upstash saved', j);
+    console.log('Upstash saved', j, 'bytes', val.length);
+    if (j && j.error) {
+      console.error('Upstash error', j.error);
+      return false;
+    }
     return true;
   } catch (e) {
     console.error('Upstash save failed', e);
@@ -108,10 +120,10 @@ function soldMap(db) {
 }
 
 function priceUnit(d) {
-  if (d === 'permanent') return 50;
-  if (d === '6month') return 10;
-  if (d === '3month') return 1;
-  return 0.50; // 30 days
+  if (d === 'permanent') return 10;
+  if (d === '6month') return 1;
+  if (d === '3month') return 0.50;
+  return 0.10; // 1 day
 }
 
 function json(res, code, obj) {
@@ -127,7 +139,17 @@ function json(res, code, obj) {
 function body(req) {
   return new Promise((resolve, reject) => {
     const c = [];
-    req.on('data', d => c.push(d));
+    let size = 0;
+    const LIMIT = 12 * 1024 * 1024; // 12MB
+    req.on('data', d => {
+      size += d.length;
+      if (size > LIMIT) {
+        reject(new Error('Body too large'));
+        req.destroy();
+        return;
+      }
+      c.push(d);
+    });
     req.on('end', () => resolve(Buffer.concat(c).toString()));
     req.on('error', reject);
   });
@@ -157,32 +179,34 @@ const server = http.createServer(async (req, res) => {
       const data = JSON.parse((await body(req)) || '{}');
       const cells = data.cells || [];
       if (cells.length < MIN) return json(res, 400, { ok: false, error: 'Need at least ' + MIN });
-
+      const duration = data.duration || '1month';
       const db = await load();
       const map = soldMap(db);
       for (const k of cells) if (map.has(k)) return json(res, 409, { ok: false, error: 'Already owned' });
-
-      if ((data.duration || '') === 'permanent') {
+      if (duration === 'permanent') {
         const used = permanentUsed(db);
         const left = Math.max(0, PERM_PIXEL_CAP - used);
         if (left <= 0) return json(res, 400, { ok: false, error: 'No permanent pixels left (limit ' + PERM_PIXEL_CAP + ')' });
         if (cells.length > left) return json(res, 400, { ok: false, error: 'Only ' + left + ' permanent pixels left' });
       }
-
-      const unit = priceUnit(data.duration || '1month');
-      const totalCents = Math.round(cells.length * unit * 100);
+      const unit = priceUnit(duration);
+      const centsPerPixel = Math.round(unit * 100);
+      const totalCents = cells.length * centsPerPixel;
       if (totalCents < 50) return json(res, 400, { ok: false, error: 'Amount too small for Stripe (min $0.50)' });
       const publicUrl = (process.env.PUBLIC_URL || 'https://www.holypixelwall.com').replace(/\/$/, '');
-
+      const unitLabel = (centsPerPixel / 100).toFixed(2);
+      const totalLabel = (totalCents / 100).toFixed(2);
       const params = new URLSearchParams();
       params.append('mode', 'payment');
       params.append('success_url', publicUrl + '/?paid=1&session_id={CHECKOUT_SESSION_ID}');
       params.append('cancel_url', publicUrl + '/?canceled=1');
       params.append('line_items[0][price_data][currency]', 'usd');
-      params.append('line_items[0][price_data][product_data][name]', 'Holy Pixel Wall — ' + cells.length + ' pixels');
+      params.append(
+        'line_items[0][price_data][product_data][name]',
+        cells.length + ' pixels × $' + unitLabel + ' = $' + totalLabel
+      );
       params.append('line_items[0][price_data][unit_amount]', String(totalCents));
       params.append('line_items[0][quantity]', '1');
-
       const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -193,34 +217,51 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, url: session.url });
     }
     if (p === '/api/claim' && req.method === 'POST') {
-      const data = JSON.parse((await body(req)) || '{}');
+      let data;
+      try {
+        data = JSON.parse((await body(req)) || '{}');
+      } catch (e) {
+        return json(res, 400, { ok: false, error: 'Invalid JSON body (image may be too large)' });
+      }
       const cells = data.cells || [];
-      if (cells.length < MIN) return json(res, 400, { ok: false, error: 'Need ' + MIN });
+      if (cells.length < MIN) return json(res, 400, { ok: false, error: 'Need ' + MIN + ' pixels minimum' });
+
+      let media = data.media || '';
+      if (media && media.length > MAX_MEDIA_CHARS) {
+        console.warn('Media truncated', media.length);
+        media = '';
+      }
 
       const db = await load();
       if ((data.duration || '') === 'permanent') {
         const used = permanentUsed(db);
         const left = Math.max(0, PERM_PIXEL_CAP - used);
-        if (left <= 0) return json(res, 400, { ok: false, error: 'No permanent pixels left (limit ' + PERM_PIXEL_CAP + ')' });
+        if (left <= 0) return json(res, 400, { ok: false, error: 'No permanent pixels left' });
         if (cells.length > left) return json(res, 400, { ok: false, error: 'Only ' + left + ' permanent pixels left' });
       }
       const map = soldMap(db);
-      for (const k of cells) if (map.has(k)) return json(res, 409, { ok: false, error: 'Blocks owned' });
+      for (const k of cells) {
+        if (map.has(k)) return json(res, 409, { ok: false, error: 'Some blocks already owned — payment received, contact support' });
+      }
 
       let minC = 1e9, maxC = -1, minR = 1e9, maxR = -1;
       cells.forEach(k => {
-        const [c, r] = k.split(',').map(Number);
+        const [c, r] = String(k).split(',').map(Number);
+        if (!isFinite(c) || !isFinite(r)) return;
         minC = Math.min(minC, c); maxC = Math.max(maxC, c);
         minR = Math.min(minR, r); maxR = Math.max(maxR, r);
       });
 
       db.regions = db.regions || [];
-      db.regions.push({
-        id: crypto.randomUUID(),
+      db.history = db.history || [];
+      const claimId = crypto.randomUUID();
+      const claimAt = Date.now();
+      const entry = {
+        id: claimId,
         name: String(data.name || 'ANON').slice(0, 40),
         desc: String(data.desc || '').slice(0, 120),
-        media: data.media || '',
-        mediaType: data.mediaType || 'image',
+        media: media,
+        mediaType: media ? (data.mediaType || 'image') : 'none',
         fit: 'cover',
         cropScale: data.cropScale || 1,
         cropX: data.cropX != null ? data.cropX : 0.5,
@@ -229,13 +270,32 @@ const server = http.createServer(async (req, res) => {
         linkType: data.linkType || 'none',
         duration: data.duration || '1month',
         paid: data.paid || 0,
-        claimedAt: Date.now(),
+        claimedAt: claimAt,
         cells, minC, maxC, minR, maxR,
         pixels: cells.length
+      };
+      db.regions.push(entry);
+      // Persistent owner history (survives expiry of timed claims)
+      db.history.push({
+        id: claimId,
+        name: entry.name,
+        pixels: cells.length,
+        duration: entry.duration,
+        paid: entry.paid || 0,
+        claimedAt: claimAt,
+        event: 'claim'
       });
+      // Keep last 500 history events
+      if (db.history.length > 500) db.history = db.history.slice(-500);
 
-      const ok = await save(db);
-      if (!ok) return json(res, 500, { ok: false, error: 'Save failed' });
+      let ok = await save(db);
+      if (!ok && media) {
+        // Retry without media if storage rejected large payload
+        db.regions[db.regions.length - 1].media = '';
+        db.regions[db.regions.length - 1].mediaType = 'none';
+        ok = await save(db);
+      }
+      if (!ok) return json(res, 500, { ok: false, error: 'Save failed — check Upstash env vars' });
       return json(res, 201, { ok: true });
     }
 
@@ -253,17 +313,11 @@ const server = http.createServer(async (req, res) => {
       const db = await load();
       soldMap(db);
       const list = (db.regions || []).map(r => ({
-        id: r.id,
-        name: r.name,
-        desc: r.desc,
+        id: r.id, name: r.name, desc: r.desc,
         pixels: r.pixels || (r.cells && r.cells.length) || 0,
-        duration: r.duration,
-        paid: r.paid,
-        link: r.link,
-        mediaType: r.mediaType,
-        hasMedia: !!(r.media && r.media.length),
-        claimedAt: r.claimedAt,
-        minC: r.minC, maxC: r.maxC, minR: r.minR, maxR: r.maxR
+        duration: r.duration, paid: r.paid, link: r.link,
+        mediaType: r.mediaType, hasMedia: !!(r.media && r.media.length),
+        claimedAt: r.claimedAt, minC: r.minC, maxC: r.maxC, minR: r.minR, maxR: r.maxR
       }));
       return json(res, 200, { ok: true, count: list.length, regions: list });
     }
@@ -275,8 +329,23 @@ const server = http.createServer(async (req, res) => {
       if (!data.id) return json(res, 400, { ok: false, error: 'Missing claim id' });
       const db = await load();
       const before = (db.regions || []).length;
+      const removed = (db.regions || []).find(r => r.id === data.id);
       db.regions = (db.regions || []).filter(r => r.id !== data.id);
       if (db.regions.length === before) return json(res, 404, { ok: false, error: 'Claim not found' });
+      db.history = db.history || [];
+      if (removed) {
+        db.history.push({
+          id: removed.id,
+          name: removed.name || 'ANON',
+          pixels: removed.pixels || (removed.cells && removed.cells.length) || 0,
+          duration: removed.duration,
+          paid: removed.paid || 0,
+          claimedAt: Date.now(),
+          event: 'removed',
+          originalClaimedAt: removed.claimedAt
+        });
+        if (db.history.length > 500) db.history = db.history.slice(-500);
+      }
       const ok = await save(db);
       if (!ok) return json(res, 500, { ok: false, error: 'Save failed' });
       return json(res, 200, { ok: true, removed: data.id, remaining: db.regions.length });
@@ -294,6 +363,29 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, remaining: 0 });
     }
 
+    
+    if (p === '/api/history' && req.method === 'GET') {
+      const db = await load();
+      const history = (db.history || []).slice().reverse(); // newest first
+      // Also synthesize from current regions if history empty (migration)
+      if (!history.length && db.regions && db.regions.length) {
+        db.regions.forEach(r => {
+          if (!r) return;
+          history.push({
+            id: r.id,
+            name: r.name || 'ANON',
+            pixels: r.pixels || (r.cells && r.cells.length) || 0,
+            duration: r.duration,
+            paid: r.paid || 0,
+            claimedAt: r.claimedAt || 0,
+            event: 'claim'
+          });
+        });
+        history.sort((a, b) => (b.claimedAt || 0) - (a.claimedAt || 0));
+      }
+      return json(res, 200, { ok: true, history: history.slice(0, 200) });
+    }
+
     let file = p === '/' ? '/index.html' : p;
     const full = path.join(ROOT, path.normalize(file));
     if (!full.startsWith(ROOT)) { res.writeHead(403); return res.end('no'); }
@@ -304,7 +396,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
       res.end(buf);
     });
-  } catch (e) { json(res, 500, { ok: false, error: e.message }); }
+  } catch (e) {
+    console.error(e);
+    json(res, 500, { ok: false, error: e.message });
+  }
 });
 
 server.listen(PORT, () => console.log('Wall running on ' + PORT + ' with ' + (USE_UPSTASH ? 'PERMANENT STORAGE' : 'TEMP FILE')));

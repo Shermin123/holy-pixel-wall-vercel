@@ -3784,10 +3784,22 @@ function clearPending() {
         (rows.length > 300 ? ' (showing 300)' : '') + '</p>' +
         show.map(h => {
           const when = h.claimedAt ? new Date(h.claimedAt).toLocaleString() : '—';
-          const ev = h.event === 'removed' ? 'REMOVED' : 'CLAIMED';
+          const ev = h.event === 'removed' ? 'REMOVED' : (h.event === 'admin_claim' ? 'ADMIN' : 'CLAIMED');
           const col = h.event === 'removed' ? 'var(--danger)' : 'var(--success)';
           const safe = String(h.name || 'ANON').replace(/</g, '&lt;');
+          // Country: from history entry, or look up current region by id/name
+          let cc = h.country || '';
+          if (!cc && h.id) {
+            const reg = regions.find(r => r && r.id === h.id);
+            if (reg && reg.country) cc = reg.country;
+          }
+          if (!cc && h.name) {
+            const reg = regions.find(r => r && (r.name || '') === h.name && r.country);
+            if (reg) cc = reg.country;
+          }
+          const flag = countryFlag(cc);
           return '<div style="display:flex;gap:8px;align-items:flex-start;border-bottom:1px solid var(--border);padding:8px 4px">' +
+            '<div style="font-size:1.3rem;line-height:1;min-width:28px;text-align:center" title="' + (cc || '') + '">' + flag + '</div>' +
             '<div style="flex:1;min-width:0">' +
             '<strong style="color:var(--dark);font-size:1.1rem">' + safe + '</strong>' +
             '<div style="color:var(--muted);font-size:0.9rem">' + (h.pixels || 0) + ' px · ' + (h.duration || '') +

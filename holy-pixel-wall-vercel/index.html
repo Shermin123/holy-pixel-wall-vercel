@@ -8,6 +8,254 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 
 <style>
+
+  /* ===== PIXEL HEADER THEME ===== */
+  header {
+    position: relative;
+    display: grid !important;
+    grid-template-columns: minmax(140px, 1.2fr) auto minmax(120px, 1fr);
+    align-items: center;
+    gap: 12px 18px;
+    min-height: 72px;
+    padding: 12px 18px 14px;
+    background:
+      linear-gradient(180deg, #fffef9 0%, #f7f0e2 100%);
+    border-bottom: 4px solid #8b5a2b;
+    box-shadow:
+      0 4px 0 #d4a017,
+      0 8px 16px rgba(92, 61, 30, 0.12);
+    flex-shrink: 0;
+    z-index: 50;
+  }
+  .header-pixel-strip {
+    position: absolute;
+    left: 0; right: 0; bottom: -4px;
+    height: 4px;
+    background-image: repeating-linear-gradient(
+      90deg,
+      #d4a017 0 8px,
+      #8b5a2b 8px 16px,
+      #c47a3a 16px 24px,
+      #5c3d1e 24px 32px
+    );
+    pointer-events: none;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-self: start;
+    min-width: 0;
+  }
+  .brand-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    font-size: 1.4rem;
+    color: #8b5a2b;
+    background:
+      linear-gradient(135deg, #fff6c8 25%, transparent 25%) -6px 0 / 12px 12px,
+      linear-gradient(225deg, #fff6c8 25%, transparent 25%) -6px 0 / 12px 12px,
+      linear-gradient(45deg, #fff6c8 25%, transparent 25%) 0 0 / 12px 12px,
+      linear-gradient(315deg, #fff6c8 25%, #f0c14b 25%) 0 0 / 12px 12px;
+    border: 3px solid #8b5a2b;
+    box-shadow: 3px 3px 0 #5c3d1e;
+    image-rendering: pixelated;
+  }
+  .brand-text { min-width: 0; }
+  .brand h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.5px;
+    color: #5c3d0e;
+    text-shadow: 2px 2px 0 #f0c14b;
+    line-height: 1.35;
+    margin: 0;
+  }
+  .brand p {
+    font-family: 'VT323', monospace;
+    font-size: 0.95rem;
+    margin: 2px 0 0;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .header-mid {
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .price-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.38rem;
+    color: #5c3d0e;
+    background: repeating-linear-gradient(
+      0deg,
+      #fff6c8 0 2px,
+      #ffe9a0 2px 4px
+    );
+    border: 3px solid #d4a017;
+    padding: 8px 12px;
+    box-shadow: 3px 3px 0 #5c3d1e;
+    white-space: nowrap;
+  }
+  .price-chip .price-px { color: #8b5a2b; }
+  .price-chip .price-eq { color: #c47a3a; }
+  .price-chip .price-val { color: #3d8b4a; font-weight: normal; }
+  .buy-cta {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.4rem;
+    letter-spacing: 0.5px;
+    color: #fffef9;
+    background: linear-gradient(180deg, #d4a017 0%, #c47a3a 50%, #8b5a2b 100%);
+    border: 3px solid #5c3d1e;
+    padding: 10px 14px;
+    box-shadow: 3px 3px 0 #3d2b1a;
+    cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.08s;
+    white-space: nowrap;
+  }
+  .buy-cta:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 #3d2b1a;
+  }
+  .buy-cta:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #3d2b1a;
+  }
+  .buy-cta.is-active {
+    background: linear-gradient(180deg, #3d8b4a 0%, #2d6b3a 100%);
+    border-color: #1a4a22;
+  }
+  .buy-stars { color: #fff6c8; }
+  .header-right {
+    justify-self: end;
+  }
+  .counter {
+    min-width: 110px;
+    padding: 6px 10px;
+    background: #fffdf8;
+    border: 3px solid #8b5a2b;
+    box-shadow: 3px 3px 0 #d4a017;
+  }
+  .counter-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.28rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .counter-num {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.42rem;
+    color: #5c3d0e;
+    margin: 4px 0;
+  }
+  .progress {
+    height: 8px;
+    background: #e8dcc8;
+    border: 2px solid #8b5a2b;
+    image-rendering: pixelated;
+  }
+  .progress-fill {
+    height: 100%;
+    background: repeating-linear-gradient(
+      90deg,
+      #d4a017 0 4px,
+      #c47a3a 4px 8px
+    );
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  /* Toolbar under header — pixel tray */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        #f3e6c8 0 2px,
+        #efe4d0 2px 4px
+      );
+    border-bottom: 3px solid #d2b48c;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.5);
+  }
+  .tool-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.34rem;
+    color: #5c3d0e;
+    background: #fffdf8;
+    border: 2px solid #8b5a2b;
+    padding: 8px 10px;
+    box-shadow: 2px 2px 0 #c9a66b;
+    cursor: pointer;
+    transition: transform 0.06s, box-shadow 0.06s;
+  }
+  .tool-btn:hover {
+    background: #fff6c8;
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 #c9a66b;
+  }
+  .tool-btn:active {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 #c9a66b;
+  }
+  .tool-btn.tool-active {
+    background: #f0c14b;
+    border-color: #5c3d1e;
+    box-shadow: inset 2px 2px 0 #8b5a2b;
+  }
+  .zoom-lvl {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.36rem;
+    color: #8b5a2b;
+    min-width: 48px;
+    text-align: center;
+    padding: 6px 4px;
+    background: #fffdf8;
+    border: 2px solid #d2b48c;
+  }
+  .tool-gap {
+    width: 10px;
+    height: 2px;
+    background: #d2b48c;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 720px) {
+    header {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      min-height: auto;
+      padding: 10px 12px 12px;
+      gap: 8px;
+    }
+    .brand { grid-column: 1 / -1; }
+    .brand-icon { width: 28px; height: 28px; font-size: 1rem; }
+    .brand h1 { font-size: 0.48rem; }
+    .brand p { display: none; }
+    .header-mid { grid-column: 1; justify-self: start; gap: 8px; }
+    .header-right { grid-column: 2; }
+    .price-chip { font-size: 0.3rem; padding: 6px 8px; }
+    .buy-cta { font-size: 0.32rem; padding: 8px 10px; }
+    .counter { min-width: 90px; padding: 4px 8px; }
+    .counter-num { font-size: 0.34rem; }
+  }
+  /* ===== end pixel header ===== */
+
   
 
 
@@ -832,13 +1080,17 @@
 <body>
 
 <header>
+  <div class="header-pixel-strip" aria-hidden="true"></div>
   <div class="brand">
-    <h1>HOLY PIXEL WALL</h1>
-    <p>Own a piece of the internet wall</p>
+    <div class="brand-icon" aria-hidden="true">▣</div>
+    <div class="brand-text">
+      <h1>HOLY PIXEL WALL</h1>
+      <p>Own a piece of the internet wall</p>
+    </div>
   </div>
   <div class="header-mid">
-    <div class="price-chip">1 PIXEL = $0.10</div>
-    <button class="buy-cta" id="buyModeBtn" type="button">★ BUY PIXELS ★</button>
+    <div class="price-chip"><span class="price-px">1 PX</span><span class="price-eq">=</span><span class="price-val">$0.10</span></div>
+    <button class="buy-cta" id="buyModeBtn" type="button"><span class="buy-stars">◆</span> BUY PIXELS <span class="buy-stars">◆</span></button>
   </div>
   <div class="header-right">
     <div class="counter">

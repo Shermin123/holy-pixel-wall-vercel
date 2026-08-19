@@ -584,7 +584,7 @@
     left: 0;
     top: 0;
     display: block;
-    border: 2px solid #3d2b1a;
+    border: 1px solid #3d2b1a;
     box-sizing: border-box;
     box-shadow: 3px 3px 0 rgba(92,61,30,0.25);
     outline: none;
@@ -593,9 +593,7 @@
     margin: 0;
     transform-origin: 0 0;
     overflow: hidden;
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
+    image-rendering: auto;
       will-change: transform;
   backface-visibility: hidden;
   }
@@ -603,10 +601,8 @@
   canvas {
     display: block;
     background: #fffdf8;
-    /* pixelated = selection + grid stay aligned when CSS-zoomed */
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
+    /* Smooth rendering keeps uploaded photos sharp when zoomed. */
+    image-rendering: auto;
   }
 
   .media-layer {
@@ -2525,8 +2521,9 @@ function getImg(src) {
             if ((c + row) % 2 === 0)
               ctx.fillRect(c * drawCell, row * drawCell, cell, cell);
       }
-      ctx.strokeStyle = '#3a2a1a';
-      ctx.lineWidth = Math.max(1.5, Math.min(3, cell * 0.2));
+      /* Thin, clean border around each claimed image. */
+      ctx.strokeStyle = 'rgba(58,42,26,0.72)';
+      ctx.lineWidth = Math.max(0.8, Math.min(1.25, cell * 0.08));
       ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
       ctx.restore();
     });
@@ -3589,7 +3586,8 @@ function clearPending() {
       const img = new Image();
       img.onload = () => {
         try {
-          const maxSide = 2560;
+          // Keep high-resolution uploads; only resize extremely large files.
+          const maxSide = 4096;
           let w = img.naturalWidth || img.width;
           let h = img.naturalHeight || img.height;
           if (!w || !h) { URL.revokeObjectURL(url); reject(new Error('bad image')); return; }
@@ -3609,9 +3607,9 @@ function clearPending() {
           let out;
           if (type === 'image/png') {
             out = c.toDataURL('image/png');
-            if (out.length > 2.5e6) out = c.toDataURL('image/jpeg', 0.95);
+            if (out.length > 6e6) out = c.toDataURL('image/jpeg', 0.98);
           } else {
-            out = c.toDataURL('image/jpeg', 0.95);
+            out = c.toDataURL('image/jpeg', 0.98);
           }
           resolve(out);
         } catch (err) {

@@ -163,10 +163,10 @@
     animation: none !important;
   }
   .buy-cta.is-active {
-    background: #3d8b4a !important;
-    color: #fff !important;
-    border-color: #1a4a22 !important;
-    box-shadow: 3px 3px 0 #1a4a22 !important;
+    background: #fff8e8 !important;
+    color: #2a2118 !important;
+    border-color: #2a2118 !important;
+    box-shadow: 3px 3px 0 #b88a52 !important;
     animation: none !important;
   }
   .buy-stars { display: none !important; }
@@ -1338,11 +1338,11 @@
 }
 
 .pixel-header .buy-cta.is-active {
-  background: #211a3a !important;
-  color: #fff8df !important;
-  border-color: #42e8ff !important;
-  box-shadow: 0 0 0 3px #42e8ff, 4px 4px 0 #080611 !important;
-  animation: none;
+  background: #fff8e8 !important;
+  color: #2a2118 !important;
+  border-color: #2a2118 !important;
+  box-shadow: 3px 3px 0 #b88a52 !important;
+  animation: none !important;
 }
 
 @media (max-width: 1000px) {
@@ -1514,66 +1514,40 @@
   display: none;
 }
 
-/* —— LEFT: brand —— */
+/* —— LEFT: brand (text only, no logo) —— */
 .pixel-brand {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
   justify-self: start;
 }
 
 .pixel-logo {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  padding: 3px;
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  grid-template-rows: repeat(3,1fr);
-  gap: 2px;
-  background: #2a2118;
-  border: 2px solid #2a2118;
-  box-shadow: 3px 3px 0 #b88a52;
-  transform: none;
+  display: none !important;
 }
 
-.pixel-logo i {
-  background: #6f8a62;
-}
-
-.pixel-logo i:nth-child(1),
-.pixel-logo i:nth-child(5),
-.pixel-logo i:nth-child(9) {
-  background: #c9a34e;
-}
-
-.pixel-logo i:nth-child(2),
-.pixel-logo i:nth-child(4),
-.pixel-logo i:nth-child(6),
-.pixel-logo i:nth-child(8) {
-  background: #a84c32;
-}
-
-.pixel-logo i:nth-child(3),
-.pixel-logo i:nth-child(7) {
-  background: #6f8a62;
+.pixel-brand__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .pixel-brand__eyebrow {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-bottom: 3px;
+  gap: 6px;
   font-family: 'Press Start 2P', monospace;
   font-size: .22rem;
-  letter-spacing: 1px;
-  color: #8a633d;
+  letter-spacing: 1.5px;
+  color: #6f8a62;
+  margin: 0;
 }
 
 .status-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
   background: #6f8a62;
   box-shadow: none;
   animation: none;
@@ -1582,19 +1556,21 @@
 .pixel-brand h1 {
   margin: 0 !important;
   font-family: 'Press Start 2P', monospace !important;
-  font-size: .52rem !important;
-  line-height: 1.35 !important;
-  letter-spacing: 0 !important;
+  font-size: .58rem !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0.5px !important;
   color: #2a2118 !important;
   text-shadow: 2px 2px 0 #d8bd91 !important;
+  white-space: nowrap;
 }
 
 .pixel-brand p {
-  margin: 3px 0 0 !important;
+  margin: 0 !important;
   font-family: 'VT323', monospace !important;
-  font-size: .8rem !important;
-  line-height: 1 !important;
+  font-size: .85rem !important;
+  line-height: 1.1 !important;
   color: #735b43 !important;
+  white-space: nowrap;
 }
 
 /* —— CENTER: price + CTA —— */
@@ -1688,6 +1664,29 @@
   font-family: 'VT323', monospace;
   font-size: 1.25rem;
   line-height: .5;
+}
+
+/* Active / view mode — light cream, not dark */
+.pixel-buy.is-active,
+.buy-cta.pixel-buy.is-active,
+.pixel-header .buy-cta.is-active,
+.pixel-header .pixel-buy.is-active {
+  background: #fff8e8 !important;
+  color: #2a2118 !important;
+  border: 3px solid #2a2118 !important;
+  box-shadow: 3px 3px 0 #b88a52 !important;
+  animation: none !important;
+  filter: none !important;
+}
+
+.pixel-buy.is-active .pixel-buy__icon {
+  background: #c9a34e !important;
+  color: #2a2118 !important;
+}
+
+.pixel-buy.is-active .pixel-buy__text,
+.pixel-buy.is-active .pixel-buy__arrow {
+  color: #2a2118 !important;
 }
 
 /* —— RIGHT: wall stats —— */
@@ -1803,16 +1802,8 @@
     gap: 8px 10px !important;
     padding: 8px 10px !important;
   }
-  .pixel-logo {
-    width: 36px;
-    height: 36px;
-    flex-basis: 36px;
-  }
-  .pixel-brand {
-    gap: 8px;
-  }
   .pixel-brand h1 {
-    font-size: .4rem !important;
+    font-size: .42rem !important;
   }
   .pixel-brand p {
     display: none !important;
@@ -1884,15 +1875,10 @@
   <div class="pixel-header__grid" aria-hidden="true"></div>
 
   <div class="pixel-brand">
-    <div class="pixel-logo" aria-hidden="true">
-      <i></i><i></i><i></i>
-      <i></i><i></i><i></i>
-      <i></i><i></i><i></i>
-    </div>
     <div class="pixel-brand__copy">
-      <div class="pixel-brand__eyebrow"><span class="status-dot"></span> LIVE WALL</div>
+      <div class="pixel-brand__eyebrow"><span class="status-dot"></span> LIVE</div>
       <h1>HOLY PIXEL WALL</h1>
-      <p>Claim a tiny piece of the internet.</p>
+      <p>Claim your piece of the internet</p>
     </div>
   </div>
 

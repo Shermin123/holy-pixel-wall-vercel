@@ -2272,8 +2272,14 @@ function getImg(src) {
     const p = pos(e);
     const r = sold.get(p.c + ',' + p.r);
     if (!r) return;
-    if (devMode) {
-      try { openEdit(r); } catch (err) { toast('EDIT FAILED'); console.warn(err); }
+    if (adminMode || devMode) {
+      try {
+        if (typeof openAdminEdit === 'function') openAdminEdit(r);
+        else openEdit(r);
+      } catch (err) {
+        console.warn(err);
+        toast('EDIT FAILED', 'error');
+      }
       return;
     }
     const ownerName = r.name || 'Anonymous';
@@ -2458,9 +2464,73 @@ function getImg(src) {
       $('confirmBtn').disabled = false;
     }
     const head = document.querySelector('#claimModal .modal-head h3');
-    if (head) head.textContent = 'EDIT YOUR PIXELS';
+    if (head) head.textContent = adminMode ? 'ADMIN EDIT CLAIM' : 'EDIT YOUR PIXELS';
     const sub = document.querySelector('#claimModal .modal-head p');
-    if (sub) sub.textContent = 'Update image, name, description or link. Ownership stays yours.';
+    if (sub) sub.textContent = adminMode
+      ? 'Edit or delete this claim. REMOVE IMAGE or DELETE CLAIM below.'
+      : 'Update image, name, description or link. Ownership stays yours.';
+
+    // Admin delete / remove image controls
+    let adminActions = document.getElementById('adminEditActions');
+    if (!adminActions) {
+      adminActions = document.createElement('div');
+      adminActions.id = 'adminEditActions';
+      adminActions.style.cssText = 'display:none;gap:8px;flex-wrap:wrap;width:100%;margin:8px 0';
+      const foot = document.querySelector('#claimModal .modal-foot');
+      if (foot) foot.insertBefore(adminActions, foot.firstChild);
+    }
+    if (adminMode && r && r.id) {
+      const claimId = r.id;
+      adminActions.style.display = 'flex';
+      adminActions.innerHTML =
+        '<button type="button" class="btn btn-sec" id="adminRemoveImgBtn" style="border-color:var(--danger);color:var(--danger)">REMOVE IMAGE</button>' +
+        '<button type="button" class="btn" id="adminDeleteClaimBtn" style="background:var(--danger);color:#fff;border:2px solid #fff">DELETE CLAIM</button>';
+      const rmBtn = document.getElementById('adminRemoveImgBtn');
+      const delBtn = document.getElementById('adminDeleteClaimBtn');
+      if (rmBtn) {
+        rmBtn.onclick = async () => {
+          if (!confirm('Remove the image from this claim?')) return;
+          const key = getAdminKey();
+          if (!key) { toast('ADMIN KEY MISSING — re-enter admin mode', 'error'); return; }
+          try {
+            await apiFetch('/api/admin/update', {
+              method: 'POST',
+              body: JSON.stringify({ key: key, id: claimId, removeMedia: true }),
+              timeout: 30000
+            }, 'Remove image');
+            clearPending();
+            if (typeof closeClaimModal === 'function') closeClaimModal();
+            await pullWall();
+            toast('IMAGE REMOVED', 'ok');
+          } catch (e) {
+            toast(friendlyError(e, 'Remove failed — is /api/admin/update deployed?'), 'error');
+          }
+        };
+      }
+      if (delBtn) {
+        delBtn.onclick = async () => {
+          if (!confirm('DELETE this entire claim and free the pixels?')) return;
+          const key = getAdminKey();
+          if (!key) { toast('ADMIN KEY MISSING — re-enter admin mode', 'error'); return; }
+          try {
+            await apiFetch('/api/admin/delete', {
+              method: 'POST',
+              body: JSON.stringify({ key: key, id: claimId }),
+              timeout: 20000
+            }, 'Delete claim');
+            if (typeof closeClaimModal === 'function') closeClaimModal();
+            await pullWall();
+            toast('CLAIM DELETED', 'ok');
+          } catch (e) {
+            toast(friendlyError(e, 'Delete failed — is /api/admin/delete deployed?'), 'error');
+          }
+        };
+      }
+    } else if (adminActions) {
+      adminActions.style.display = 'none';
+      adminActions.innerHTML = '';
+    }
+
     if ($('claimModal')) $('claimModal').style.display = 'flex';
     try { updateBlockPreview(); } catch (e) {}
   }

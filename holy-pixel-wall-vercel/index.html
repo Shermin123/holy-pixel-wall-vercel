@@ -1607,14 +1607,13 @@
   flex-wrap: nowrap;
 }
 
-/* Big, hard-to-miss price card */
+/* Price card — only the big $0.50 */
 .pixel-price-card {
-  min-width: 168px;
-  padding: 10px 16px 9px;
+  min-width: 0;
+  padding: 12px 18px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   background: #fff8e8;
   border: 3px solid #2a2118;
   box-shadow: 4px 4px 0 #b88a52;
@@ -1622,48 +1621,31 @@
 }
 
 .pixel-price-card::before {
-  display: none;
+  display: none !important;
+  content: none !important;
 }
 
-.pixel-price-card__tag {
-  font-family: 'Press Start 2P', monospace;
-  font-size: .22rem;
-  letter-spacing: 1px;
-  color: #8a633d;
-  order: 0;
+.pixel-price-card__tag,
+.pixel-price-card .price-unit,
+.pixel-price-card__sub {
+  display: none !important;
 }
 
-/* The price itself — largest text in the bar */
 .pixel-price-card strong,
 .pixel-price-card .price-amount {
   font-family: 'Press Start 2P', monospace !important;
-  font-size: 0.72rem !important;
-  line-height: 1.2 !important;
+  font-size: 0.8rem !important;
+  line-height: 1 !important;
   color: #2a2118 !important;
   letter-spacing: 0.5px;
   white-space: nowrap;
+  margin: 0;
 }
 
 .pixel-price-card strong b,
 .pixel-price-card .price-amount b {
   color: #a84c32 !important;
   font-size: 1em;
-}
-
-.pixel-price-card .price-unit {
-  font-family: 'Press Start 2P', monospace;
-  font-size: .28rem;
-  color: #735b43;
-  letter-spacing: 0.5px;
-  margin-top: 1px;
-}
-
-.pixel-price-card__sub {
-  font-family: 'VT323', monospace;
-  font-size: .72rem;
-  letter-spacing: .5px;
-  color: #8a633d;
-  margin-top: 2px;
 }
 
 .pixel-buy {
@@ -1916,10 +1898,7 @@
 
   <div class="pixel-center">
     <div class="pixel-price-card">
-      <span class="pixel-price-card__tag">PIXEL PRICE</span>
-      <strong class="price-amount">$0.10</strong>
-      <span class="price-unit">PER PIXEL</span>
-      <span class="pixel-price-card__sub">1 DAY · START SMALL</span>
+      <strong class="price-amount">$0.50</strong>
     </div>
     <button class="buy-cta pixel-buy" id="buyModeBtn" type="button">
       <span class="pixel-buy__icon">+</span>
@@ -2073,7 +2052,7 @@
       <div class="field">
         <label>DURATION</label>
         <select id="duration">
-          <option value="1day">1 DAY — $0.10 / PIXEL</option>
+          <option value="1day">1 DAY — $0.50 / PIXEL</option>
           <option value="3month">3 MONTHS — $0.50 / PIXEL</option>
           <option value="6month">6 MONTHS — $1 / PIXEL</option>
           <option value="permanent">PERMANENT — $10 / PIXEL (limited)</option>
@@ -2194,7 +2173,7 @@
     <div class="modal-body" style="font-size:1rem;line-height:1.45;color:var(--muted)">
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">1.</strong> Drag to select free pixels.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">2.</strong> Add your name and a photo (tap to upload). Optional link & description.</p>
-      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.10 / pixel for 1 day.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.50 / pixel for 1 day.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">4.</strong> Your pixels stay locked — others cannot take them until time ends.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">Hover</strong> any claim to see owner, description, and time left.</p>
             <p style="margin-top:12px;font-size:0.9rem"><strong style="color:var(--dark)">Photo tip:</strong> Use a clear JPG or PNG under 2MB. It fills your block automatically.</p>
@@ -2483,7 +2462,7 @@ Min 10 blocks · no maximum
     if (d === 'permanent') return 10;
     if (d === '6month') return 1;
     if (d === '3month') return 0.50;
-    return 0.10; // 1 day
+    return 0.50; // 1 day
   }
 
   function durationMs(d) {

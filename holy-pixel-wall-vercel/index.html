@@ -1465,18 +1465,19 @@
 
 
 /* =========================================================
-   RETRO 8-BIT HEADER — warm vintage paper / arcade style
+   RETRO 8-BIT HEADER — clean 3-zone layout, big price
+   Left: brand · Center: BIG price + buy · Right: stats
    ========================================================= */
 .pixel-header {
   position: relative !important;
   isolation: isolate;
   display: grid !important;
-  grid-template-columns: 1fr auto 1fr !important;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, 1fr) !important;
   align-items: center !important;
-  gap: 18px !important;
-  min-height: 76px !important;
-  height: 76px;
-  padding: 8px 16px !important;
+  gap: 16px 20px !important;
+  min-height: 88px !important;
+  height: auto !important;
+  padding: 12px 18px !important;
   overflow: hidden;
   background: #f5ead3 !important;
   border-bottom: 4px solid #2a2118 !important;
@@ -1489,13 +1490,13 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  opacity: .32;
+  opacity: .28;
   pointer-events: none;
   background:
     repeating-linear-gradient(
       0deg,
       transparent 0 3px,
-      rgba(42,33,24,.035) 3px 4px
+      rgba(42,33,24,.04) 3px 4px
     );
 }
 
@@ -1513,18 +1514,19 @@
   display: none;
 }
 
+/* —— LEFT: brand —— */
 .pixel-brand {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   justify-self: start;
 }
 
 .pixel-logo {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   padding: 3px;
   display: grid;
   grid-template-columns: repeat(3,1fr);
@@ -1562,7 +1564,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
   font-family: 'Press Start 2P', monospace;
   font-size: .22rem;
   letter-spacing: 1px;
@@ -1580,7 +1582,7 @@
 .pixel-brand h1 {
   margin: 0 !important;
   font-family: 'Press Start 2P', monospace !important;
-  font-size: .55rem !important;
+  font-size: .52rem !important;
   line-height: 1.35 !important;
   letter-spacing: 0 !important;
   color: #2a2118 !important;
@@ -1588,30 +1590,35 @@
 }
 
 .pixel-brand p {
-  margin: 2px 0 0 !important;
+  margin: 3px 0 0 !important;
   font-family: 'VT323', monospace !important;
-  font-size: .78rem !important;
+  font-size: .8rem !important;
   line-height: 1 !important;
   color: #735b43 !important;
 }
 
+/* —— CENTER: price + CTA —— */
 .pixel-center {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 14px;
   justify-self: center;
+  flex-wrap: nowrap;
 }
 
+/* Big, hard-to-miss price card */
 .pixel-price-card {
-  min-width: 132px;
-  padding: 6px 9px;
+  min-width: 168px;
+  padding: 10px 16px 9px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  background: #ead7b5;
-  border: 2px solid #2a2118;
-  box-shadow: 3px 3px 0 #b88a52;
+  align-items: center;
+  gap: 4px;
+  background: #fff8e8;
+  border: 3px solid #2a2118;
+  box-shadow: 4px 4px 0 #b88a52;
+  text-align: center;
 }
 
 .pixel-price-card::before {
@@ -1620,40 +1627,58 @@
 
 .pixel-price-card__tag {
   font-family: 'Press Start 2P', monospace;
-  font-size: .20rem;
-  letter-spacing: .5px;
+  font-size: .22rem;
+  letter-spacing: 1px;
   color: #8a633d;
+  order: 0;
 }
 
-.pixel-price-card strong {
+/* The price itself — largest text in the bar */
+.pixel-price-card strong,
+.pixel-price-card .price-amount {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
+  color: #2a2118 !important;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.pixel-price-card strong b,
+.pixel-price-card .price-amount b {
+  color: #a84c32 !important;
+  font-size: 1em;
+}
+
+.pixel-price-card .price-unit {
   font-family: 'Press Start 2P', monospace;
-  font-size: .34rem;
-  color: #2a2118;
-}
-
-.pixel-price-card strong b {
-  color: #a84c32;
+  font-size: .28rem;
+  color: #735b43;
+  letter-spacing: 0.5px;
+  margin-top: 1px;
 }
 
 .pixel-price-card__sub {
   font-family: 'VT323', monospace;
-  font-size: .60rem;
+  font-size: .72rem;
   letter-spacing: .5px;
-  color: #735b43;
+  color: #8a633d;
+  margin-top: 2px;
 }
 
 .pixel-buy {
-  min-height: 42px;
-  padding: 7px 10px !important;
+  min-height: 52px;
+  padding: 10px 14px !important;
   display: flex !important;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   border: 3px solid #2a2118 !important;
   background: #a84c32 !important;
   color: #fff5df !important;
-  box-shadow: 3px 3px 0 #2a2118 !important;
+  box-shadow: 4px 4px 0 #2a2118 !important;
   animation: none;
   border-radius: 0 !important;
+  flex-shrink: 0;
 }
 
 .pixel-buy::before {
@@ -1661,36 +1686,37 @@
 }
 
 .pixel-buy__icon {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
   background: #c9a34e;
   color: #2a2118;
   font-family: 'Press Start 2P', monospace;
-  font-size: .32rem;
+  font-size: .36rem;
 }
 
 .pixel-buy__text {
   font-family: 'Press Start 2P', monospace;
-  font-size: .34rem;
-  letter-spacing: 0;
+  font-size: .38rem;
+  letter-spacing: 0.5px;
 }
 
 .pixel-buy__arrow {
   font-family: 'VT323', monospace;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   line-height: .5;
 }
 
+/* —— RIGHT: wall stats —— */
 .pixel-stats {
   justify-self: end;
   width: 100%;
-  max-width: 205px;
+  max-width: 220px;
 }
 
 .pixel-stat {
-  padding: 6px 9px;
+  padding: 8px 12px;
   background: #ead7b5;
   border: 2px solid #2a2118;
   box-shadow: 3px 3px 0 #b88a52;
@@ -1706,7 +1732,7 @@
 
 .pixel-stat__label {
   font-family: 'Press Start 2P', monospace;
-  font-size: .19rem;
+  font-size: .2rem;
   letter-spacing: .5px;
   color: #735b43;
 }
@@ -1722,24 +1748,24 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin: 3px 0 4px;
+  margin: 4px 0 5px;
 }
 
 .pixel-stat .counter-num {
   font-family: 'Press Start 2P', monospace !important;
-  font-size: .38rem !important;
+  font-size: .42rem !important;
   color: #2a2118 !important;
 }
 
 .pixel-stat__unit {
   font-family: 'VT323', monospace;
-  font-size: .65rem;
+  font-size: .7rem;
   color: #735b43;
 }
 
 .pixel-progress {
   width: 100% !important;
-  height: 6px !important;
+  height: 7px !important;
   margin: 0 !important;
   border: 2px solid #2a2118 !important;
   background: #d6c09a !important;
@@ -1750,17 +1776,19 @@
 }
 
 .pixel-stat__foot {
-  margin-top: 3px;
+  margin-top: 4px;
   font-family: 'Press Start 2P', monospace;
   font-size: .16rem;
   color: #8a633d;
 }
 
+/* Tablet: brand + center on row 1, stats full width below */
 @media (max-width: 1000px) {
   .pixel-header {
     grid-template-columns: 1fr auto !important;
-    height: auto;
-    min-height: 72px !important;
+    gap: 12px !important;
+    min-height: 0 !important;
+    padding: 10px 14px !important;
   }
   .pixel-center {
     grid-column: 2;
@@ -1775,7 +1803,7 @@
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
   .pixel-stat__top,
   .pixel-stat__foot {
@@ -1786,30 +1814,63 @@
   }
 }
 
+/* Phone: keep price visible (don’t hide it), tighten spacing */
 @media (max-width: 680px) {
   .pixel-header {
-    gap: 7px !important;
-    padding: 7px 9px !important;
+    grid-template-columns: 1fr auto !important;
+    gap: 8px 10px !important;
+    padding: 8px 10px !important;
   }
   .pixel-logo {
     width: 36px;
     height: 36px;
     flex-basis: 36px;
   }
-  .pixel-brand h1 {
-    font-size: .42rem !important;
+  .pixel-brand {
+    gap: 8px;
   }
-  .pixel-brand p,
-  .pixel-price-card {
+  .pixel-brand h1 {
+    font-size: .4rem !important;
+  }
+  .pixel-brand p {
     display: none !important;
   }
+  .pixel-center {
+    gap: 8px;
+  }
+  /* Price stays visible on mobile — slightly smaller but still clear */
+  .pixel-price-card {
+    min-width: 0;
+    padding: 7px 10px 6px;
+    border-width: 2px;
+    box-shadow: 2px 2px 0 #b88a52;
+  }
+  .pixel-price-card strong,
+  .pixel-price-card .price-amount {
+    font-size: 0.48rem !important;
+  }
+  .pixel-price-card__tag {
+    font-size: .18rem;
+  }
+  .pixel-price-card .price-unit,
+  .pixel-price-card__sub {
+    display: none;
+  }
   .pixel-buy {
-    min-height: 38px;
-    padding: 6px 8px !important;
+    min-height: 42px;
+    padding: 8px 10px !important;
     box-shadow: 2px 2px 0 #2a2118 !important;
   }
   .pixel-buy__text {
-    font-size: .28rem;
+    font-size: .3rem;
+  }
+  .pixel-buy__icon {
+    width: 15px;
+    height: 15px;
+    font-size: .3rem;
+  }
+  .pixel-stats {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1820,9 +1881,16 @@
   .pixel-brand__eyebrow {
     display: none;
   }
+  .pixel-price-card strong,
+  .pixel-price-card .price-amount {
+    font-size: 0.4rem !important;
+  }
   .pixel-buy__icon,
   .pixel-buy__arrow {
     display: none;
+  }
+  .pixel-buy__text {
+    font-size: .28rem;
   }
 }
 
@@ -1849,8 +1917,9 @@
   <div class="pixel-center">
     <div class="pixel-price-card">
       <span class="pixel-price-card__tag">PIXEL PRICE</span>
-      <strong>1 PX <b>=</b> $0.10</strong>
-      <span class="pixel-price-card__sub">START SMALL. OWN BIG.</span>
+      <strong class="price-amount">$0.10</strong>
+      <span class="price-unit">PER PIXEL</span>
+      <span class="pixel-price-card__sub">1 DAY · START SMALL</span>
     </div>
     <button class="buy-cta pixel-buy" id="buyModeBtn" type="button">
       <span class="pixel-buy__icon">+</span>

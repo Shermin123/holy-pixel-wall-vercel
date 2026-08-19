@@ -1088,6 +1088,24 @@ Min 10 blocks · no maximum
     }
   } catch (e) {}
 
+  
+  function getAdminKey() {
+    try {
+      const el = document.getElementById('adminKeyInput');
+      const typed = (el && el.value) ? String(el.value).trim() : '';
+      if (typed) {
+        try { localStorage.setItem('hpw_admin_key', typed); } catch (e) {}
+        try { sessionStorage.setItem('hpw_admin_key', typed); } catch (e) {}
+        return typed;
+      }
+      return localStorage.getItem('hpw_admin_key')
+        || sessionStorage.getItem('hpw_admin_key')
+        || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
   const $ = id => document.getElementById(id);
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d', { alpha: true });
@@ -2298,8 +2316,10 @@ function getImg(src) {
   }
 
   function enterAdminMode() {
-    const key = getAdminKey();
-    if (!key) { toast('ENTER ADMIN KEY FIRST', 'error'); return; }
+    const input = document.getElementById('adminKeyInput');
+    const key = (input && input.value ? String(input.value).trim() : '') || getAdminKey();
+    if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
+    try { localStorage.setItem('hpw_admin_key', key); } catch (e) {}
     adminMode = true;
     const b = $('adminBanner');
     if (b) b.style.display = 'flex';
@@ -3396,15 +3416,7 @@ function clearPending() {
   if ($('helpClose')) $('helpClose').onclick = () => { $('helpModal').style.display = 'none'; };
 
   // ===== OWNER ADMIN — control every claim/image =====
-  function getAdminKey() {
-    const el = $('adminKeyInput');
-    const typed = el && el.value ? el.value.trim() : '';
-    if (typed) {
-      try { localStorage.setItem('hpw_admin_key', typed); } catch (e) {}
-      return typed;
-    }
-    try { return localStorage.getItem('hpw_admin_key') || ''; } catch (e) { return ''; }
-  }
+  
 
   async function adminLoadClaims() {
     const key = getAdminKey();
@@ -3587,16 +3599,7 @@ function clearPending() {
     } catch (e) {}
   };
   if ($('adminCloseBtn')) $('adminCloseBtn').onclick = () => { $('adminModal').style.display = 'none'; };
-  if ($('adminLoadBtn')) $('adminLoadBtn').onclick = async () => {
-    const key = getAdminKey();
-    if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
-    try {
-      await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 15000 }, 'Admin');
-      enterAdminMode();
-    } catch (e) {
-      toast(friendlyError(e, 'Wrong key'), 'error');
-    }
-  };
+  
   if ($('adminClearBtn')) $('adminClearBtn').onclick = async () => {
     if (!confirm('Delete ALL claims on the wall? This cannot be undone.')) return;
     if (!confirm('Type OK in the next step mentally — really delete everything?')) return;
@@ -4196,13 +4199,16 @@ let scrollDrawRaf = 0;
     
   // ===== ADMIN PANEL =====
   const ADMIN_SESSION_KEY = 'hpw_admin_key';
-  function getAdminKey() {
-    try { return sessionStorage.getItem(ADMIN_SESSION_KEY) || ''; } catch (e) { return ''; }
-  }
+  
   function setAdminKey(k) {
     try {
-      if (k) sessionStorage.setItem(ADMIN_SESSION_KEY, k);
-      else sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      if (k) {
+        localStorage.setItem('hpw_admin_key', k);
+        sessionStorage.setItem('hpw_admin_key', k);
+      } else {
+        localStorage.removeItem('hpw_admin_key');
+        sessionStorage.removeItem('hpw_admin_key');
+      }
     } catch (e) {}
   }
 
@@ -4380,16 +4386,7 @@ let scrollDrawRaf = 0;
 
     setTimeout(() => toast('DRAG A RECTANGLE · MIN 10 BLOCKS · SCROLL TO MOVE · PINCH TO ZOOM'), 600);
 
-  if ($('adminLoadBtn')) $('adminLoadBtn').onclick = async () => {
-    const key = getAdminKey();
-    if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
-    try {
-      await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 15000 }, 'Admin');
-      enterAdminMode();
-    } catch (e) {
-      toast(friendlyError(e, 'Wrong key'), 'error');
-    }
-  };
+  
   if ($('adminExitBtn')) $('adminExitBtn').onclick = () => exitAdminMode();
   if ($('adminCloseBtn')) $('adminCloseBtn').onclick = () => { if ($('adminModal')) $('adminModal').style.display = 'none'; };
   window.addEventListener('keydown', e => {
@@ -4399,6 +4396,41 @@ let scrollDrawRaf = 0;
       openAdmin();
     }
   });
+
+
+  // ===== ADMIN LOGIN (single handler) =====
+  (function wireAdminLogin() {
+    const btn = document.getElementById('adminLoadBtn');
+    const input = document.getElementById('adminKeyInput');
+    async function tryEnterAdmin() {
+      const key = (input && input.value ? String(input.value).trim() : '') || getAdminKey();
+      if (!key) {
+        toast('ENTER ADMIN KEY', 'error');
+        if (input) input.focus();
+        return;
+      }
+      try {
+        localStorage.setItem('hpw_admin_key', key);
+        sessionStorage.setItem('hpw_admin_key', key);
+      } catch (e) {}
+      try {
+        await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 15000 }, 'Admin');
+        if (typeof enterAdminMode === 'function') enterAdminMode();
+        else toast('Admin mode function missing', 'error');
+      } catch (e) {
+        toast(friendlyError(e, 'Wrong key or server error'), 'error');
+      }
+    }
+    if (btn) btn.onclick = tryEnterAdmin;
+    if (input) {
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          tryEnterAdmin();
+        }
+      });
+    }
+  })();
 
 })();
 </script>

@@ -39,339 +39,10 @@
     );
   }
 
-  /* ===== PIXEL HEADER THEME ===== */
-  header {
-    display: flex !important;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    min-height: 64px;
-    padding: 10px 20px;
-    background: #2a1f14;
-    border-bottom: 4px solid #d4a017;
-    box-shadow: 0 4px 0 #8b5a2b, 0 8px 24px rgba(0,0,0,0.25);
-    flex-shrink: 0;
-    z-index: 50;
-  }
-  .header-pixel-strip { display: none !important; }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-  .brand-mark {
-    width: 28px;
-    height: 28px;
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    font-size: 14px;
-    line-height: 1;
-    color: #2a1f14;
-    background: #d4a017;
-    border: 2px solid #f0c14b;
-    box-shadow: 2px 2px 0 #000;
-  }
-  .brand-icon { display: none !important; }
-  .brand h1 {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.58rem;
-    color: #f7f0e2;
-    text-shadow: 2px 2px 0 #000;
-    letter-spacing: 0.5px;
-    line-height: 1.3;
-    margin: 0;
-  }
-  .brand p {
-    font-family: 'VT323', monospace;
-    font-size: 0.95rem;
-    color: #d4a017;
-    margin: 2px 0 0;
-    opacity: 0.95;
-  }
-  .header-mid {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    flex: 1 1 auto;
-  }
-  .price-chip {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.36rem;
-    color: #2a1f14;
-    background: #f0c14b;
-    border: 2px solid #fff6c8;
-    padding: 9px 12px;
-    box-shadow: 3px 3px 0 #000;
-    white-space: nowrap;
-  }
-  .price-chip .price-px,
-  .price-chip .price-eq,
-  .price-chip .price-val { color: inherit; }
-  .buy-cta {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.4rem;
-    color: #fff;
-    background: #c47a3a;
-    border: 2px solid #fff6c8;
-    padding: 10px 16px;
-    box-shadow: 3px 3px 0 #000;
-    cursor: pointer;
-    white-space: nowrap;
-    letter-spacing: 0.5px;
-    animation: buyPulse 2.2s ease-in-out infinite;
-  }
-  .buy-cta:hover {
-    background: #d4a017;
-    color: #2a1f14;
-  }
-  .buy-cta:active {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 #000;
-  }
-  .buy-cta.is-active {
-    background: #3d8b4a;
-    border-color: #8fef9a;
-    animation: none;
-  }
-  .buy-stars { display: none; }
-  @keyframes buyPulse {
-    0%, 100% { box-shadow: 3px 3px 0 #000; }
-    50% { box-shadow: 3px 3px 0 #000, 0 0 12px rgba(212, 160, 23, 0.55); }
-  }
-  .header-right {
-    flex: 0 0 auto;
-  }
-  .counter {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 120px;
-    padding: 6px 10px;
-    background: #3d2b1a;
-    border: 2px solid #d4a017;
-    box-shadow: 2px 2px 0 #000;
-  }
-  .counter-label {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.26rem;
-    color: #d4a017;
-    letter-spacing: 1px;
-  }
-  .counter-num {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.4rem;
-    color: #f7f0e2;
-  }
-  .progress {
-    height: 6px;
-    background: #2a1f14;
-    border: 1px solid #8b5a2b;
-  }
-  .progress-fill {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #c47a3a, #d4a017);
-    transition: width 0.35s ease;
-  }
-
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 12px;
-    flex-wrap: wrap;
-    background: #3d2b1a;
-    border-bottom: 3px solid #d4a017;
-  }
-  .tool-btn {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.32rem;
-    color: #f7f0e2;
-    background: #5c3d1e;
-    border: 2px solid #d4a017;
-    padding: 8px 10px;
-    box-shadow: 2px 2px 0 #000;
-    cursor: pointer;
-  }
-  .tool-btn:hover {
-    background: #d4a017;
-    color: #2a1f14;
-  }
-  .tool-btn:active {
-    transform: translate(1px, 1px);
-    box-shadow: 1px 1px 0 #000;
-  }
-  .tool-btn.tool-active {
-    background: #d4a017;
-    color: #2a1f14;
-    box-shadow: inset 2px 2px 0 #8b5a2b;
-  }
-  .zoom-lvl {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.34rem;
-    color: #d4a017;
-    min-width: 48px;
-    text-align: center;
-    padding: 6px 4px;
-    background: #2a1f14;
-    border: 2px solid #8b5a2b;
-  }
-  .tool-gap {
-    width: 8px;
-    height: 2px;
-    background: #8b5a2b;
-    flex-shrink: 0;
-  }
-
-  @media (max-width: 780px) {
-    header {
-      flex-wrap: wrap;
-      gap: 10px;
-      padding: 10px 12px;
-    }
-    .brand h1 { font-size: 0.45rem; }
-    .brand p { display: none; }
-    .header-mid { order: 3; width: 100%; justify-content: stretch; }
-    .price-chip, .buy-cta { flex: 1; text-align: center; justify-content: center; }
-    .buy-cta { text-align: center; }
-    .counter { min-width: 100px; }
-  }
-  /* ===== end pixel header ===== */
+  
 
   
 
-
-  /* Even top layout */
-  header {
-    display: grid !important;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 12px 16px;
-    min-height: 58px;
-    padding: 10px 18px;
-    flex-wrap: nowrap;
-  }
-  .brand {
-    justify-self: start;
-    min-width: 0;
-  }
-  .brand h1 {
-    font-size: 0.68rem;
-    letter-spacing: 0.5px;
-  }
-  .brand p {
-    font-size: 0.78rem;
-    margin-top: 3px;
-    color: var(--muted);
-  }
-  .header-mid {
-    justify-self: center;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 0 0 auto;
-  }
-  .header-right {
-    justify-self: end;
-    margin-left: 0 !important;
-  }
-  .price-chip {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.4rem;
-    color: #5c3d0e;
-    background: linear-gradient(180deg, #fff8d6, #f0c14b);
-    border: 2px solid var(--gold);
-    padding: 9px 12px;
-    box-shadow: 2px 2px 0 #5c3d1e;
-    white-space: nowrap;
-  }
-  .buy-cta {
-    font-size: 0.48rem !important;
-    padding: 11px 16px !important;
-  }
-  .counter {
-    min-width: 88px;
-  }
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px 12px;
-    flex-wrap: wrap;
-  }
-  .tool-gap {
-    width: 12px;
-    height: 1px;
-    flex-shrink: 0;
-  }
-  .zoom-lvl {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.4rem;
-    color: var(--dark);
-    min-width: 44px;
-    text-align: center;
-  }
-  @media (max-width: 720px) {
-    header {
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: auto auto;
-    }
-    .brand { grid-column: 1 / -1; }
-    .header-mid { grid-column: 1; justify-self: start; }
-    .header-right { grid-column: 2; }
-    .brand p { display: none; }
-    .tool-gap { width: 6px; }
-  }
-
-  /* Clean top bar */
-  header {
-    min-height: 56px;
-    padding: 8px 16px;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .header-mid {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1 1 auto;
-    justify-content: center;
-  }
-  .price-chip {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.42rem;
-    color: #5c3d0e;
-    background: linear-gradient(180deg, #fff6c8, #f0c14b);
-    border: 2px solid var(--gold);
-    padding: 8px 12px;
-    box-shadow: 2px 2px 0 #5c3d1e;
-    white-space: nowrap;
-  }
-  .center-badge, .price-hero, .live-tag, 
-  .brand p {
-    font-size: 0.8rem;
-    margin-top: 2px;
-  }
-  .header-right {
-    margin-left: 0;
-  }
-  .toolbar {
-    padding: 6px 10px;
-    gap: 5px;
-  }
-  @media (max-width: 700px) {
-    .brand p { display: none; }
-    .price-chip { font-size: 0.34rem; padding: 6px 8px; }
-  }
 
   :root {
     --bg: #faf6ee;
@@ -390,6 +61,235 @@
     --line: 2px solid var(--border);
     --line-gold: 2px solid var(--gold);
   }
+
+  /* ========== TOP BAR (single source of truth) ========== */
+  header {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 14px !important;
+    min-height: 70px !important;
+    padding: 10px 18px !important;
+    background: #fffdf8 !important;
+    border-bottom: 4px solid #d4a017 !important;
+    box-shadow: 0 3px 0 #c9a66b !important;
+    flex-shrink: 0;
+    z-index: 50;
+  }
+  .header-pixel-strip { display: none !important; }
+
+  .brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+  }
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    color: #fffdf8;
+    background: #8b5a2b;
+    border: 2px solid #d4a017;
+    box-shadow: 2px 2px 0 #5c3d1e;
+  }
+  .brand-icon { display: none !important; }
+  .brand h1 {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.55rem !important;
+    color: #5c3d0e !important;
+    text-shadow: 1px 1px 0 #f0c14b !important;
+    letter-spacing: 0.5px !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+  }
+  .brand p {
+    font-family: 'VT323', monospace !important;
+    font-size: 0.95rem !important;
+    color: #8b5a2b !important;
+    margin: 3px 0 0 !important;
+    opacity: 1 !important;
+  }
+
+  .header-mid {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 14px !important;
+    flex: 1 1 auto !important;
+  }
+
+  .price-chip {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.5rem !important;
+    line-height: 1.45 !important;
+    color: #3d2b1a !important;
+    background: linear-gradient(180deg, #fff6c8 0%, #f0c14b 100%) !important;
+    border: 3px solid #8b5a2b !important;
+    padding: 12px 18px !important;
+    box-shadow: 3px 3px 0 #5c3d1e !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+  }
+
+  .buy-cta {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.42rem !important;
+    letter-spacing: 1px !important;
+    color: #3d2b1a !important;
+    background: linear-gradient(180deg, #ffe566 0%, #f0c14b 50%, #d4a017 100%) !important;
+    border: 3px solid #5c3d1e !important;
+    padding: 12px 18px !important;
+    box-shadow: 3px 3px 0 #5c3d1e !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    animation: buyPulse 1.6s steps(2) infinite !important;
+    filter: none !important;
+  }
+  .buy-cta:hover {
+    background: #ffe066 !important;
+    transform: translate(-1px, -1px) !important;
+    box-shadow: 4px 4px 0 #5c3d1e !important;
+  }
+  .buy-cta:active {
+    transform: translate(2px, 2px) !important;
+    box-shadow: 1px 1px 0 #5c3d1e !important;
+    animation: none !important;
+  }
+  .buy-cta.is-active {
+    background: #3d8b4a !important;
+    color: #fff !important;
+    border-color: #1a4a22 !important;
+    box-shadow: 3px 3px 0 #1a4a22 !important;
+    animation: none !important;
+  }
+  .buy-stars { display: none !important; }
+
+  @keyframes buyPulse {
+    0%, 100% { box-shadow: 3px 3px 0 #5c3d1e; }
+    50% { box-shadow: 3px 3px 0 #5c3d1e, 0 0 0 4px rgba(212, 160, 23, 0.35); }
+  }
+
+  .header-right {
+    display: flex !important;
+    align-items: center !important;
+    flex: 0 0 auto !important;
+    margin-left: 0 !important;
+  }
+  .counter {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    min-width: 120px !important;
+    padding: 8px 12px !important;
+    background: #fff !important;
+    border: 2px solid #d4a017 !important;
+    box-shadow: 2px 2px 0 #8b5a2b !important;
+    text-align: left !important;
+  }
+  .counter-label {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.26rem !important;
+    color: #8b5a2b !important;
+    letter-spacing: 1px !important;
+  }
+  .counter-num {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.38rem !important;
+    color: #5c3d0e !important;
+  }
+  .progress {
+    width: 100% !important;
+    height: 6px !important;
+    background: #eee6d8 !important;
+    border: 1px solid #d2b48c !important;
+    margin-top: 2px !important;
+  }
+  .progress-fill {
+    height: 100% !important;
+    background: #d4a017 !important;
+    transition: width 0.3s steps(8) !important;
+  }
+
+  .toolbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 8px 12px !important;
+    flex-wrap: wrap !important;
+    background: #f3e6c8 !important;
+    border-bottom: 3px solid #d4a017 !important;
+    flex-shrink: 0;
+    z-index: 40;
+  }
+  .tool-btn {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.32rem !important;
+    color: #5c3d0e !important;
+    background: #fffdf8 !important;
+    border: 2px solid #8b5a2b !important;
+    padding: 8px 10px !important;
+    box-shadow: 2px 2px 0 #c9a66b !important;
+    cursor: pointer !important;
+    animation: none !important;
+  }
+  .tool-btn:hover { background: #f0c14b !important; }
+  .tool-btn:active {
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0 #c9a66b !important;
+  }
+  .tool-btn.tool-active {
+    background: #f0c14b !important;
+    box-shadow: inset 2px 2px 0 #8b5a2b !important;
+  }
+  .zoom-lvl {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.34rem !important;
+    color: #8b5a2b !important;
+    min-width: 48px !important;
+    text-align: center !important;
+    padding: 6px 4px !important;
+    background: #fff !important;
+    border: 2px solid #d2b48c !important;
+  }
+  .tool-gap {
+    width: 8px !important;
+    height: 2px !important;
+    background: #d2b48c !important;
+    flex-shrink: 0 !important;
+  }
+
+  @media (max-width: 780px) {
+    header {
+      flex-wrap: wrap !important;
+      gap: 10px !important;
+      padding: 10px 12px !important;
+    }
+    .brand h1 { font-size: 0.42rem !important; }
+    .brand p { display: none !important; }
+    .header-mid {
+      order: 3 !important;
+      width: 100% !important;
+      justify-content: stretch !important;
+    }
+    .price-chip, .buy-cta {
+      flex: 1 1 0 !important;
+      text-align: center !important;
+    }
+    .price-chip { font-size: 0.4rem !important; padding: 11px 12px !important; }
+    .buy-cta { font-size: 0.36rem !important; padding: 11px 12px !important; }
+    .counter { min-width: 100px !important; }
+  }
+  /* ========== end TOP BAR ========== */
+
+
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 

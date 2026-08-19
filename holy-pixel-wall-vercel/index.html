@@ -1738,8 +1738,8 @@ Min 10 blocks · no maximum
   const tip = $('tip');
   const toastEl = $('toast');
 
-  // Adaptive grid: more columns on desktop (landscape), more rows on phone (portrait)
-  let COLS = 400, ROWS = 250, TOTAL = 100000;
+  // Adaptive grid: ~500,000 pixels — shape follows screen, snapped to 10
+  let COLS = 1000, ROWS = 500, TOTAL = 500000;
   let selected = new Set();
   const selectHistory = [];
   const MAX_HISTORY = 20;
@@ -1774,17 +1774,20 @@ Min 10 blocks · no maximum
 
 
   function computeGrid() {
-    // ~100,000 pixels — shape follows screen, snapped to 10
+    // ~500,000 pixels — shape follows screen, snapped to 10 for clean blocks
     const vw = Math.max(viewport.clientWidth, 120);
     const vh = Math.max(viewport.clientHeight, 120);
     const aspect = vw / vh;
-    const TARGET = 100000;
+    const TARGET = 500000;
     let cols = Math.round(Math.sqrt(TARGET * aspect));
     let rows = Math.round(TARGET / cols);
-    cols = Math.max(200, Math.min(600, Math.round(cols / 10) * 10));
-    rows = Math.max(150, Math.min(500, Math.round(rows / 10) * 10));
-    while (cols * rows > 105000 && rows >= 160) rows -= 10;
-    while (cols * rows < 95000 && cols <= 580) cols += 10;
+    // Snap to 10×10 sections; allow larger grid for 500k
+    cols = Math.max(400, Math.min(1400, Math.round(cols / 10) * 10));
+    rows = Math.max(300, Math.min(900, Math.round(rows / 10) * 10));
+    while (cols * rows > 520000 && rows >= 320) rows -= 10;
+    while (cols * rows < 480000 && cols <= 1380) cols += 10;
+    // Final snap: prefer clean TOTAL near 500000
+    while (cols * rows > 520000 && cols >= 420) cols -= 10;
     COLS = cols;
     ROWS = rows;
     TOTAL = COLS * ROWS;

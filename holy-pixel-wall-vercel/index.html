@@ -1055,7 +1055,7 @@ Min 10 blocks · no maximum
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
       <h3>ADMIN CONTROL</h3>
-      <p>Type your secret key, then Load Claims. Edit any user image, name, link — or delete.</p>
+      <p>Enter your secret key, then LOAD CLAIMS to enter full admin mode on the wall.</p>
     </div>
     <div class="modal-body">
       <div class="field">
@@ -1063,7 +1063,7 @@ Min 10 blocks · no maximum
         <input type="password" id="adminKeyInput" placeholder="Your secret key" autocomplete="off">
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button type="button" class="btn btn-sec" id="adminLoadBtn">LOAD CLAIMS</button>
+        <button type="button" class="btn btn-sec" id="adminLoadBtn">ENTER ADMIN MODE</button>
         <button type="button" class="btn btn-sec" id="adminClearBtn" style="border-color:var(--danger);color:var(--danger)">DELETE ALL</button>
       </div>
       <div id="adminList" style="max-height:40vh;overflow:auto;font-size:0.95rem;line-height:1.35"></div>
@@ -1117,6 +1117,7 @@ Min 10 blocks · no maximum
   let dragBaseline = new Set(); // selection before this drag started
     let toolMode = 'drag';
   let buyMode = false;
+  let adminMode = false;
   let devMode = false;
   let spaceHeld = false;
   let panning = false, panLastX = 0, panLastY = 0;
@@ -2284,6 +2285,49 @@ function getImg(src) {
   }
 
 
+  
+  function openAdmin() {
+    const modal = $('adminModal');
+    if (!modal) return;
+    if (adminMode) { enterAdminMode(); return; }
+    try {
+      const saved = localStorage.getItem('hpw_admin_key');
+      if (saved && $('adminKeyInput')) $('adminKeyInput').value = saved;
+    } catch (e) {}
+    modal.style.display = 'flex';
+  }
+
+  function enterAdminMode() {
+    const key = getAdminKey();
+    if (!key) { toast('ENTER ADMIN KEY FIRST', 'error'); return; }
+    adminMode = true;
+    const b = $('adminBanner');
+    if (b) b.style.display = 'flex';
+    buyMode = true;
+    toolMode = 'select';
+    $('toolSelect')?.classList.add('tool-active');
+    $('toolDrag')?.classList.remove('tool-active');
+    viewport?.classList.remove('drag-mode');
+    const btn = $('buyModeBtn');
+    if (btn) { btn.textContent = '⚡ ADMIN'; btn.classList.add('is-active'); }
+    if ($('adminModal')) $('adminModal').style.display = 'none';
+    toast('ADMIN MODE — click any claim to EDIT · select free area to ADD FREE', 'ok');
+    try { draw(); updateFloat(); } catch (e) {}
+  }
+
+  function exitAdminMode() {
+    adminMode = false;
+    const b = $('adminBanner');
+    if (b) b.style.display = 'none';
+    if (typeof setBuyMode === 'function') setBuyMode(false);
+    toast('ADMIN MODE OFF');
+    try { draw(); updateFloat(); } catch (e) {}
+  }
+
+  function openAdminEdit(r) {
+    openEdit(r);
+  }
+
   function openEdit(r) {
     if (!r) return;
     editingRegion = r;
@@ -2295,7 +2339,8 @@ function getImg(src) {
       dur.value = ['permanent','6month','3month','1day','1month'].includes(r.duration)
         ? r.duration
         : '1month';
-      dur.disabled = true;
+      // Admin can change duration; normal edit keeps locked
+      dur.disabled = !adminMode;
     }
     if (r.media) setPending(r.media, r.mediaType || 'image');
     else clearPending();
@@ -2367,8 +2412,9 @@ function getImg(src) {
   function selectionIssues() {
     const issues = [];
     const n = selected.size;
+    const minNeed = adminMode ? 1 : MIN_BUY;
     if (!n) issues.push('Select pixels on the wall');
-    else if (n < MIN_BUY) issues.push('Need at least ' + MIN_BUY + ' free pixels (now ' + n + ')');
+    else if (n < minNeed) issues.push('Need at least ' + minNeed + ' free pixels (now ' + n + ')');
     for (const k of selected) {
       if (sold.has(k)) {
         issues.push('Selection includes owned pixels');
@@ -2515,8 +2561,21 @@ function getImg(src) {
       draw();
       return;
     }
+    editingRegion = null;
     updatePayTotal();
-    $('confirmBtn').textContent = 'PAY & CLAIM';
+    if (adminMode) {
+      $('confirmBtn').textContent = 'ADD FREE TO WALL';
+      if ($('payTotalLine')) $('payTotalLine').textContent = 'ADMIN — FREE (no payment)';
+      const payField = $('payment-element') && $('payment-element').closest('.field');
+      if (payField) payField.style.display = 'none';
+      const dur = $('duration');
+      if (dur) { dur.disabled = false; if (!dur.value) dur.value = 'permanent'; }
+    } else {
+      $('confirmBtn').textContent = 'PAY & CLAIM';
+      if ($('payTotalLine')) updatePayTotal();
+      const payField = $('payment-element') && $('payment-element').closest('.field');
+      if (payField) payField.style.display = '';
+    }
     $('claimModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     try { updateBlockPreview(); refreshClaimValidation(); } catch (e) {}
@@ -3100,17 +3159,43 @@ function clearPending() {
     toast('PAID $' + total.toFixed(2) + ' · SOLD BY ' + region.name.toUpperCase());
   }
 
-  $('confirmBtn').onclick = () => {
-    // Edit existing claim — no payment
+  $('confirmBtn').onclick = async () => {
+    // Edit existing claim — admin saves to server for ALL users
     if (editingRegion) {
       const er = editingRegion;
-      er.name = $('ownerName').value.trim() || er.name || 'ANON';
-      er.desc = $('desc').value.trim().slice(0, 120);
-      er.media = pendingMedia;
-      er.mediaType = pendingType;
-      er.fit = 'cover'; er.cropScale = crop.scale; er.cropX = crop.x; er.cropY = crop.y;
-      er.link = buildLink();
-      er.linkType = ($('linkType') && $('linkType').value) || 'none';
+      const body = {
+        id: er.id,
+        name: ($('ownerName').value.trim() || er.name || 'ANON'),
+        desc: ($('desc').value || '').trim().slice(0, 120),
+        media: pendingMedia || '',
+        mediaType: pendingType || 'image',
+        fit: 'cover',
+        cropScale: crop.scale,
+        cropX: crop.x,
+        cropY: crop.y,
+        link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
+        linkType: ($('linkType') && $('linkType').value) || 'none',
+        duration: ($('duration') && $('duration').value) || er.duration
+      };
+      if (adminMode) {
+        body.key = getAdminKey();
+        try {
+          await apiFetch('/api/admin/update', {
+            method: 'POST',
+            body: JSON.stringify(body),
+            timeout: 90000
+          }, 'Admin update');
+          await pullWall();
+          clearPending();
+          closeClaimModal();
+          toast('SAVED TO WALL — ' + body.name.toUpperCase(), 'ok');
+        } catch (e) {
+          toast(friendlyError(e, 'Save failed'), 'error');
+        }
+        return;
+      }
+      // Local-only fallback (not admin)
+      Object.assign(er, body);
       save();
       draw();
       syncMediaOverlays();
@@ -3119,6 +3204,49 @@ function clearPending() {
       toast('UPDATED — ' + (er.name || 'ANON').toUpperCase());
       return;
     }
+
+    // ADMIN MODE: place new claim for FREE (no Stripe)
+    if (adminMode) {
+      const keys = Array.from(selected);
+      if (!keys.length) { toast('SELECT BLOCKS FIRST'); return; }
+      const nm = ($('ownerName').value || '').trim() || 'ADMIN';
+      const payload = {
+        key: getAdminKey(),
+        cells: keys,
+        name: nm,
+        desc: ($('desc').value || '').trim().slice(0, 120),
+        duration: ($('duration') && $('duration').value) || 'permanent',
+        media: pendingMedia || '',
+        mediaType: pendingType || 'image',
+        fit: 'cover',
+        cropScale: crop.scale,
+        cropX: crop.x,
+        cropY: crop.y,
+        link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
+        linkType: ($('linkType') && $('linkType').value) || 'none'
+      };
+      const btn = $('confirmBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'SAVING…'; }
+      try {
+        await apiFetch('/api/admin/claim', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+          timeout: 90000
+        }, 'Admin free claim');
+        selected.clear();
+        updateFloat();
+        clearPending();
+        closeClaimModal();
+        await pullWall();
+        toast('ADDED FREE — ' + nm.toUpperCase(), 'ok');
+      } catch (e) {
+        toast(friendlyError(e, 'Free claim failed'), 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'ADD FREE TO WALL'; }
+      }
+      return;
+    }
+
     if (paying) return;
     if (!refreshClaimValidation()) {
       toast(($('formStatus') && $('formStatus').textContent) || 'CHECK FORM');
@@ -3459,7 +3587,16 @@ function clearPending() {
     } catch (e) {}
   };
   if ($('adminCloseBtn')) $('adminCloseBtn').onclick = () => { $('adminModal').style.display = 'none'; };
-  if ($('adminLoadBtn')) $('adminLoadBtn').onclick = () => adminLoadClaims();
+  if ($('adminLoadBtn')) $('adminLoadBtn').onclick = async () => {
+    const key = getAdminKey();
+    if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
+    try {
+      await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 15000 }, 'Admin');
+      enterAdminMode();
+    } catch (e) {
+      toast(friendlyError(e, 'Wrong key'), 'error');
+    }
+  };
   if ($('adminClearBtn')) $('adminClearBtn').onclick = async () => {
     if (!confirm('Delete ALL claims on the wall? This cannot be undone.')) return;
     if (!confirm('Type OK in the next step mentally — really delete everything?')) return;
@@ -4188,12 +4325,6 @@ let scrollDrawRaf = 0;
   }
 
   if ($('adminBtn')) $('adminBtn').onclick = () => openAdmin();
-  document.addEventListener('keydown', function(e) {
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
-    e.preventDefault();
-    openAdmin();
-  }
-});
   if ($('adminClose')) $('adminClose').onclick = () => { $('adminModal').style.display = 'none'; };
   if ($('adminModal')) $('adminModal').addEventListener('click', e => {
     if (e.target === $('adminModal')) $('adminModal').style.display = 'none';
@@ -4248,6 +4379,27 @@ let scrollDrawRaf = 0;
 
 
     setTimeout(() => toast('DRAG A RECTANGLE · MIN 10 BLOCKS · SCROLL TO MOVE · PINCH TO ZOOM'), 600);
+
+  if ($('adminLoadBtn')) $('adminLoadBtn').onclick = async () => {
+    const key = getAdminKey();
+    if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
+    try {
+      await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 15000 }, 'Admin');
+      enterAdminMode();
+    } catch (e) {
+      toast(friendlyError(e, 'Wrong key'), 'error');
+    }
+  };
+  if ($('adminExitBtn')) $('adminExitBtn').onclick = () => exitAdminMode();
+  if ($('adminCloseBtn')) $('adminCloseBtn').onclick = () => { if ($('adminModal')) $('adminModal').style.display = 'none'; };
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+      e.preventDefault();
+      openAdmin();
+    }
+  });
+
 })();
 </script>
 </body>

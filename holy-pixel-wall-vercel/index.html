@@ -3332,7 +3332,7 @@ function clearPending() {
       const btn = $('confirmBtn');
       if (btn) { btn.disabled = true; btn.textContent = 'SAVING…'; }
       try {
-        await apiFetch('/api/admin/claim', {
+        await apiFetch('/api/claim', {
           method: 'POST',
           body: JSON.stringify(payload),
           timeout: 90000

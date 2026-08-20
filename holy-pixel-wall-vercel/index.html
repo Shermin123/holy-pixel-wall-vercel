@@ -616,14 +616,15 @@
     transform-origin: 0 0;
     overflow: hidden;
     image-rendering: auto;
-      will-change: transform;
-  backface-visibility: hidden;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
   canvas {
     display: block;
     background: #fffdf8;
-    /* Smooth rendering keeps uploaded photos sharp when zoomed. */
+    /* Photos stay smooth/sharp — never pixelated */
     image-rendering: auto;
   }
 
@@ -636,9 +637,11 @@
   .media-layer .media-item {
     position: absolute;
     object-fit: cover;
+    object-position: center;
     background: #1a1512;
     pointer-events: none;
     image-rendering: auto;
+    -ms-interpolation-mode: bicubic;
   }
 
   .float-bar {
@@ -1437,6 +1440,7 @@
   <span id="zoomLvl" class="zoom-lvl">100%</span>
   <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
   <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
+  <button class="tool-btn" id="findFreeBtn" type="button" title="Jump to free space">FIND FREE</button>
   <span class="tool-gap"></span>
   <button class="tool-btn" id="storyBtn" type="button">STORY</button>
   <button class="tool-btn" id="contactBtn" type="button">CONTACT</button>
@@ -1680,7 +1684,7 @@
     <div class="modal-foot">
       <div style="text-align:left;font-size:0.95rem;color:var(--muted);margin:0 18px 12px;line-height:1.45">
 <strong style="color:var(--dark)">SHORTCUTS</strong><br>
-Drag = rectangle · Double-click = 10×10 block<br>
+Drag = rectangle · Double-click = toggle buy/view · Shift+double-click = 10×10<br>
 Scroll = pan · Pinch / Ctrl+wheel = zoom<br>
 Space+drag or DRAG tool = pan<br>
 Ctrl+Z = undo · Esc = clear · Enter = claim<br>
@@ -2256,23 +2260,24 @@ Min 10 blocks · no maximum
     // Bitmap stays baseW×baseH; browser scales CSS size with pixelated rendering
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    canvas.style.imageRendering = 'pixelated';
+    canvas.style.imageRendering = 'auto';
 
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
   }
 
   function paintBase() {
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
-    // Higher internal res so uploaded images stay clear when zoomed
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const minLong = 2200;
+    // High internal resolution so claim photos stay sharp when zoomed
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const minLong = 2800;
     const long = Math.max(baseW, baseH);
     const boost = long < minLong ? (minLong / long) : 1;
-    const scale = dpr * Math.min(boost, 2.5);
+    const scale = dpr * Math.min(boost, 3);
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
     // draw() uses logical size baseW×baseH via cell=baseCell temporarily
     const savedCell = cell;
     const savedW = sizeW, savedH = sizeH;
@@ -2463,13 +2468,15 @@ function getImg(src) {
     if (imgCache.has(src)) return imgCache.get(src);
     const img = new Image();
     img.decoding = 'async';
-    // data: URLs must not set crossOrigin
+    try { img.loading = 'eager'; } catch (e) {}
     if (!String(src).startsWith('data:')) img.crossOrigin = 'anonymous';
-    img.onload = () => { scheduleDraw(); };
-    img.onerror = () => {
-      imgCache.delete(src);
-      // silent for replaced pending images
+    img.onload = () => {
+      try {
+        if (img.decode) img.decode().then(() => scheduleDraw()).catch(() => scheduleDraw());
+        else scheduleDraw();
+      } catch (e) { scheduleDraw(); }
     };
+    img.onerror = () => { imgCache.delete(src); };
     try { img.src = src; } catch (e) { return null; }
     imgCache.set(src, img);
     return img;
@@ -2607,7 +2614,8 @@ function getImg(src) {
     const drawCell = baseCell;
     const drawW = baseW;
     const drawH = baseH;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
 
     // 1) Blit cached checker + section grid (fast)
     const grid = rebuildGridCache();
@@ -3066,11 +3074,15 @@ function getImg(src) {
   canvas.addEventListener('dblclick', e => {
     e.preventDefault();
     e.stopPropagation();
-    if (toolMode === 'drag' || spaceHeld) return;
-    const p = pos(e);
-    // If owned and not dev, still select free cells in that section
-    selectBigBlock(p.c, p.r, !!e.shiftKey);
     didDrag = true; // suppress following click
+    // Shift+double-click still selects a 10×10 free block in buy mode
+    if (e.shiftKey && buyMode && !spaceHeld) {
+      const p = pos(e);
+      selectBigBlock(p.c, p.r, false);
+      return;
+    }
+    // Double-click toggles BUY ↔ VIEW mode
+    setBuyMode(!buyMode);
   });
 
   $('clearBtn').onclick = () => {
@@ -4799,6 +4811,66 @@ function clearPending() {
     }
   }
 
+
+  // —— Navigate free space (cycles through free 10×10 sections) ——
+  let freeNavIndex = 0;
+  function listFreeSections() {
+    const out = [];
+    const SEC = SECTION || 10;
+    for (let sc = 0; sc < COLS; sc += SEC) {
+      for (let sr = 0; sr < ROWS; sr += SEC) {
+        const maxC = Math.min(COLS, sc + SEC) - 1;
+        const maxR = Math.min(ROWS, sr + SEC) - 1;
+        let free = 0, total = 0;
+        for (let c = sc; c <= maxC; c++) {
+          for (let r = sr; r <= maxR; r++) {
+            total++;
+            if (!sold.has(c + ',' + r)) free++;
+          }
+        }
+        if (free > 0) {
+          out.push({ minC: sc, maxC: maxC, minR: sr, maxR: maxR, free: free, total: total });
+        }
+      }
+    }
+    // Prefer mostly-empty sections first
+    out.sort((a, b) => (b.free / b.total) - (a.free / a.total) || b.free - a.free);
+    return out;
+  }
+
+  function goToFreeSpace() {
+    const list = listFreeSections();
+    if (!list.length) {
+      toast('NO FREE SPACE LEFT', 'error');
+      return;
+    }
+    freeNavIndex = freeNavIndex % list.length;
+    const block = list[freeNavIndex];
+    freeNavIndex = (freeNavIndex + 1) % list.length;
+    try {
+      if (typeof focusRegion === 'function') focusRegion(block);
+    } catch (e) {
+      const midC = (block.minC + block.maxC + 1) / 2;
+      const midR = (block.minR + block.maxR + 1) / 2;
+      const z = zoom || 1;
+      const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
+      viewport.scrollLeft = Math.max(0, pad + midC * (baseCell * z) - viewport.clientWidth / 2);
+      viewport.scrollTop = Math.max(0, pad + midR * (baseCell * z) - viewport.clientHeight / 2);
+    }
+    // In buy mode, auto-select free cells in that block
+    if (buyMode) {
+      selected = new Set();
+      for (let c = block.minC; c <= block.maxC; c++) {
+        for (let r = block.minR; r <= block.maxR; r++) {
+          const k = c + ',' + r;
+          if (!sold.has(k)) selected.add(k);
+        }
+      }
+      try { updateFloat(); draw(); } catch (e) {}
+    }
+    toast('FREE AREA · ' + block.free + ' open px · next: FIND FREE', 'ok');
+  }
+
   function showOwnersBoard() {
     const modal = $('ownersModal');
     if (!modal) return;
@@ -5104,6 +5176,7 @@ function clearPending() {
   if ($('zoomIn')) $('zoomIn').onclick = () => bumpZoom(0.25, lastMouseX, lastMouseY);
   if ($('zoomOut')) $('zoomOut').onclick = () => bumpZoom(-0.25, lastMouseX, lastMouseY);
   if ($('zoomFit')) $('zoomFit').onclick = () => resize(true);
+  if ($('findFreeBtn')) $('findFreeBtn').onclick = () => goToFreeSpace();
   // Navigation: scroll/trackpad = pan · pinch or Ctrl+wheel = zoom toward cursor
   viewport.addEventListener('wheel', e => {
     e.preventDefault();

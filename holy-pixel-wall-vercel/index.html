@@ -1355,7 +1355,7 @@
     <div class="pixel-brand__copy">
       <div class="pixel-brand__eyebrow"><span class="status-dot"></span> LIVE</div>
       <h1>HOLY PIXEL WALL</h1>
-      <p>Claim your piece of the internet</p>
+      <p>Raising funds for university education</p>
     </div>
   </div>
 
@@ -1630,15 +1630,18 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-head">
       <h3>HOW IT WORKS</h3>
-      <p>Holy Pixel Wall — claim your place on the wall.</p>
+      <p>Claim a pixel. Support education.</p>
     </div>
     <div class="modal-body" style="font-size:1rem;line-height:1.45;color:var(--muted)">
+      <p style="margin-bottom:12px;padding:10px 12px;background:#fff8e8;border:2px solid #c9a34e;color:var(--dark)">
+        <strong>Why this exists.</strong> Holy Pixel Wall is a small project to help raise money for university fees and education costs. Every pixel you buy supports that goal.
+      </p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">1.</strong> Drag to select free pixels.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">2.</strong> Add your name and a photo (tap to upload). Optional link & description.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.50 / pixel for 3 months minimum.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">4.</strong> Your pixels stay locked — others cannot take them until time ends.</p>
-      <p style="margin-bottom:10px"><strong style="color:var(--dark)">Hover</strong> any claim to see owner, description, and time left.</p>
-            <p style="margin-top:12px;font-size:0.9rem"><strong style="color:var(--dark)">Photo tip:</strong> Use a clear JPG or PNG under 2MB. It fills your block automatically.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--dark)">Hover</strong> any claim to see the owner name and description.</p>
+      <p style="margin-top:12px;font-size:0.9rem"><strong style="color:var(--dark)">Photo tip:</strong> Use a clear JPG or PNG under 2MB. It fills your block automatically.</p>
       <p style="margin-top:16px;border-top:2px dashed var(--border);padding-top:10px;font-size:0.8rem;opacity:0.6">© 2026 Holy Pixel Wall. All rights reserved.</p>
     </div>
     <div class="modal-foot">
@@ -2831,8 +2834,7 @@ function getImg(src) {
             '<div style="font-family:VT323,monospace;font-size:1rem;color:var(--muted);letter-spacing:0.5px;margin-bottom:2px">Owned by</div>' +
             '<strong style="display:block;color:var(--dark);font-size:1.35rem;line-height:1.2;margin-bottom:4px">' +
             (r.country ? countryFlag(r.country) + ' ' : '') + nm + '</strong>' +
-            (r.desc ? '<span style="display:block;color:var(--muted);font-size:1rem;margin-bottom:2px">' + String(r.desc).replace(/</g, '&lt;') + '</span>' : '') +
-            '<span style="font-size:1.05rem">' + left(r) + '</span>' +
+            (r.desc ? '<span style="display:block;color:var(--muted);font-size:1rem">' + String(r.desc).replace(/</g, '&lt;') + '</span>' : '') +
             (r.link ? '<br><em style="color:var(--gold);font-size:0.95rem">Click → open link</em>' : '');
           tip.style.display = 'block';
           tip.style.left = Math.min((e.pageX || cx || 0) + 14, window.innerWidth - 200) + 'px';

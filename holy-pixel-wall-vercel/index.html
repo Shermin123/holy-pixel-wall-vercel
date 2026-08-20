@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
 <title>Holy Pixel Wall</title>
 <script src="https://js.stripe.com/v3/"></script>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -1223,6 +1225,16 @@
   border: 2px solid #2a2118;
   box-shadow: 3px 3px 0 #c9a34e;
   min-width: 150px;
+  transition: transform 0.08s steps(1);
+}
+.pixel-stat:hover {
+  background: #fff8e0;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #c9a34e;
+}
+.pixel-stat:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 #c9a34e;
 }
 
 .pixel-stat__top {
@@ -1371,7 +1383,7 @@
   </div>
 
   <div class="pixel-stats">
-    <div class="pixel-stat">
+    <div class="pixel-stat" id="pxClaimedBtn" role="button" tabindex="0" title="See who owns pixels" style="cursor:pointer">
       <div class="pixel-stat__top">
         <span class="pixel-stat__label">WALL STATUS</span>
         <span class="pixel-live">● LIVE</span>
@@ -1606,15 +1618,15 @@
 <div class="overlay" id="ownersModal">
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
-      <h3>OWNERS</h3>
-      <p>Leaderboard & permanent history log</p>
+      <h3>PIXEL OWNERS</h3>
+      <p>Everyone who owns pixels on the wall</p>
     </div>
     <div style="display:flex;gap:6px;padding:10px 18px 0;background:var(--panel);border-bottom:2px solid var(--border)">
-      <button type="button" class="tool-btn tool-active" id="ownersTabBoard" style="flex:1">LEADERBOARD</button>
-      <button type="button" class="tool-btn" id="ownersTabLog" style="flex:1">HISTORY LOG</button>
+      <button type="button" class="tool-btn tool-active" id="ownersTabBoard" style="flex:1">PEOPLE</button>
+      <button type="button" class="tool-btn" id="ownersTabLog" style="flex:1">HISTORY</button>
     </div>
     <div style="padding:10px 18px 0;background:var(--surface)">
-      <input type="text" id="ownersSearch" placeholder="Search owner name…" autocomplete="off"
+      <input type="text" id="ownersSearch" placeholder="Search by name…" autocomplete="off"
         style="width:100%;padding:8px 10px;border:3px solid var(--border);font-family:VT323,monospace;font-size:1.1rem;background:#fff;color:var(--text);outline:none">
     </div>
     <div class="modal-body" id="ownersList" style="max-height:58vh;overflow:auto;padding-top:10px">
@@ -1695,11 +1707,13 @@ Min 10 blocks · no maximum
     </div>
     <div class="modal-body">
       <div style="padding:12px 14px;margin-bottom:14px;background:#fff8e8;border:2px solid #c9a34e">
-        <div style="font-family:'Press Start 2P',monospace;font-size:0.28rem;color:#8a633d;margin-bottom:6px">PHONE (UK)</div>
-        <a href="tel:+4475554467660" style="font-family:'Press Start 2P',monospace;font-size:0.42rem;color:#2a2118;text-decoration:none;letter-spacing:1px">
-          07554 467 660
+        <div style="font-family:'Press Start 2P',monospace;font-size:0.28rem;color:#8a633d;margin-bottom:6px">WHATSAPP (UK)</div>
+        <a id="whatsappLink" href="https://wa.me/4475554467660?text=Hi%20%E2%80%94%20I%20saw%20Holy%20Pixel%20Wall" target="_blank" rel="noopener noreferrer"
+          style="display:inline-block;font-family:'Press Start 2P',monospace;font-size:0.36rem;color:#fff;background:#25D366;border:2px solid #128C7E;padding:10px 14px;text-decoration:none;letter-spacing:0.5px;box-shadow:2px 2px 0 #2a2118">
+          CHAT ON WHATSAPP
         </a>
-        <div style="margin-top:6px;color:var(--muted);font-size:0.95rem">Tap to call · UK mobile</div>
+        <div style="margin-top:8px;font-family:'Press Start 2P',monospace;font-size:0.28rem;color:#2a2118">07554 467 660</div>
+        <div style="margin-top:4px;color:var(--muted);font-size:0.95rem">Opens WhatsApp · UK number</div>
       </div>
       <div class="field">
         <label>YOUR NAME</label>
@@ -1783,18 +1797,48 @@ Min 10 blocks · no maximum
   function getAdminKey() {
     try {
       const el = document.getElementById('adminKeyInput');
-      const typed = (el && el.value) ? String(el.value).trim() : '';
+      const typed = (el && el.value) ? String(el.value).trim().slice(0, 128) : '';
       if (typed) {
-        try { localStorage.setItem('hpw_admin_key', typed); } catch (e) {}
+        // Prefer session-only storage — less persistent XSS theft surface
         try { sessionStorage.setItem('hpw_admin_key', typed); } catch (e) {}
+        try { localStorage.removeItem('hpw_admin_key'); } catch (e) {}
         return typed;
       }
-      return localStorage.getItem('hpw_admin_key')
-        || sessionStorage.getItem('hpw_admin_key')
+      return sessionStorage.getItem('hpw_admin_key')
+        || localStorage.getItem('hpw_admin_key') // legacy migration
         || '';
     } catch (e) {
       return '';
     }
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function safeUrl(u) {
+    try {
+      const s = String(u || '').trim();
+      if (!s) return '';
+      const parsed = new URL(s, 'https://example.invalid');
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';
+      // Block obvious javascript/data vectors if someone bypassed URL parser
+      if (/^(javascript|data|vbscript):/i.test(s)) return '';
+      return parsed.href;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function sanitizeText(s, max) {
+    max = max || 200;
+    var str = (s == null) ? '' : String(s);
+    return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim().slice(0, max);
   }
 
   const $ = id => document.getElementById(id);
@@ -2901,13 +2945,14 @@ function getImg(src) {
         const p = pos(e);
         const r = sold.get(p.c + ',' + p.r);
         if (r && tip) {
-          const nm = (r.name || 'Anonymous').replace(/</g, '&lt;');
+          const nm = escapeHtml(r.name || 'Anonymous');
+          const desc = r.desc ? escapeHtml(String(r.desc).slice(0, 200)) : '';
           tip.innerHTML =
             '<div style="font-family:VT323,monospace;font-size:1rem;color:var(--muted);letter-spacing:0.5px;margin-bottom:2px">Owned by</div>' +
             '<strong style="display:block;color:var(--dark);font-size:1.35rem;line-height:1.2;margin-bottom:4px">' +
             (r.country ? countryFlag(r.country) + ' ' : '') + nm + '</strong>' +
-            (r.desc ? '<span style="display:block;color:var(--muted);font-size:1rem">' + String(r.desc).replace(/</g, '&lt;') + '</span>' : '') +
-            (r.link ? '<br><em style="color:var(--gold);font-size:0.95rem">Click → open link</em>' : '');
+            (desc ? '<span style="display:block;color:var(--muted);font-size:1rem">' + desc + '</span>' : '') +
+            (r.link && safeUrl(r.link) ? '<br><em style="color:var(--gold);font-size:0.95rem">Click → open link</em>' : '');
           tip.style.display = 'block';
           tip.style.left = Math.min((e.pageX || cx || 0) + 14, window.innerWidth - 200) + 'px';
           tip.style.top = Math.max(8, (e.pageY || cy || 0) - 10) + 'px';
@@ -2968,7 +3013,7 @@ function getImg(src) {
     const px = r.pixels || (r.cells && r.cells.length) || 0;
     toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
     if (r.link) {
-      setTimeout(() => window.open(r.link, '_blank', 'noopener,noreferrer'), 200);
+      setTimeout(() => { const lu = safeUrl(r.link); if (lu) window.open(lu, '_blank', 'noopener,noreferrer'); }, 200);
     }
   });
 
@@ -4300,12 +4345,16 @@ function clearPending() {
       return;
     }
     const payload = {
-      name: name || 'Anonymous',
-      email: email || '',
-      message: message.slice(0, 1000),
-      at: Date.now(),
-      userAgent: (navigator.userAgent || '').slice(0, 180)
+      name: sanitizeText(name || 'Anonymous', 80),
+      email: sanitizeText(email || '', 120).slice(0, 120),
+      message: sanitizeText(message, 1000),
+      at: Date.now()
     };
+    // basic email shape check if provided
+    if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      if (err) { err.style.display = 'block'; err.textContent = 'Enter a valid email or leave it blank.'; }
+      return;
+    }
     const btn = $('contactSend');
     if (btn) { btn.disabled = true; btn.textContent = 'SENDING…'; }
     if (err) err.style.display = 'none';
@@ -4608,30 +4657,70 @@ function clearPending() {
     let stats = buildOwnerStats();
     if (q) stats = stats.filter(o => o.name.toLowerCase().includes(q));
     if (!stats.length) {
-      list.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">' +
-        (q ? 'No owners match “' + q.replace(/</g,'') + '”.' : 'No owners yet — be the first.') + '</p>';
+      list.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--muted)">' +
+        '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--dark);margin-bottom:10px">NO OWNERS YET</div>' +
+        (q ? 'No one matches “' + escapeHtml(q) + '”.' : 'Be the first to claim pixels on the wall.') +
+        '</div>';
       return;
     }
-    const totalAll = buildOwnerStats();
-    const totalPx = totalAll.reduce((s, o) => s + o.pixels, 0);
+    const totalPx = stats.reduce((s, o) => s + o.pixels, 0);
+    const all = buildOwnerStats();
     list.innerHTML =
-      '<p style="color:var(--muted);margin-bottom:8px;font-size:0.95rem;position:sticky;top:0;background:var(--surface);padding-bottom:6px;z-index:1">' +
-      totalAll.length + ' owners · ' + totalPx + ' px' +
-      (q ? ' · showing ' + stats.length : '') + '</p>' +
+      '<div style="position:sticky;top:0;background:var(--surface);padding-bottom:10px;margin-bottom:6px;border-bottom:2px solid var(--border);z-index:1">' +
+      '<div style="font-family:Press Start 2P,monospace;font-size:0.32rem;color:var(--dark);margin-bottom:4px">' +
+      all.length + ' PEOPLE · ' + totalPx + ' PIXELS CLAIMED</div>' +
+      '<div style="color:var(--muted);font-size:0.95rem">Tap <strong style="color:var(--dark)">SHOW ON WALL</strong> to jump to their pixels</div>' +
+      '</div>' +
       stats.map((o, i) => {
-        const safe = o.name.replace(/</g, '&lt;');
-        const rank = totalAll.findIndex(x => x.name === o.name) + 1;
+        const safe = escapeHtml(o.name);
+        const rank = all.findIndex(x => x.name === o.name) + 1;
         const flag = countryFlag(o.country);
-        return '<div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding:8px 4px">' +
-          '<div style="font-family:Press Start 2P,monospace;font-size:0.32rem;color:var(--gold);min-width:32px">#' + rank + '</div>' +
-          '<div style="font-size:1.35rem;line-height:1;min-width:28px;text-align:center" title="' + (o.country || '') + '">' + flag + '</div>' +
-          '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-          '<strong style="color:var(--dark);font-size:1.1rem">' + safe + '</strong>' +
-          '<span style="color:var(--muted);font-size:0.85rem"> · ' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</span>' +
+        const desc = o.desc ? escapeHtml(String(o.desc).slice(0, 80)) : '';
+        return '<div class="owner-row" data-owner="' + safe.replace(/"/g, '&quot;') + '" style="display:flex;align-items:center;gap:10px;border:2px solid var(--border);background:#fff;padding:10px;margin-bottom:8px">' +
+          '<div style="font-family:Press Start 2P,monospace;font-size:0.34rem;color:var(--gold);min-width:36px">#' + rank + '</div>' +
+          '<div style="font-size:1.5rem;line-height:1;min-width:32px;text-align:center" title="' + escapeHtml(o.country || '') + '">' + flag + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:bold;color:var(--dark);font-size:1.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safe + '</div>' +
+          (desc ? '<div style="color:var(--muted);font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + desc + '</div>' : '') +
+          '<div style="color:var(--muted);font-size:0.85rem;margin-top:2px">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
           '</div>' +
-          '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--dark);white-space:nowrap">' + o.pixels + ' PX</div>' +
-          '</div>';
+          '<div style="text-align:right;flex-shrink:0">' +
+          '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--dark);margin-bottom:6px">' + o.pixels + ' PX</div>' +
+          '<button type="button" class="btn btn-sec owner-focus-btn" data-owner="' + safe.replace(/"/g, '&quot;') + '" style="font-size:0.28rem;padding:6px 8px">SHOW ON WALL</button>' +
+          '</div></div>';
       }).join('');
+
+    list.querySelectorAll('.owner-focus-btn').forEach(btn => {
+      btn.onclick = () => {
+        const name = btn.getAttribute('data-owner') || '';
+        // Find largest claim by this owner
+        let best = null, bestPx = -1;
+        regions.forEach(r => {
+          if (!r || expired(r)) return;
+          const nm = (r.name || 'Anonymous').trim() || 'Anonymous';
+          if (nm !== name) return;
+          const px = r.pixels || (r.cells && r.cells.length) || 0;
+          if (px > bestPx) { bestPx = px; best = r; }
+        });
+        if (!best) { toast('Could not find their pixels', 'error'); return; }
+        try {
+          if (typeof focusRegion === 'function') focusRegion(best);
+          else {
+            const midC = ((best.minC || 0) + (best.maxC || 0)) / 2;
+            const midR = ((best.minR || 0) + (best.maxR || 0)) / 2;
+            const z = zoom || 1;
+            const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
+            viewport.scrollLeft = Math.max(0, pad + midC * (baseCell * z) - viewport.clientWidth / 2);
+            viewport.scrollTop = Math.max(0, pad + midR * (baseCell * z) - viewport.clientHeight / 2);
+          }
+          $('ownersModal').style.display = 'none';
+          toast('SHOWING: ' + name, 'ok');
+        } catch (e) {
+          console.warn(e);
+          toast('Could not focus', 'error');
+        }
+      };
+    });
   }
 
   async function renderOwnerHistory() {
@@ -4735,6 +4824,12 @@ function clearPending() {
   };
 
   if ($('ownersBtn')) $('ownersBtn').onclick = () => showOwnersBoard();
+  if ($('pxClaimedBtn')) {
+    $('pxClaimedBtn').onclick = () => showOwnersBoard();
+    $('pxClaimedBtn').onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showOwnersBoard(); }
+    };
+  }
   if ($('ownersClose')) $('ownersClose').onclick = () => { $('ownersModal').style.display = 'none'; };
   if ($('ownersModal')) $('ownersModal').addEventListener('click', e => {
     if (e.target === $('ownersModal')) $('ownersModal').style.display = 'none';

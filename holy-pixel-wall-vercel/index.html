@@ -1398,7 +1398,6 @@
   <button class="tool-btn" id="toolSelect" type="button" style="display:none">SELECT</button>
   <button class="tool-btn" id="toolDrag" type="button" style="display:none">DRAG</button>
   <button class="tool-btn" id="toolDev" type="button" style="display:none">DEV</button>
-  <button class="tool-btn" id="toolUndo" type="button" title="Undo">UNDO</button>
   <button class="tool-btn" id="toolClaims" type="button" title="My claims">MY CLAIMS</button>
   <button class="tool-btn" id="ownersBtn" type="button" title="All owners">OWNERS</button>
   <span class="tool-gap"></span>
@@ -1407,6 +1406,7 @@
   <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
   <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
   <span class="tool-gap"></span>
+  <button class="tool-btn" id="storyBtn" type="button">STORY</button>
   <button class="tool-btn" id="helpBtn" type="button">HOW IT WORKS</button>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
   <!-- admin: Ctrl+Shift+A only -->
@@ -1657,6 +1657,34 @@ Min 10 blocks · no maximum
 <button class="btn btn-pri" id="helpClose">GOT IT</button>
     </div>
   </div>
+
+<div class="overlay" id="storyModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <h3>THE STORY</h3>
+      <p>Why this wall exists</p>
+    </div>
+    <div class="modal-body" style="font-size:1.05rem;line-height:1.5;color:var(--muted)">
+      <p style="margin-bottom:12px;color:var(--dark)">
+        I want to go to university, but I don’t have the money for the fees.
+      </p>
+      <p style="margin-bottom:12px">
+        Tuition, books, living costs — it adds up fast. Waiting for a miracle wasn’t working, so I built something small instead: this pixel wall.
+      </p>
+      <p style="margin-bottom:12px">
+        Every pixel you claim helps cover education costs. You’re not just buying space on a grid — you’re helping someone stay in school.
+      </p>
+      <p style="color:var(--dark)">
+        Thank you for being here. It means more than you know.
+      </p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-sec" id="storyClose">CLOSE</button>
+      <button type="button" class="btn" id="storyBuy">BUY PIXELS</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <div class="overlay" id="adminModal">
@@ -4182,6 +4210,15 @@ function clearPending() {
 
   if ($('helpBtn')) $('helpBtn').onclick = () => { $('helpModal').style.display = 'flex'; };
   if ($('helpClose')) $('helpClose').onclick = () => { $('helpModal').style.display = 'none'; };
+  if ($('storyBtn')) $('storyBtn').onclick = () => { $('storyModal').style.display = 'flex'; };
+  if ($('storyClose')) $('storyClose').onclick = () => { $('storyModal').style.display = 'none'; };
+  if ($('storyBuy')) $('storyBuy').onclick = () => {
+    $('storyModal').style.display = 'none';
+    if (typeof setBuyMode === 'function') setBuyMode(true);
+  };
+  if ($('storyModal')) $('storyModal').addEventListener('click', e => {
+    if (e.target === $('storyModal')) $('storyModal').style.display = 'none';
+  });
 
   // ===== OWNER ADMIN — control every claim/image =====
   

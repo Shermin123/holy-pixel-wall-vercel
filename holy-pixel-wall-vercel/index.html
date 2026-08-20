@@ -2832,7 +2832,7 @@ function getImg(src) {
             '<strong style="display:block;color:var(--dark);font-size:1.35rem;line-height:1.2;margin-bottom:4px">' +
             (r.country ? countryFlag(r.country) + ' ' : '') + nm + '</strong>' +
             (r.desc ? '<span style="display:block;color:var(--muted);font-size:1rem;margin-bottom:2px">' + String(r.desc).replace(/</g, '&lt;') + '</span>' : '') +
-            '<span style="font-size:1.05rem">' + left(r) + ' · ' + (r.pixels || 0) + ' PX</span>' +
+            '<span style="font-size:1.05rem">' + left(r) + '</span>' +
             (r.link ? '<br><em style="color:var(--gold);font-size:0.95rem">Click → open link</em>' : '');
           tip.style.display = 'block';
           tip.style.left = Math.min((e.pageX || cx || 0) + 14, window.innerWidth - 200) + 'px';

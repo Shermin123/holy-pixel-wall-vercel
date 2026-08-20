@@ -553,33 +553,45 @@
     color: #2c221e;
     border-color: var(--gold);
   }
-  .viewport.drag-mode, .viewport.drag-mode canvas {
-    cursor: grab !important;
-  }
-  .viewport.drag-mode.panning, .viewport.drag-mode.panning canvas {
-    cursor: grabbing !important;
-  }
-
-  .viewport.panning, .viewport.panning * {
-    cursor: grabbing !important;
-  }
+  /* Default wall cursor: sharp crosshair for precise pixel aiming */
   .viewport {
     flex: 1;
     min-height: 0;
     position: relative;
     overflow: auto;
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6' stroke='%232a2118' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23a84c32'/%3E%3C/svg%3E") 12 12, crosshair;
+    cursor: crosshair;
     -webkit-overflow-scrolling: touch;
     background: #f0ebe3;
     padding: 0;
   }
+  .viewport #canvas,
+  .viewport .stage,
   .viewport canvas {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6' stroke='%232a2118' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23a84c32'/%3E%3C/svg%3E") 12 12, crosshair !important;
+    cursor: crosshair !important;
   }
-  /* Buy / select mode — even sharper cell pointer */
+  /* Buy / select mode — cell cross (sharp +) */
   .viewport.buy-mode,
+  .viewport.buy-mode #canvas,
+  .viewport.buy-mode .stage,
   .viewport.buy-mode canvas {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6' stroke='%232a2118' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23a84c32'/%3E%3C/svg%3E") 12 12, crosshair !important;
+    cursor: cell !important;
+  }
+  /* Pan / drag mode */
+  .viewport.drag-mode,
+  .viewport.drag-mode #canvas,
+  .viewport.drag-mode .stage,
+  .viewport.drag-mode canvas {
+    cursor: grab !important;
+  }
+  .viewport.drag-mode.panning,
+  .viewport.drag-mode.panning #canvas,
+  .viewport.drag-mode.panning .stage,
+  .viewport.drag-mode.panning canvas,
+  .viewport.panning,
+  .viewport.panning #canvas,
+  .viewport.panning .stage,
+  .viewport.panning canvas {
+    cursor: grabbing !important;
   }
 
   #wallWrap {
@@ -4856,39 +4868,57 @@ function clearPending() {
     toolMode = mode;
     $('toolSelect')?.classList.toggle('tool-active', mode === 'select' && buyMode);
     $('toolDrag')?.classList.toggle('tool-active', mode === 'drag');
-    viewport.classList.toggle('drag-mode', mode === 'drag');
+    if (viewport) {
+      viewport.classList.toggle('drag-mode', mode === 'drag');
+      viewport.classList.toggle('buy-mode', mode === 'select' && buyMode);
+    }
+    try {
+      const cur = (mode === 'drag') ? 'grab' : 'cell';
+      if (canvas) canvas.style.cursor = cur;
+      if (stage) stage.style.cursor = cur;
+    } catch (e) {}
   }
 
   function setBuyMode(on) {
-    buyMode = on;
+    buyMode = !!on;
     const btn = $('buyModeBtn');
     if (btn) {
-      btn.textContent = on ? '✓ VIEW MODE' : '★ BUY PIXELS ★';
-      btn.classList.toggle('is-active', on);
+      btn.textContent = buyMode ? '✓ VIEW MODE' : '★ BUY PIXELS ★';
+      btn.classList.toggle('is-active', buyMode);
       btn.style.background = '';
       btn.style.color = '';
     }
-    if (on) {
+    try {
+      if (viewport) {
+        viewport.classList.toggle('buy-mode', buyMode);
+        viewport.classList.toggle('drag-mode', !buyMode);
+      }
+      if (canvas) {
+        canvas.style.cursor = buyMode ? 'cell' : 'grab';
+      }
+      if (stage) {
+        stage.style.cursor = buyMode ? 'cell' : 'grab';
+      }
+    } catch (e) {}
+    if (buyMode) {
       toolMode = 'select';
       $('toolSelect')?.classList.add('tool-active');
       $('toolDrag')?.classList.remove('tool-active');
-      viewport.classList.remove('drag-mode');
       toast('BUY MODE — SELECT 10+ PIXELS');
     } else {
       toolMode = 'drag';
       $('toolSelect')?.classList.remove('tool-active');
       $('toolDrag')?.classList.add('tool-active');
-      viewport.classList.add('drag-mode');
       selected.clear();
-      updateFloat();
-      draw();
+      try { updateFloat(); } catch (e) {}
+      try { draw(); } catch (e) {}
       toast('VIEW MODE — CLICK LOGOS TO VISIT');
     }
   }
 
-  $('toolSelect').onclick = () => setTool('select');
-  $('toolDrag').onclick = () => setTool('drag');
-  $('buyModeBtn').onclick = () => setBuyMode(!buyMode);
+  if ($('toolSelect')) $('toolSelect').onclick = () => setTool('select');
+  if ($('toolDrag')) $('toolDrag').onclick = () => setTool('drag');
+  if ($('buyModeBtn')) $('buyModeBtn').onclick = () => setBuyMode(!buyMode);
   if ($('toolDev')) $('toolDev').onclick = () => {
     devMode = !devMode;
     $('toolDev').classList.toggle('tool-active', devMode);

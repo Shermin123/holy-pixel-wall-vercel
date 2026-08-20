@@ -568,10 +568,18 @@
     min-height: 0;
     position: relative;
     overflow: auto;
-    cursor: crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6' stroke='%232a2118' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23a84c32'/%3E%3C/svg%3E") 12 12, crosshair;
     -webkit-overflow-scrolling: touch;
     background: #f0ebe3;
     padding: 0;
+  }
+  .viewport canvas {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6' stroke='%232a2118' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23a84c32'/%3E%3C/svg%3E") 12 12, crosshair !important;
+  }
+  /* Buy / select mode — even sharper cell pointer */
+  .viewport.buy-mode,
+  .viewport.buy-mode canvas {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6' stroke='%232a2118' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23a84c32'/%3E%3C/svg%3E") 12 12, crosshair !important;
   }
 
   #wallWrap {
@@ -4657,43 +4665,43 @@ function clearPending() {
     let stats = buildOwnerStats();
     if (q) stats = stats.filter(o => o.name.toLowerCase().includes(q));
     if (!stats.length) {
-      list.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--muted)">' +
-        '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--dark);margin-bottom:10px">NO OWNERS YET</div>' +
-        (q ? 'No one matches “' + escapeHtml(q) + '”.' : 'Be the first to claim pixels on the wall.') +
+      list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.95rem">' +
+        (q ? 'No match for “' + escapeHtml(q) + '”.' : 'No owners yet — be the first.') +
         '</div>';
       return;
     }
-    const totalPx = stats.reduce((s, o) => s + o.pixels, 0);
     const all = buildOwnerStats();
+    const totalPx = all.reduce((s, o) => s + o.pixels, 0);
+    // Cap DOM for performance with hundreds of owners
+    const MAX_SHOW = 200;
+    const show = stats.slice(0, MAX_SHOW);
     list.innerHTML =
-      '<div style="position:sticky;top:0;background:var(--surface);padding-bottom:10px;margin-bottom:6px;border-bottom:2px solid var(--border);z-index:1">' +
-      '<div style="font-family:Press Start 2P,monospace;font-size:0.32rem;color:var(--dark);margin-bottom:4px">' +
-      all.length + ' PEOPLE · ' + totalPx + ' PIXELS CLAIMED</div>' +
-      '<div style="color:var(--muted);font-size:0.95rem">Tap <strong style="color:var(--dark)">SHOW ON WALL</strong> to jump to their pixels</div>' +
-      '</div>' +
-      stats.map((o, i) => {
+      '<div style="position:sticky;top:0;background:var(--surface);z-index:1;padding:0 0 6px;margin-bottom:4px;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted)">' +
+      all.length + ' people · ' + totalPx + ' px' +
+      (q ? ' · ' + stats.length + ' match' : '') +
+      (stats.length > MAX_SHOW ? ' · showing ' + MAX_SHOW : '') +
+      ' · tap row to locate</div>' +
+      '<div style="display:grid;grid-template-columns:28px 22px 1fr auto;gap:4px 6px;align-items:center;font-size:0.8rem;color:var(--muted);padding:2px 4px 6px;border-bottom:1px solid var(--border)">' +
+      '<span>#</span><span></span><span>Name</span><span style="text-align:right">PX</span></div>' +
+      show.map((o) => {
         const safe = escapeHtml(o.name);
         const rank = all.findIndex(x => x.name === o.name) + 1;
         const flag = countryFlag(o.country);
-        const desc = o.desc ? escapeHtml(String(o.desc).slice(0, 80)) : '';
-        return '<div class="owner-row" data-owner="' + safe.replace(/"/g, '&quot;') + '" style="display:flex;align-items:center;gap:10px;border:2px solid var(--border);background:#fff;padding:10px;margin-bottom:8px">' +
-          '<div style="font-family:Press Start 2P,monospace;font-size:0.34rem;color:var(--gold);min-width:36px">#' + rank + '</div>' +
-          '<div style="font-size:1.5rem;line-height:1;min-width:32px;text-align:center" title="' + escapeHtml(o.country || '') + '">' + flag + '</div>' +
-          '<div style="flex:1;min-width:0">' +
-          '<div style="font-weight:bold;color:var(--dark);font-size:1.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safe + '</div>' +
-          (desc ? '<div style="color:var(--muted);font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + desc + '</div>' : '') +
-          '<div style="color:var(--muted);font-size:0.85rem;margin-top:2px">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
-          '</div>' +
-          '<div style="text-align:right;flex-shrink:0">' +
-          '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--dark);margin-bottom:6px">' + o.pixels + ' PX</div>' +
-          '<button type="button" class="btn btn-sec owner-focus-btn" data-owner="' + safe.replace(/"/g, '&quot;') + '" style="font-size:0.28rem;padding:6px 8px">SHOW ON WALL</button>' +
-          '</div></div>';
+        const attr = encodeURIComponent(o.name);
+        return '<button type="button" class="owner-row" data-owner="' + attr + '" title="Show on wall" ' +
+          'style="display:grid;grid-template-columns:28px 22px 1fr auto;gap:4px 6px;align-items:center;width:100%;text-align:left;' +
+          'border:none;border-bottom:1px solid var(--border);background:transparent;padding:5px 4px;cursor:pointer;font:inherit;color:inherit">' +
+          '<span style="font-family:Press Start 2P,monospace;font-size:0.22rem;color:var(--gold)">' + rank + '</span>' +
+          '<span style="font-size:0.95rem;line-height:1;text-align:center">' + flag + '</span>' +
+          '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dark);font-size:1rem">' + safe + '</span>' +
+          '<span style="font-family:Press Start 2P,monospace;font-size:0.26rem;color:var(--dark);white-space:nowrap;text-align:right">' + o.pixels + '</span>' +
+          '</button>';
       }).join('');
 
-    list.querySelectorAll('.owner-focus-btn').forEach(btn => {
+    list.querySelectorAll('.owner-row').forEach(btn => {
       btn.onclick = () => {
-        const name = btn.getAttribute('data-owner') || '';
-        // Find largest claim by this owner
+        let name = '';
+        try { name = decodeURIComponent(btn.getAttribute('data-owner') || ''); } catch (e) { name = btn.getAttribute('data-owner') || ''; }
         let best = null, bestPx = -1;
         regions.forEach(r => {
           if (!r || expired(r)) return;
@@ -4714,12 +4722,14 @@ function clearPending() {
             viewport.scrollTop = Math.max(0, pad + midR * (baseCell * z) - viewport.clientHeight / 2);
           }
           $('ownersModal').style.display = 'none';
-          toast('SHOWING: ' + name, 'ok');
+          toast(name, 'ok');
         } catch (e) {
           console.warn(e);
           toast('Could not focus', 'error');
         }
       };
+      btn.onmouseenter = () => { btn.style.background = '#fff8e0'; };
+      btn.onmouseleave = () => { btn.style.background = 'transparent'; };
     });
   }
 

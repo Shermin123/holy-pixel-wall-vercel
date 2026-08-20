@@ -1407,6 +1407,7 @@
   <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
   <span class="tool-gap"></span>
   <button class="tool-btn" id="storyBtn" type="button">STORY</button>
+  <button class="tool-btn" id="contactBtn" type="button">CONTACT</button>
   <button class="tool-btn" id="helpBtn" type="button">HOW IT WORKS</button>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
   <!-- admin: Ctrl+Shift+A only -->
@@ -1686,6 +1687,41 @@ Min 10 blocks · no maximum
   </div>
 </div>
 
+<div class="overlay" id="contactModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <h3>CONTACT</h3>
+      <p>Questions, support, or a kind word</p>
+    </div>
+    <div class="modal-body">
+      <div style="padding:12px 14px;margin-bottom:14px;background:#fff8e8;border:2px solid #c9a34e">
+        <div style="font-family:'Press Start 2P',monospace;font-size:0.28rem;color:#8a633d;margin-bottom:6px">PHONE (UK)</div>
+        <a href="tel:+4475554467660" style="font-family:'Press Start 2P',monospace;font-size:0.42rem;color:#2a2118;text-decoration:none;letter-spacing:1px">
+          07554 467 660
+        </a>
+        <div style="margin-top:6px;color:var(--muted);font-size:0.95rem">Tap to call · UK mobile</div>
+      </div>
+      <div class="field">
+        <label>YOUR NAME</label>
+        <input type="text" id="contactName" placeholder="Name" maxlength="80" autocomplete="name">
+      </div>
+      <div class="field">
+        <label>EMAIL (optional)</label>
+        <input type="email" id="contactEmail" placeholder="you@email.com" maxlength="120" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>MESSAGE</label>
+        <textarea id="contactMessage" placeholder="Write your message…" maxlength="1000" rows="4" style="min-height:100px"></textarea>
+      </div>
+      <p id="contactErr" style="display:none;color:var(--danger);font-size:0.95rem;margin-top:6px"></p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-sec" id="contactClose">CLOSE</button>
+      <button type="button" class="btn" id="contactSend">SEND MESSAGE</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="adminModal">
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
@@ -1701,7 +1737,16 @@ Min 10 blocks · no maximum
         <button type="button" class="btn btn-sec" id="adminLoadBtn">ENTER ADMIN MODE</button>
         <button type="button" class="btn btn-sec" id="adminClearBtn" style="border-color:var(--danger);color:var(--danger)">DELETE ALL</button>
       </div>
-      <div id="adminList" style="max-height:40vh;overflow:auto;font-size:0.95rem;line-height:1.35"></div>
+      <div id="adminList" style="max-height:28vh;overflow:auto;font-size:0.95rem;line-height:1.35"></div>
+      <div style="margin-top:14px;border-top:2px solid var(--border);padding-top:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <strong style="font-family:'Press Start 2P',monospace;font-size:0.35rem;color:var(--dark)">MESSAGES</strong>
+          <button type="button" class="btn btn-sec" id="adminMsgRefresh" style="font-size:0.3rem;padding:6px 8px">REFRESH</button>
+        </div>
+        <div id="adminMessages" style="max-height:22vh;overflow:auto;font-size:0.95rem;line-height:1.35;color:var(--muted)">
+          <p style="text-align:center;padding:8px">Enter admin mode to load messages.</p>
+        </div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="adminCloseBtn">CLOSE</button>
@@ -3039,6 +3084,7 @@ function getImg(src) {
     const key = (input && input.value ? String(input.value).trim() : '') || getAdminKey();
     if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
     try { localStorage.setItem('hpw_admin_key', key); } catch (e) {}
+    try { if (typeof loadAdminMessages === 'function') loadAdminMessages(); } catch (e) {}
     adminMode = true;
     const b = $('adminBanner');
     if (b) b.style.display = 'flex';
@@ -4219,6 +4265,115 @@ function clearPending() {
     if (e.target === $('storyModal')) $('storyModal').style.display = 'none';
   });
 
+  // ===== CONTACT =====
+  const CONTACT_STORE = 'hpw_contact_messages';
+  function loadLocalMessages() {
+    try {
+      const raw = localStorage.getItem(CONTACT_STORE);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveLocalMessage(msg) {
+    const arr = loadLocalMessages();
+    arr.unshift(msg);
+    while (arr.length > 100) arr.pop();
+    try { localStorage.setItem(CONTACT_STORE, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  function openContact() {
+    if ($('contactErr')) { $('contactErr').style.display = 'none'; $('contactErr').textContent = ''; }
+    if ($('contactModal')) $('contactModal').style.display = 'flex';
+  }
+  if ($('contactBtn')) $('contactBtn').onclick = openContact;
+  if ($('contactClose')) $('contactClose').onclick = () => { $('contactModal').style.display = 'none'; };
+  if ($('contactModal')) $('contactModal').addEventListener('click', e => {
+    if (e.target === $('contactModal')) $('contactModal').style.display = 'none';
+  });
+  if ($('contactSend')) $('contactSend').onclick = async () => {
+    const name = ($('contactName') && $('contactName').value || '').trim();
+    const email = ($('contactEmail') && $('contactEmail').value || '').trim();
+    const message = ($('contactMessage') && $('contactMessage').value || '').trim();
+    const err = $('contactErr');
+    if (!message || message.length < 3) {
+      if (err) { err.style.display = 'block'; err.textContent = 'Please write a short message.'; }
+      return;
+    }
+    const payload = {
+      name: name || 'Anonymous',
+      email: email || '',
+      message: message.slice(0, 1000),
+      at: Date.now(),
+      userAgent: (navigator.userAgent || '').slice(0, 180)
+    };
+    const btn = $('contactSend');
+    if (btn) { btn.disabled = true; btn.textContent = 'SENDING…'; }
+    if (err) err.style.display = 'none';
+    let sentApi = false;
+    try {
+      await apiFetch('/api/contact', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        timeout: 20000
+      }, 'Contact');
+      sentApi = true;
+    } catch (e) {
+      console.warn('contact api', e);
+      // Still keep locally so admin on this device can see it
+    }
+    saveLocalMessage(payload);
+    if (btn) { btn.disabled = false; btn.textContent = 'SEND MESSAGE'; }
+    if ($('contactName')) $('contactName').value = '';
+    if ($('contactEmail')) $('contactEmail').value = '';
+    if ($('contactMessage')) $('contactMessage').value = '';
+    $('contactModal').style.display = 'none';
+    toast(sentApi ? 'MESSAGE SENT — thank you' : 'MESSAGE SAVED — will show in admin', 'ok');
+  };
+
+  async function loadAdminMessages() {
+    const box = $('adminMessages');
+    if (!box) return;
+    box.innerHTML = '<p style="text-align:center;padding:8px">Loading…</p>';
+    let msgs = [];
+    try {
+      const key = (typeof getAdminKey === 'function' && getAdminKey()) || '';
+      const data = await apiFetch('/api/admin/messages?key=' + encodeURIComponent(key), {
+        timeout: 15000
+      }, 'Messages');
+      if (data && Array.isArray(data.messages)) msgs = data.messages;
+      else if (Array.isArray(data)) msgs = data;
+    } catch (e) {
+      console.warn(e);
+    }
+    // Merge local fallback messages
+    const local = loadLocalMessages();
+    const seen = new Set(msgs.map(m => (m.at || '') + '|' + (m.message || '').slice(0, 40)));
+    local.forEach(m => {
+      const k = (m.at || '') + '|' + (m.message || '').slice(0, 40);
+      if (!seen.has(k)) msgs.push(Object.assign({ local: true }, m));
+    });
+    msgs.sort((a, b) => (b.at || 0) - (a.at || 0));
+    if (!msgs.length) {
+      box.innerHTML = '<p style="text-align:center;padding:8px">No messages yet.</p>';
+      return;
+    }
+    box.innerHTML = msgs.map(m => {
+      const when = m.at ? new Date(m.at).toLocaleString() : '—';
+      const nm = String(m.name || 'Anonymous').replace(/</g, '&lt;');
+      const em = String(m.email || '').replace(/</g, '&lt;');
+      const body = String(m.message || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+      const tag = m.local ? ' <span style="color:var(--gold)">(local)</span>' : '';
+      return '<div style="border:2px solid var(--border);padding:8px;margin-bottom:8px;background:#fff">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+        '<strong style="color:var(--dark)">' + nm + tag + '</strong>' +
+        '<span style="font-size:0.85rem">' + when + '</span></div>' +
+        (em ? '<div style="font-size:0.9rem;color:var(--muted)">' + em + '</div>' : '') +
+        '<div style="margin-top:6px;color:var(--text)">' + body + '</div></div>';
+    }).join('');
+  }
+  if ($('adminMsgRefresh')) $('adminMsgRefresh').onclick = () => loadAdminMessages();
+
+
   // ===== OWNER ADMIN — control every claim/image =====
   
 
@@ -5169,6 +5324,7 @@ let scrollDrawRaf = 0;
       $('adminLoginErr').style.display = 'none';
       loadAdminList();
       toast('ADMIN UNLOCKED', 'ok');
+      try { loadAdminMessages(); } catch (e) {}
     } catch (e) {
       setAdminKey('');
       $('adminLoginErr').style.display = 'block';
@@ -5234,8 +5390,12 @@ let scrollDrawRaf = 0;
       } catch (e) {}
       try {
         await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 15000 }, 'Admin');
-        if (typeof enterAdminMode === 'function') enterAdminMode();
-        else toast('Admin mode function missing', 'error');
+        if (typeof enterAdminMode === 'function') {
+          enterAdminMode();
+          try { loadAdminMessages(); } catch (e) {}
+        } else {
+          toast('Admin mode function missing', 'error');
+        }
       } catch (e) {
         toast(friendlyError(e, 'Wrong key or server error'), 'error');
       }

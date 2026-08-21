@@ -6083,8 +6083,45 @@ let scrollDrawRaf = 0;
     }
   } catch (e) {}
 
-  // Local geometry overrides: keep admin resizes even if server lag/omits cells
+  // Local geometry overrides — persisted so resize survives refresh when API omits cells
+  const GEOM_OVERRIDE_KEY = 'hpw_geom_override_v1';
   const localGeomOverride = new Map();
+
+  function loadLocalGeomOverrides() {
+    try {
+      const raw = localStorage.getItem(GEOM_OVERRIDE_KEY);
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach(id => {
+        const g = obj[id];
+        if (!g || !Array.isArray(g.cells) || !g.cells.length) return;
+        localGeomOverride.set(String(id), g);
+      });
+    } catch (e) { console.warn('load geom overrides', e); }
+  }
+
+  function persistLocalGeomOverrides() {
+    try {
+      const obj = {};
+      localGeomOverride.forEach((g, id) => {
+        obj[id] = {
+          cells: g.cells,
+          minC: g.minC,
+          maxC: g.maxC,
+          minR: g.minR,
+          maxR: g.maxR,
+          pixels: g.pixels,
+          cropScale: g.cropScale,
+          cropX: g.cropX,
+          cropY: g.cropY,
+          mediaType: g.mediaType,
+          at: g.at || Date.now()
+        };
+      });
+      localStorage.setItem(GEOM_OVERRIDE_KEY, JSON.stringify(obj));
+    } catch (e) { console.warn('persist geom overrides', e); }
+  }
 
   function setLocalGeomOverride(id, geom) {
     if (!id || !geom || !geom.cells || !geom.cells.length) return;
@@ -6098,26 +6135,36 @@ let scrollDrawRaf = 0;
       cropScale: geom.cropScale,
       cropX: geom.cropX,
       cropY: geom.cropY,
-      media: geom.media,
       mediaType: geom.mediaType,
       at: Date.now()
     });
+    persistLocalGeomOverrides();
   }
 
   function applyLocalGeomOverrides() {
     if (!localGeomOverride.size) return;
+    let changed = false;
     regions.forEach(r => {
       if (!r) return;
-      const id = String(r.id || r.claimId || '');
-      if (!id || !localGeomOverride.has(id)) return;
-      const o = localGeomOverride.get(id);
-      // If server already matches our size, drop override
+      const candidates = [String(r.id || ''), String(r.claimId || '')].filter(Boolean);
+      let o = null;
+      let matchedKey = '';
+      for (const id of candidates) {
+        if (localGeomOverride.has(id)) {
+          o = localGeomOverride.get(id);
+          matchedKey = id;
+          break;
+        }
+      }
+      if (!o) return;
       const serverPx = r.pixels || (r.cells && r.cells.length) || 0;
       const sameBox =
-        r.minC === o.minC && r.maxC === o.maxC && r.minR === o.minR && r.maxR === o.maxR &&
+        Number(r.minC) === Number(o.minC) && Number(r.maxC) === Number(o.maxC) &&
+        Number(r.minR) === Number(o.minR) && Number(r.maxR) === Number(o.maxR) &&
         serverPx === o.pixels;
       if (sameBox) {
-        localGeomOverride.delete(id);
+        localGeomOverride.delete(matchedKey);
+        changed = true;
         return;
       }
       (r.cells || []).forEach(k => { if (sold.get(k) === r) sold.delete(k); });
@@ -6127,10 +6174,12 @@ let scrollDrawRaf = 0;
       if (o.cropScale != null) r.cropScale = o.cropScale;
       if (o.cropX != null) r.cropX = o.cropX;
       if (o.cropY != null) r.cropY = o.cropY;
-      if (o.media) { r.media = o.media; r.mediaType = o.mediaType || r.mediaType; }
       o.cells.forEach(k => sold.set(k, r));
     });
+    if (changed) persistLocalGeomOverrides();
   }
+
+  try { loadLocalGeomOverrides(); } catch (e) {}
 
   async function pullWall() {
     try {
@@ -6146,6 +6195,7 @@ let scrollDrawRaf = 0;
       });
       try { applyCropCacheToRegions(); } catch (e) {}
       try { applyLocalGeomOverrides(); } catch (e) {}
+      try { save(); } catch (e) {}
       draw();
       syncMediaOverlays();
       return true;
@@ -6156,9 +6206,11 @@ let scrollDrawRaf = 0;
   }
 
   (async () => {
+    try { loadLocalGeomOverrides(); } catch (e) {}
     const ok = await pullWall();
     if (!ok) {
       load();
+      try { applyLocalGeomOverrides(); } catch (e) {}
       if (!navigator.onLine) toast('Offline — showing saved wall', 'error');
     }
     try { resize(true); } catch (e) { console.warn(e); }

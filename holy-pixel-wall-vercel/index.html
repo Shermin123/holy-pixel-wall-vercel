@@ -1415,6 +1415,148 @@
   }
 }
 
+/* =========================================================
+   MOBILE APP LAYOUT — wall-first, clean, touch-friendly
+   ========================================================= */
+@media (max-width: 700px) {
+  html, body {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  /* Single compact header row */
+  .pixel-header {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    height: auto !important;
+    min-height: 44px !important;
+    padding: 6px 8px !important;
+    border-bottom-width: 2px !important;
+    box-shadow: 0 2px 0 #c9a34e !important;
+  }
+  .pixel-header__grid { display: none !important; }
+  .pixel-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .pixel-brand h1 {
+    font-size: 0.36rem !important;
+    letter-spacing: 0.5px !important;
+  }
+  .pixel-brand p,
+  .pixel-brand__eyebrow { display: none !important; }
+
+  .pixel-center {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0;
+  }
+  .pixel-price-card {
+    display: none !important;
+  }
+  .pixel-buy {
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 0 12px !important;
+    box-shadow: 2px 2px 0 #2a2118 !important;
+  }
+  .pixel-buy__text {
+    font-size: 0.34rem !important;
+  }
+  .pixel-buy__icon,
+  .pixel-buy__arrow { display: none !important; }
+
+  .pixel-stats {
+    display: none !important;
+  }
+
+  /* Horizontal scrolling toolbar — one row, large taps */
+  .toolbar {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+    justify-content: flex-start !important;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .toolbar .tool-gap {
+    width: 4px;
+    flex-shrink: 0;
+  }
+  .toolbar .tool-btn {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 8px 10px !important;
+    font-size: 0.34rem !important;
+    white-space: nowrap;
+  }
+  .toolbar .zoom-lvl {
+    flex: 0 0 auto;
+    min-width: 44px;
+    text-align: center;
+    font-size: 0.7rem;
+    line-height: 36px;
+  }
+
+  .viewport {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    background: #faf7f0 !important;
+  }
+
+  .site-copy {
+    display: none !important;
+  }
+
+  .float-bar {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    width: calc(100% - 16px) !important;
+    max-width: 420px !important;
+    padding: 10px 12px !important;
+    border-width: 3px !important;
+  }
+  .float-bar .btn-claim,
+  .float-bar .btn-clear {
+    min-height: 40px;
+    padding: 8px 14px !important;
+    font-size: 0.4rem !important;
+  }
+  .sel-sum {
+    font-size: 0.4rem !important;
+  }
+
+  .overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .overlay .modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 92dvh !important;
+    border-radius: 12px 12px 0 0;
+    margin: 0 !important;
+  }
+  .overlay .modal-body {
+    max-height: 60dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 380px) {
+  .pixel-brand h1 { font-size: 0.28rem !important; }
+  .pixel-buy__text { font-size: 0.28rem !important; }
+  .toolbar .tool-btn { font-size: 0.3rem !important; padding: 7px 8px !important; }
+}
+
 </style>
 </head>
 <body>
@@ -2314,8 +2456,7 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Same fit rule on Mac and phone: largest size that shows the FULL wall
-    // (identical coordinate system + aspect). Only the viewport is narrower.
+    // Base size = largest scale that fits the FULL wall in the viewport
     const margin = isPhoneLayout() ? 2 : 4;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
@@ -2329,18 +2470,28 @@ Min 10 blocks · no maximum
     sizeW = baseW;
     sizeH = baseH;
     if (fitReset) {
-      zoom = 1;
-      zoomTarget = 1;
-      hqZoom = 1;
       zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
+      // Portrait phone: open zoomed so wall HEIGHT fills the screen
+      // (swipe left/right to explore). FIT still goes to zoom 1 = full wall.
+      const portrait = isPhoneLayout() && rawH > rawW;
+      if (portrait) {
+        const heightFill = (vh / ROWS) / Math.max(baseCell, 0.001);
+        const z = Math.min(Z_MAX, Math.max(1.15, heightFill * 0.98));
+        zoom = z;
+        zoomTarget = z;
+        hqZoom = z;
+      } else {
+        zoom = 1;
+        zoomTarget = 1;
+        hqZoom = 1;
+      }
     }
     paintBase();
     layoutAtZoom(zoom || 1);
     try { syncMediaOverlays(); } catch (e) {}
     if (fitReset) {
       requestAnimationFrame(() => {
-        // Center the wall exactly like desktop FIT
         const wrap = $('wallWrap');
         if (wrap && viewport) {
           const left = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
@@ -5918,7 +6069,33 @@ function clearPending() {
   }, { passive: true });
   if ($('zoomIn')) $('zoomIn').onclick = () => bumpZoom(0.25, lastMouseX, lastMouseY);
   if ($('zoomOut')) $('zoomOut').onclick = () => bumpZoom(-0.25, lastMouseX, lastMouseY);
-  if ($('zoomFit')) $('zoomFit').onclick = () => resize(true);
+  if ($('zoomFit')) $('zoomFit').onclick = () => {
+    // FIT = always show the entire wall (same overview as desktop)
+    computeGrid();
+    const margin = isPhoneLayout() ? 2 : 4;
+    const { vw: rawW, vh: rawH } = viewportSize();
+    const vw = Math.max(rawW - margin * 2, 80);
+    const vh = Math.max(rawH - margin * 2, 80);
+    let s = Math.min(vw / COLS, vh / ROWS);
+    if (!isFinite(s) || s < 0.2) s = 0.2;
+    baseCell = s; cell = s;
+    baseW = COLS * s; baseH = ROWS * s;
+    sizeW = baseW; sizeH = baseH;
+    zoom = 1; zoomTarget = 1; hqZoom = 1; zoomAnchor = null;
+    if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
+    paintBase();
+    layoutAtZoom(1);
+    try { syncMediaOverlays(); } catch (e) {}
+    requestAnimationFrame(() => {
+      const wrap = $('wallWrap');
+      if (wrap && viewport) {
+        viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
+        viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
+      }
+      try { positionMediaOverlays(); draw(); } catch (e) {}
+    });
+    toast('FULL WALL', 'ok');
+  };
   // Navigation: scroll/trackpad = pan · pinch or Ctrl+wheel = zoom toward cursor
   viewport.addEventListener('wheel', e => {
     e.preventDefault();

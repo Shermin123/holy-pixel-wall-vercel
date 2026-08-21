@@ -603,15 +603,14 @@
     margin: 0 auto;
     box-sizing: content-box;
     background: #f0ebe3;
-    transform: translateZ(0);
   }
 
   .stage {
-    position: absolute;
+    /* relative so it sits in the padded content box — canvas/media never outside */
+    position: relative;
     left: 0;
     top: 0;
     display: block;
-    /* No border-box border — it shrank content vs canvas and shifted GIFs on phone */
     border: none;
     box-sizing: content-box;
     box-shadow: 0 0 0 1px #3d2b1a, 3px 3px 0 rgba(92,61,30,0.25);
@@ -623,7 +622,6 @@
     transform-origin: 0 0;
     overflow: hidden;
     image-rendering: auto;
-    will-change: transform;
     backface-visibility: hidden;
     -webkit-font-smoothing: antialiased;
   }
@@ -649,7 +647,6 @@
     padding: 0;
     pointer-events: none;
     overflow: hidden;
-    transform: translateZ(0);
   }
   .media-layer .media-item {
     position: absolute;
@@ -2290,14 +2287,14 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Fit whole wall into phone/desktop viewport (minimal empty edges)
-    const edge = 2;
+    // Fill the viewport fully (Mac + phone). Outer Z_PAD is only scroll margin —
+    // do NOT shrink the wall by pad size (that made Mac look small).
+    const margin = 4;
     const { vw: rawW, vh: rawH } = viewportSize();
-    const padPx = (typeof getZPad === 'function') ? getZPad() : 8;
-    const vw = Math.max(rawW - edge * 2 - padPx * 2, 60);
-    const vh = Math.max(rawH - edge * 2 - padPx * 2, 60);
+    const vw = Math.max(rawW - margin * 2, 80);
+    const vh = Math.max(rawH - margin * 2, 80);
     let s = Math.min(vw / COLS, vh / ROWS);
-    if (!isFinite(s) || s < 0.2) s = 0.2;
+    if (!isFinite(s) || s < 0.25) s = 0.25;
     baseCell = s;
     cell = s;
     baseW = COLS * s;
@@ -2346,12 +2343,12 @@ Min 10 blocks · no maximum
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
   const Z_MIN = 1, Z_MAX = 14;
-  // Small pad on phones so the wall fills the screen (no big empty edges)
+  // Outer scroll margin only (does not shrink wall size). Smaller on phone.
   function getZPad() {
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      return w < 700 ? 8 : 48;
-    } catch (e) { return 16; }
+      return w < 700 ? 12 : 48;
+    } catch (e) { return 24; }
   }
   const Z_PAD = 48;
   let zoomRaf = 0;
@@ -2388,24 +2385,40 @@ Min 10 blocks · no maximum
     const pad = (typeof getZPad === 'function') ? getZPad() : Z_PAD;
 
     if (wrap) {
-      wrap.style.width = Math.ceil(w + pad * 2) + 'px';
-      wrap.style.height = Math.ceil(h + pad * 2) + 'px';
+      // Content size = wall; padding = scroll margin so stage origin stays at 0,0
+      wrap.style.boxSizing = 'content-box';
+      wrap.style.width = Math.ceil(w) + 'px';
+      wrap.style.height = Math.ceil(h) + 'px';
+      wrap.style.padding = pad + 'px';
     }
-    // Stage + canvas + media share one origin so images stay on their cells (esp. phones)
-    stage.style.left = pad + 'px';
-    stage.style.top = pad + 'px';
+    // Stage fills wrap content box — left/top 0 so canvas + media never sit outside
+    stage.style.left = '0';
+    stage.style.top = '0';
     stage.style.width = w + 'px';
     stage.style.height = h + 'px';
     stage.style.margin = '0';
     stage.style.padding = '0';
     stage.style.transform = 'none';
     stage.style.overflow = 'hidden';
+    stage.style.position = 'relative';
 
+    canvas.style.position = 'absolute';
     canvas.style.left = '0';
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     canvas.style.imageRendering = 'auto';
+
+    // Media layer must match stage exactly (phone was clipping GIFs outside)
+    if (mediaLayer) {
+      mediaLayer.style.position = 'absolute';
+      mediaLayer.style.left = '0';
+      mediaLayer.style.top = '0';
+      mediaLayer.style.width = w + 'px';
+      mediaLayer.style.height = h + 'px';
+      mediaLayer.style.overflow = 'hidden';
+      mediaLayer.style.pointerEvents = 'none';
+    }
 
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
     try { positionMediaOverlays(); } catch (e) {}

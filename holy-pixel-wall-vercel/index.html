@@ -2039,21 +2039,29 @@ Min 10 blocks · no maximum
     return { vw: Math.max(vw, 80), vh: Math.max(vh, 80) };
   }
 
+  // FIXED grid for every device — Mac/phone must share the same cell coordinates
+  // so a claim in the top-right on desktop is still there on mobile.
+  const GRID_COLS = 1000;
+  const GRID_ROWS = 500;
+
   function computeGrid() {
-    // ~500,000 pixels — shape follows screen, snapped to 10 for clean blocks
-    const { vw, vh } = viewportSize();
-    const aspect = vw / Math.max(vh, 1);
-    const TARGET = 500000;
-    let cols = Math.round(Math.sqrt(TARGET * aspect));
-    let rows = Math.round(TARGET / cols);
-    cols = Math.max(400, Math.min(1400, Math.round(cols / 10) * 10));
-    rows = Math.max(300, Math.min(900, Math.round(rows / 10) * 10));
-    while (cols * rows > 520000 && rows >= 320) rows -= 10;
-    while (cols * rows < 480000 && cols <= 1380) cols += 10;
-    while (cols * rows > 520000 && cols >= 420) cols -= 10;
-    COLS = cols;
-    ROWS = rows;
+    // Never resize the grid to the screen. Aspect only affects how large each
+    // cell is drawn (see resize), not which (col,row) exists.
+    COLS = GRID_COLS;
+    ROWS = GRID_ROWS;
     TOTAL = COLS * ROWS;
+  }
+
+  function applyServerGrid(data) {
+    try {
+      const c = Number(data && (data.cols || data.COLS || data.width));
+      const r = Number(data && (data.rows || data.ROWS || data.height));
+      if (c >= 100 && r >= 100 && c * r <= 2000000) {
+        COLS = Math.round(c);
+        ROWS = Math.round(r);
+        TOTAL = COLS * ROWS;
+      }
+    } catch (e) {}
   }
 
   
@@ -2748,16 +2756,22 @@ function getImg(src) {
 
   function visibleCellRange() {
     // Map viewport scroll → cell indices (only draw what's on screen)
+    // Extra margin so edge/top-right claims never get culled on phone
     try {
-      const pad = (typeof Z_PAD === 'number') ? Z_PAD : 40;
+      const pad = (typeof getZPad === 'function') ? getZPad() : ((typeof Z_PAD === 'number') ? Z_PAD : 40);
       const sl = viewport.scrollLeft - pad;
       const st = viewport.scrollTop - pad;
       const vw = viewport.clientWidth;
       const vh = viewport.clientHeight;
-      const c0 = Math.max(0, Math.floor(sl / cell) - 1);
-      const r0 = Math.max(0, Math.floor(st / cell) - 1);
-      const c1 = Math.min(COLS - 1, Math.ceil((sl + vw) / cell) + 1);
-      const r1 = Math.min(ROWS - 1, Math.ceil((st + vh) / cell) + 1);
+      // At fit zoom the whole wall is on screen — draw everything
+      if ((zoom || 1) <= 1.05) {
+        return { c0: 0, r0: 0, c1: COLS - 1, r1: ROWS - 1 };
+      }
+      const margin = 8; // cells of slack so top-right never disappears
+      const c0 = Math.max(0, Math.floor(sl / cell) - margin);
+      const r0 = Math.max(0, Math.floor(st / cell) - margin);
+      const c1 = Math.min(COLS - 1, Math.ceil((sl + vw) / cell) + margin);
+      const r1 = Math.min(ROWS - 1, Math.ceil((st + vh) / cell) + margin);
       return { c0, r0, c1, r1 };
     } catch (e) {
       return { c0: 0, r0: 0, c1: COLS - 1, r1: ROWS - 1 };
@@ -2876,7 +2890,7 @@ function getImg(src) {
         for (let c = r.minC; c <= r.maxC; c++) {
           for (let row = r.minR; row <= r.maxR; row++) {
             if (sold.get(c + ',' + row) === r) {
-              ctx.rect(c * drawCell, row * drawCell, cell, cell);
+              ctx.rect(c * drawCell, row * drawCell, drawCell, drawCell);
               any = true;
             }
           }
@@ -2891,17 +2905,19 @@ function getImg(src) {
         const img = getImg(r.media);
         if (img && img.complete) {
           drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
+        } else if (img) {
+          img.onload = () => { try { scheduleDraw(); } catch (e) {} };
         }
       } else if (!r.media) {
         ctx.fillStyle = 'rgba(255,255,255,0.12)';
         for (let c = r.minC; c <= r.maxC; c++)
           for (let row = r.minR; row <= r.maxR; row++)
             if ((c + row) % 2 === 0)
-              ctx.fillRect(c * drawCell, row * drawCell, cell, cell);
+              ctx.fillRect(c * drawCell, row * drawCell, drawCell, drawCell);
       }
       /* Thin, clean border around each claimed image. */
       ctx.strokeStyle = 'rgba(58,42,26,0.72)';
-      ctx.lineWidth = Math.max(0.8, Math.min(1.25, cell * 0.08));
+      ctx.lineWidth = Math.max(0.8, Math.min(1.25, drawCell * 0.08));
       ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
       ctx.restore();
     });
@@ -6085,20 +6101,50 @@ let scrollDrawRaf = 0;
   async function pullWall() {
     try {
       const data = await apiFetch('/api/wall', { timeout: 15000 }, 'Wall sync');
+      try { applyServerGrid(data); } catch (e) {}
       regions = [];
       sold.clear();
+      let maxCSeen = 0, maxRSeen = 0;
       (data.regions || []).forEach(r => {
         try {
           if (!r || expired(r)) return;
+          // Normalize bounds from cells if missing
+          if ((r.minC == null || r.maxC == null) && r.cells && r.cells.length) {
+            let minC = COLS, maxC = 0, minR = ROWS, maxR = 0;
+            r.cells.forEach(k => {
+              const p = String(k).split(',');
+              const c = +p[0], row = +p[1];
+              if (!isFinite(c) || !isFinite(row)) return;
+              if (c < minC) minC = c; if (c > maxC) maxC = c;
+              if (row < minR) minR = row; if (row > maxR) maxR = row;
+            });
+            if (maxC >= minC) {
+              r.minC = minC; r.maxC = maxC; r.minR = minR; r.maxR = maxR;
+            }
+          }
+          if (r.maxC != null && r.maxC > maxCSeen) maxCSeen = r.maxC;
+          if (r.maxR != null && r.maxR > maxRSeen) maxRSeen = r.maxR;
           regions.push(r);
           (r.cells || []).forEach(k => sold.set(k, r));
         } catch (err) { console.warn(err); }
       });
+      // Expand fixed grid if server has claims beyond defaults (legacy adaptive grids)
+      let expanded = false;
+      if (maxCSeen >= COLS || maxRSeen >= ROWS) {
+        COLS = Math.max(COLS, Math.ceil((maxCSeen + 1) / 10) * 10);
+        ROWS = Math.max(ROWS, Math.ceil((maxRSeen + 1) / 10) * 10);
+        TOTAL = COLS * ROWS;
+        expanded = true;
+      }
       try { applyCropCacheToRegions(); } catch (e) {}
       try { applyLocalGeomOverrides(); } catch (e) {}
       try { save(); } catch (e) {}
-      draw();
-      syncMediaOverlays();
+      if (expanded) {
+        try { resize(false); } catch (e) {}
+      } else {
+        try { draw(); } catch (e) {}
+      }
+      try { syncMediaOverlays(); } catch (e) {}
       return true;
     } catch (e) {
       console.warn('pullWall', e);

@@ -553,44 +553,33 @@
     color: #2c221e;
     border-color: var(--gold);
   }
-  /* Default wall cursor: sharp crosshair for precise pixel aiming */
+  /* Wall cursor — sharp crosshair always (grab only while actively panning) */
   .viewport {
     flex: 1;
     min-height: 0;
     position: relative;
     overflow: auto;
-    cursor: crosshair;
+    cursor: crosshair !important;
     -webkit-overflow-scrolling: touch;
     background: #f0ebe3;
     padding: 0;
   }
   .viewport #canvas,
   .viewport .stage,
-  .viewport canvas {
+  .viewport canvas,
+  .viewport #wallWrap {
     cursor: crosshair !important;
   }
-  /* Buy / select mode — cell cross (sharp +) */
-  .viewport.buy-mode,
   .viewport.buy-mode #canvas,
   .viewport.buy-mode .stage,
   .viewport.buy-mode canvas {
-    cursor: cell !important;
+    cursor: crosshair !important;
   }
-  /* Pan / drag mode */
-  .viewport.drag-mode,
-  .viewport.drag-mode #canvas,
-  .viewport.drag-mode .stage,
-  .viewport.drag-mode canvas {
-    cursor: grab !important;
-  }
-  .viewport.drag-mode.panning,
-  .viewport.drag-mode.panning #canvas,
-  .viewport.drag-mode.panning .stage,
-  .viewport.drag-mode.panning canvas,
+  /* Only while finger/mouse is panning */
   .viewport.panning,
-  .viewport.panning #canvas,
-  .viewport.panning .stage,
-  .viewport.panning canvas {
+  .viewport.panning *,
+  .viewport.drag-mode.panning,
+  .viewport.drag-mode.panning * {
     cursor: grabbing !important;
   }
 
@@ -1440,7 +1429,6 @@
   <span id="zoomLvl" class="zoom-lvl">100%</span>
   <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
   <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
-  <button class="tool-btn" id="findFreeBtn" type="button" title="Jump to free space">FIND FREE</button>
   <span class="tool-gap"></span>
   <button class="tool-btn" id="storyBtn" type="button">STORY</button>
   <button class="tool-btn" id="contactBtn" type="button">CONTACT</button>
@@ -1863,6 +1851,64 @@ Min 10 blocks · no maximum
     max = max || 200;
     var str = (s == null) ? '' : String(s);
     return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim().slice(0, max);
+  }
+
+
+  function makeClaimId() {
+    const t = Date.now().toString(36).toUpperCase();
+    const r = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return 'HPW-' + t + '-' + r;
+  }
+  function pixelIdFor(claimId, c, r) {
+    return claimId + '-C' + c + 'R' + r;
+  }
+  function buildPixelIds(claimId, keys) {
+    return keys.map(k => {
+      const parts = String(k).split(',');
+      const c = +parts[0], r = +parts[1];
+      return pixelIdFor(claimId, c, r);
+    });
+  }
+  const MY_CLAIMS_STORE = 'hpw_my_claim_packages';
+  function loadMyPackages() {
+    try {
+      const raw = localStorage.getItem(MY_CLAIMS_STORE);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveMyPackage(pkg) {
+    const arr = loadMyPackages();
+    arr.unshift(pkg);
+    while (arr.length > 50) arr.pop();
+    try { localStorage.setItem(MY_CLAIMS_STORE, JSON.stringify(arr)); } catch (e) {}
+  }
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 500);
+  }
+  function packageToText(pkg) {
+    const lines = [];
+    lines.push('HOLY PIXEL WALL — CLAIM PACKAGE');
+    lines.push('Package ID: ' + (pkg.claimId || ''));
+    lines.push('Owner: ' + (pkg.name || ''));
+    lines.push('Country: ' + (pkg.country || ''));
+    lines.push('Pixels: ' + (pkg.pixels || (pkg.pixelIds && pkg.pixelIds.length) || 0));
+    lines.push('Paid: ' + (pkg.paid != null ? ('$' + Number(pkg.paid).toFixed(2)) : '—'));
+    lines.push('Duration: ' + (pkg.duration || ''));
+    lines.push('Claimed: ' + (pkg.claimedAt ? new Date(pkg.claimedAt).toISOString() : ''));
+    lines.push('');
+    lines.push('PIXEL IDs (' + (pkg.pixelIds || []).length + '):');
+    (pkg.pixelIds || []).forEach(id => lines.push(id));
+    lines.push('');
+    lines.push('CELLS (col,row):');
+    (pkg.cells || []).forEach(k => lines.push(k));
+    return lines.join('\n');
   }
 
   const $ = id => document.getElementById(id);
@@ -2814,24 +2860,80 @@ function getImg(src) {
   }
 
   function showMyClaims() {
-    if (!regions.length) { toast('NO CLAIMS YET'); return; }
-    const lines = regions.map((r, i) => {
-      const label = (r.name || 'ANON') + ' · ' + (r.pixels || 0) + 'px · ' + left(r);
-      return '<button type="button" class="tool-btn" data-claim="' + i + '" style="display:block;width:100%;margin:6px 0;text-align:left">' + label + '</button>';
+    const packages = loadMyPackages();
+    // Also include live regions that have claimId from this session
+    const fromWall = regions.filter(r => r && r.claimId).map(r => ({
+      claimId: r.claimId,
+      pixelIds: r.pixelIds || buildPixelIds(r.claimId, r.cells || []),
+      cells: r.cells || [],
+      name: r.name,
+      country: r.country || '',
+      desc: r.desc || '',
+      pixels: r.pixels || (r.cells && r.cells.length) || 0,
+      paid: r.paid,
+      duration: r.duration,
+      claimedAt: r.claimedAt
+    }));
+    const seen = new Set(packages.map(p => p.claimId));
+    fromWall.forEach(p => { if (p.claimId && !seen.has(p.claimId)) packages.push(p); });
+    if (!packages.length) { toast('NO CLAIMS YET — buy pixels to get a package ID'); return; }
+
+    const lines = packages.map((p, i) => {
+      const id = escapeHtml(p.claimId || ('#' + (i + 1)));
+      const nm = escapeHtml(p.name || 'ANON');
+      const px = p.pixels || (p.pixelIds && p.pixelIds.length) || 0;
+      return '<div style="border:2px solid var(--border);padding:10px;margin-bottom:8px;background:#fff">' +
+        '<div style="font-family:Press Start 2P,monospace;font-size:0.28rem;color:var(--gold);margin-bottom:6px;word-break:break-all">' + id + '</div>' +
+        '<div style="color:var(--dark);font-size:1.1rem"><strong>' + nm + '</strong> · ' + px + ' px</div>' +
+        '<div style="color:var(--muted);font-size:0.85rem;margin:4px 0 8px">' +
+        (p.claimedAt ? new Date(p.claimedAt).toLocaleString() : '') +
+        (p.duration ? ' · ' + escapeHtml(String(p.duration)) : '') +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button type="button" class="btn btn-sec claim-focus" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">SHOW</button>' +
+        '<button type="button" class="btn btn-sec claim-dl-txt" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">DOWNLOAD TXT</button>' +
+        '<button type="button" class="btn btn-sec claim-dl-json" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">DOWNLOAD JSON</button>' +
+        '</div></div>';
     }).join('');
+
     const box = document.createElement('div');
     box.className = 'overlay';
     box.style.display = 'flex';
-    box.innerHTML = '<div class="modal" style="max-width:420px"><div class="modal-head"><h3>MY CLAIMS</h3><p>Stored on this browser only</p></div><div class="modal-body">' + lines + '</div><div class="modal-foot"><button type="button" class="btn btn-sec" id="claimsClose">CLOSE</button></div></div>';
+    box.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-head"><h3>MY CLAIMS</h3><p>Each purchase has a unique package ID + pixel IDs — save them</p></div><div class="modal-body" style="max-height:60vh;overflow:auto">' + lines + '</div><div class="modal-foot"><button type="button" class="btn btn-sec" id="claimsClose">CLOSE</button></div></div>';
     document.body.appendChild(box);
     box.querySelector('#claimsClose').onclick = () => box.remove();
-    box.querySelectorAll('[data-claim]').forEach(btn => {
+    box.querySelectorAll('.claim-focus').forEach(btn => {
       btn.onclick = () => {
-        const r = regions[+btn.dataset.claim];
-        focusRegion(r);
+        const p = packages[+btn.dataset.i];
+        if (!p) return;
+        const r = regions.find(x => x && (x.claimId === p.claimId || x.id === p.claimId));
+        if (r) focusRegion(r);
+        else if (p.cells && p.cells.length) {
+          const cells = p.cells.map(k => k.split(',').map(Number));
+          const minC = Math.min.apply(null, cells.map(c => c[0]));
+          const maxC = Math.max.apply(null, cells.map(c => c[0]));
+          const minR = Math.min.apply(null, cells.map(c => c[1]));
+          const maxR = Math.max.apply(null, cells.map(c => c[1]));
+          focusRegion({ minC, maxC, minR, maxR });
+        }
         box.remove();
-        if (devMode) openEdit(r);
-        else toast(r.name || 'CLAIM');
+        toast(p.claimId || 'CLAIM', 'ok');
+      };
+    });
+    box.querySelectorAll('.claim-dl-txt').forEach(btn => {
+      btn.onclick = () => {
+        const p = packages[+btn.dataset.i];
+        if (!p) return;
+        downloadText((p.claimId || 'claim') + '.txt', packageToText(p));
+        toast('SAVED TXT', 'ok');
+      };
+    });
+    box.querySelectorAll('.claim-dl-json').forEach(btn => {
+      btn.onclick = () => {
+        const p = packages[+btn.dataset.i];
+        if (!p) return;
+        downloadText((p.claimId || 'claim') + '.json', JSON.stringify(p, null, 2));
+        toast('SAVED JSON', 'ok');
       };
     });
     box.onclick = e => { if (e.target === box) box.remove(); };
@@ -3017,6 +3119,14 @@ function getImg(src) {
   canvas.addEventListener('touchstart', e => { onDown(e); e.preventDefault(); }, { passive: false });
   window.addEventListener('touchmove', e => { onMove(e); if (dragging) e.preventDefault(); }, { passive: false });
   window.addEventListener('touchend', onUp);
+  function forceCrosshair() {
+    try {
+      if (canvas) canvas.style.cursor = 'crosshair';
+      if (stage) stage.style.cursor = 'crosshair';
+    } catch (e) {}
+  }
+  canvas.addEventListener('pointerenter', forceCrosshair);
+  canvas.addEventListener('pointermove', forceCrosshair);
   canvas.addEventListener('mouseleave', () => tip.style.display = 'none');
   canvas.addEventListener('click', e => {
     // Ignore click that ends a drag-select (second select used to break here)
@@ -4010,7 +4120,12 @@ function clearPending() {
       minR = Math.min(minR, r); maxR = Math.max(maxR, r);
     });
     const total = keys.length * price();
+    const claimId = makeClaimId();
+    const pixelIds = buildPixelIds(claimId, keys);
     const region = {
+      id: claimId,
+      claimId: claimId,
+      pixelIds: pixelIds,
       name: $('ownerName').value.trim() || 'ANON',
       country: ($('country') && $('country').value) || '',
       desc: $('desc').value.trim().slice(0, 120),
@@ -4031,6 +4146,21 @@ function clearPending() {
       pixels: keys.length,
       cells: keys.slice() // exact cells owned by this claim
     };
+    // Save package for MY CLAIMS download
+    try {
+      saveMyPackage({
+        claimId: claimId,
+        pixelIds: pixelIds,
+        cells: keys.slice(),
+        name: region.name,
+        country: region.country,
+        desc: region.desc,
+        pixels: keys.length,
+        paid: total,
+        duration: region.duration,
+        claimedAt: region.claimedAt
+      });
+    } catch (e) {}
 
     // Lock every cell to this owner only (never overwrite)
     for (const k of keys) {
@@ -4050,6 +4180,8 @@ function clearPending() {
       method: 'POST',
       body: JSON.stringify({
         cells: keys,
+        claimId: region.claimId,
+        pixelIds: region.pixelIds,
         name: region.name,
         country: region.country || '',
         desc: region.desc,
@@ -4146,8 +4278,12 @@ function clearPending() {
       const keys = Array.from(selected);
       if (!keys.length) { toast('SELECT BLOCKS FIRST'); return; }
       const nm = ($('ownerName').value || '').trim() || 'ADMIN';
+      const claimId = makeClaimId();
+      const pixelIds = buildPixelIds(claimId, keys);
       const payload = {
         key: getAdminKey(),
+        claimId: claimId,
+        pixelIds: pixelIds,
         cells: keys,
         name: nm,
       country: ($('country') && $('country').value) || '',
@@ -4193,7 +4329,11 @@ function clearPending() {
 
     // One-click Stripe Checkout (Card + Apple Pay + Google Pay on Stripe)
     const keys = Array.from(selected);
+    const claimId = makeClaimId();
+    const pixelIds = buildPixelIds(claimId, keys);
     const payload = {
+      claimId: claimId,
+      pixelIds: pixelIds,
       cells: keys,
       name: nm,
       country: ($('country') && $('country').value) || '',
@@ -4207,8 +4347,23 @@ function clearPending() {
       cropY: crop.y,
       link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
       linkType: ($('linkType') && $('linkType').value) || 'none',
-      paid: keys.length * price()
+      paid: keys.length * price(),
+      claimedAt: Date.now()
     };
+    try {
+      saveMyPackage({
+        claimId: claimId,
+        pixelIds: pixelIds,
+        cells: keys.slice(),
+        name: nm,
+        country: payload.country,
+        desc: payload.desc,
+        pixels: keys.length,
+        paid: payload.paid,
+        duration: payload.duration,
+        claimedAt: payload.claimedAt
+      });
+    } catch (e) {}
 
     // Media too large for API?
     if (payload.media && payload.media.length > 1200000) {
@@ -4812,65 +4967,6 @@ function clearPending() {
   }
 
 
-  // —— Navigate free space (cycles through free 10×10 sections) ——
-  let freeNavIndex = 0;
-  function listFreeSections() {
-    const out = [];
-    const SEC = SECTION || 10;
-    for (let sc = 0; sc < COLS; sc += SEC) {
-      for (let sr = 0; sr < ROWS; sr += SEC) {
-        const maxC = Math.min(COLS, sc + SEC) - 1;
-        const maxR = Math.min(ROWS, sr + SEC) - 1;
-        let free = 0, total = 0;
-        for (let c = sc; c <= maxC; c++) {
-          for (let r = sr; r <= maxR; r++) {
-            total++;
-            if (!sold.has(c + ',' + r)) free++;
-          }
-        }
-        if (free > 0) {
-          out.push({ minC: sc, maxC: maxC, minR: sr, maxR: maxR, free: free, total: total });
-        }
-      }
-    }
-    // Prefer mostly-empty sections first
-    out.sort((a, b) => (b.free / b.total) - (a.free / a.total) || b.free - a.free);
-    return out;
-  }
-
-  function goToFreeSpace() {
-    const list = listFreeSections();
-    if (!list.length) {
-      toast('NO FREE SPACE LEFT', 'error');
-      return;
-    }
-    freeNavIndex = freeNavIndex % list.length;
-    const block = list[freeNavIndex];
-    freeNavIndex = (freeNavIndex + 1) % list.length;
-    try {
-      if (typeof focusRegion === 'function') focusRegion(block);
-    } catch (e) {
-      const midC = (block.minC + block.maxC + 1) / 2;
-      const midR = (block.minR + block.maxR + 1) / 2;
-      const z = zoom || 1;
-      const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
-      viewport.scrollLeft = Math.max(0, pad + midC * (baseCell * z) - viewport.clientWidth / 2);
-      viewport.scrollTop = Math.max(0, pad + midR * (baseCell * z) - viewport.clientHeight / 2);
-    }
-    // In buy mode, auto-select free cells in that block
-    if (buyMode) {
-      selected = new Set();
-      for (let c = block.minC; c <= block.maxC; c++) {
-        for (let r = block.minR; r <= block.maxR; r++) {
-          const k = c + ',' + r;
-          if (!sold.has(k)) selected.add(k);
-        }
-      }
-      try { updateFloat(); draw(); } catch (e) {}
-    }
-    toast('FREE AREA · ' + block.free + ' open px · next: FIND FREE', 'ok');
-  }
-
   function showOwnersBoard() {
     const modal = $('ownersModal');
     if (!modal) return;
@@ -4945,9 +5041,8 @@ function clearPending() {
       viewport.classList.toggle('buy-mode', mode === 'select' && buyMode);
     }
     try {
-      const cur = (mode === 'drag') ? 'grab' : 'cell';
-      if (canvas) canvas.style.cursor = cur;
-      if (stage) stage.style.cursor = cur;
+      if (canvas) canvas.style.cursor = 'crosshair';
+      if (stage) stage.style.cursor = 'crosshair';
     } catch (e) {}
   }
 
@@ -4965,12 +5060,8 @@ function clearPending() {
         viewport.classList.toggle('buy-mode', buyMode);
         viewport.classList.toggle('drag-mode', !buyMode);
       }
-      if (canvas) {
-        canvas.style.cursor = buyMode ? 'cell' : 'grab';
-      }
-      if (stage) {
-        stage.style.cursor = buyMode ? 'cell' : 'grab';
-      }
+      if (canvas) canvas.style.cursor = 'crosshair';
+      if (stage) stage.style.cursor = 'crosshair';
     } catch (e) {}
     if (buyMode) {
       toolMode = 'select';
@@ -5176,7 +5267,6 @@ function clearPending() {
   if ($('zoomIn')) $('zoomIn').onclick = () => bumpZoom(0.25, lastMouseX, lastMouseY);
   if ($('zoomOut')) $('zoomOut').onclick = () => bumpZoom(-0.25, lastMouseX, lastMouseY);
   if ($('zoomFit')) $('zoomFit').onclick = () => resize(true);
-  if ($('findFreeBtn')) $('findFreeBtn').onclick = () => goToFreeSpace();
   // Navigation: scroll/trackpad = pan · pinch or Ctrl+wheel = zoom toward cursor
   viewport.addEventListener('wheel', e => {
     e.preventDefault();
@@ -5361,6 +5451,22 @@ let scrollDrawRaf = 0;
           } catch (e) {}
           history.replaceState({}, '', '/');
           await pullWall();
+          try {
+            if (payload.claimId) {
+              saveMyPackage({
+                claimId: payload.claimId,
+                pixelIds: payload.pixelIds || buildPixelIds(payload.claimId, payload.cells || []),
+                cells: payload.cells || [],
+                name: payload.name,
+                country: payload.country || '',
+                desc: payload.desc || '',
+                pixels: (payload.cells && payload.cells.length) || 0,
+                paid: payload.paid,
+                duration: payload.duration,
+                claimedAt: payload.claimedAt || Date.now()
+              });
+            }
+          } catch (e) {}
           toast('Payment OK — pixels claimed', 'ok');
         } else {
           history.replaceState({}, '', '/');

@@ -1384,18 +1384,18 @@
     background: #faf7f0 !important;
   }
 
-  /* One slim header row — classic look, not oversized */
+  /* Ultra-slim header row */
   .pixel-header {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 6px !important;
-    height: 42px !important;
-    min-height: 42px !important;
-    max-height: 42px !important;
-    padding: 0 8px !important;
+    gap: 4px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    padding: 0 6px !important;
     border-bottom: 2px solid #2a2118 !important;
     box-shadow: 0 2px 0 #c9a34e !important;
     background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
@@ -1407,8 +1407,8 @@
     overflow: hidden;
   }
   .pixel-brand h1 {
-    font-size: 0.34rem !important;
-    letter-spacing: 0.3px !important;
+    font-size: 0.3rem !important;
+    letter-spacing: 0.2px !important;
     text-shadow: 1px 1px 0 #e8d5b0 !important;
   }
   .pixel-brand p,
@@ -1448,18 +1448,18 @@
   .pixel-stat__unit { display: none !important; }
   .pixel-stat__main { margin: 0 !important; }
   .pixel-stat .counter-num {
-    font-size: 0.28rem !important;
+    font-size: 0.24rem !important;
     white-space: nowrap;
   }
 
   .pixel-buy {
-    min-height: 30px !important;
-    height: 30px !important;
-    padding: 0 10px !important;
-    box-shadow: 2px 2px 0 #2a2118 !important;
+    min-height: 26px !important;
+    height: 26px !important;
+    padding: 0 8px !important;
+    box-shadow: 1px 1px 0 #2a2118 !important;
     animation: none !important;
   }
-  .pixel-buy__text { font-size: 0.3rem !important; }
+  .pixel-buy__text { font-size: 0.26rem !important; }
   .pixel-buy__icon,
   .pixel-buy__arrow { display: none !important; }
 
@@ -1469,8 +1469,8 @@
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
-    gap: 4px !important;
-    padding: 4px 6px !important;
+    gap: 3px !important;
+    padding: 3px 5px !important;
     justify-content: flex-start !important;
     background: #f5efe4 !important;
     border-bottom: 1px solid #e0d4c0 !important;
@@ -1478,7 +1478,7 @@
   }
   .toolbar::-webkit-scrollbar { display: none; }
   .toolbar .tool-gap {
-    width: 4px;
+    width: 3px;
     flex-shrink: 0;
     display: block !important;
   }
@@ -1488,18 +1488,18 @@
   }
   .toolbar .tool-btn {
     flex: 0 0 auto;
-    min-height: 28px;
-    padding: 4px 8px !important;
-    font-size: 0.28rem !important;
+    min-height: 24px;
+    padding: 3px 6px !important;
+    font-size: 0.24rem !important;
     white-space: nowrap;
     background: #fff !important;
   }
   .toolbar .zoom-lvl {
     flex: 0 0 auto;
-    min-width: 36px;
+    min-width: 32px;
     text-align: center;
-    font-size: 0.7rem;
-    line-height: 28px;
+    font-size: 0.6rem;
+    line-height: 24px;
     color: #5c4a32;
   }
 
@@ -1583,7 +1583,7 @@
 
   <div class="pixel-center">
     <div class="pixel-price-card">
-      <strong class="price-amount">1 PIXEL — $0.50 / 6 MO</strong>
+      <strong class="price-amount">1 PIXEL — $0.50</strong>
     </div>
     <button class="buy-cta pixel-buy" id="buyModeBtn" type="button">
       <span class="pixel-buy__icon">+</span>
@@ -2529,10 +2529,12 @@ Min 10 blocks · no maximum
   const Z_MIN = 1, Z_MAX = 14;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
+    // Extra room around the wall so corners stay reachable when zoomed
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      return w < 700 ? 2 : 12;
-    } catch (e) { return 8; }
+      if (w < 700) return 48; // phone: scroll past edges
+      return 64;              // desktop: room to pan into corners
+    } catch (e) { return 48; }
   }
   function isPhoneLayout() {
     try {

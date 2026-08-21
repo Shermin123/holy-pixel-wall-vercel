@@ -2273,10 +2273,11 @@ Min 10 blocks · no maximum
     return { vw: Math.max(vw, 80), vh: Math.max(vh, 80) };
   }
 
-  // FIXED grid for every device — Mac/phone must share the same cell coordinates
-  // so a claim in the top-right on desktop is still there on mobile.
+  // FIXED grid — taller (less wide) so it fills phones well.
+  // Square 1000×1000 like the original Million Dollar Homepage.
+  // Existing claims stay valid (they sit in the upper part of the wall).
   const GRID_COLS = 1000;
-  const GRID_ROWS = 500;
+  const GRID_ROWS = 1000;
 
   function computeGrid() {
     // Never resize the grid to the screen. Aspect only affects how large each
@@ -2287,12 +2288,14 @@ Min 10 blocks · no maximum
   }
 
   function applyServerGrid(data) {
+    // Always keep our fixed taller grid. Only expand if server is larger
+    // so no claim coordinates are ever clipped.
     try {
       const c = Number(data && (data.cols || data.COLS || data.width));
       const r = Number(data && (data.rows || data.ROWS || data.height));
       if (c >= 100 && r >= 100 && c * r <= 2000000) {
-        COLS = Math.round(c);
-        ROWS = Math.round(r);
+        COLS = Math.max(GRID_COLS, Math.round(c));
+        ROWS = Math.max(GRID_ROWS, Math.round(r));
         TOTAL = COLS * ROWS;
       }
     } catch (e) {}

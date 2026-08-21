@@ -2690,6 +2690,8 @@ Min 10 blocks · no maximum
       keepAnchor();
       zoomAnchor = null;
       clampScroll();
+      // Redraw so buy-mode pixel grid matches the new zoom
+      try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;
     }
     zoom += diff * 0.32;
@@ -3101,47 +3103,79 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // 4) Selection highlight
+    // 4) Buy-mode pixel grid — each square is one buyable pixel (shows when zoomed)
+    const visCell = (baseCell || drawCell) * (zoom || 1);
+    if (buyMode && visCell >= 3.5) {
+      const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.38)';
+      ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
+      ctx.beginPath();
+      for (let c = gc0; c <= gc1 + 1; c++) {
+        const x = Math.floor(c * drawCell) + 0.5;
+        ctx.moveTo(x, gr0 * drawCell);
+        ctx.lineTo(x, (gr1 + 1) * drawCell);
+      }
+      for (let r = gr0; r <= gr1 + 1; r++) {
+        const y = Math.floor(r * drawCell) + 0.5;
+        ctx.moveTo(gc0 * drawCell, y);
+        ctx.lineTo((gc1 + 1) * drawCell, y);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.6)';
+      ctx.lineWidth = Math.max(1, drawCell * 0.09);
+      ctx.beginPath();
+      const sec = SECTION || 10;
+      for (let c = Math.floor(gc0 / sec) * sec; c <= gc1 + 1; c += sec) {
+        const x = Math.floor(c * drawCell) + 0.5;
+        ctx.moveTo(x, gr0 * drawCell);
+        ctx.lineTo(x, (gr1 + 1) * drawCell);
+      }
+      for (let r = Math.floor(gr0 / sec) * sec; r <= gr1 + 1; r += sec) {
+        const y = Math.floor(r * drawCell) + 0.5;
+        ctx.moveTo(gc0 * drawCell, y);
+        ctx.lineTo((gc1 + 1) * drawCell, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 5) Selection — every selected cell drawn as its own pixel
     if (selected.size) {
-      // Bounding box of selection in cell indices (base canvas units only)
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
+      const gap = Math.max(0.35, drawCell * 0.1);
       selected.forEach(k => {
-        if (sold.has(k)) return;
+        if (sold.has(k) && !(adminMode && editingRegion && typeof cellOwnedByEditing === 'function' && cellOwnedByEditing(k))) return;
         const [c, r] = k.split(',').map(Number);
         if (!Number.isFinite(c) || !Number.isFinite(r)) return;
         if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
         if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
+        const x = c * drawCell;
+        const y = r * drawCell;
+        ctx.fillStyle = 'rgba(5, 150, 105, 0.48)';
+        ctx.fillRect(x + gap * 0.5, y + gap * 0.5, Math.max(0.4, drawCell - gap), Math.max(0.4, drawCell - gap));
+        ctx.strokeStyle = 'rgba(4, 120, 87, 0.95)';
+        ctx.lineWidth = Math.max(0.55, drawCell * 0.07);
+        ctx.strokeRect(
+          x + gap * 0.5 + 0.5,
+          y + gap * 0.5 + 0.5,
+          Math.max(0.4, drawCell - gap - 1),
+          Math.max(0.4, drawCell - gap - 1)
+        );
       });
       if (sMaxC >= sMinC && sMaxR >= sMinR) {
         const bx = sMinC * drawCell;
         const by = sMinR * drawCell;
         const bw = (sMaxC - sMinC + 1) * drawCell;
         const bh = (sMaxR - sMinR + 1) * drawCell;
-        // Outline only — fully see-through so every grid line stays visible
-        ctx.strokeStyle = '#059669';
-        ctx.lineWidth = Math.max(1.5, Math.min(2.5, drawCell * 0.18));
+        ctx.strokeStyle = '#047857';
+        ctx.lineWidth = Math.max(2, Math.min(3.5, drawCell * 0.22));
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
       }
     }
 
-    // 5) Dragging preview — use snapped free selection if available
-    if (dragging && selected.size) {
-      let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
-      selected.forEach(k => {
-        const [c, r] = k.split(',').map(Number);
-        if (c < minC) minC = c; if (c > maxC) maxC = c;
-        if (r < minR) minR = r; if (r > maxR) maxR = r;
-      });
-      if (maxC >= minC) {
-        const dx = minC * drawCell, dy = minR * drawCell;
-        const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
-        ctx.strokeStyle = '#059669';
-        ctx.lineWidth = Math.max(1.5, Math.min(2.5, drawCell * 0.18));
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
-        ctx.setLineDash([]);
-      }
-    } else if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
+    // 6) Dragging preview when selection not yet committed
+    if (dragging && Number.isFinite(startC) && Number.isFinite(curC) && !selected.size) {
       const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
       const dx = minC * drawCell, dy = minR * drawCell;
@@ -3410,7 +3444,7 @@ function getImg(src) {
 
     if (snapped && tip) {
       tip.style.display = 'block';
-      tip.innerHTML = '<strong>SNAPPED TO FREE</strong>' + next.size + ' free pixels selected';
+      tip.innerHTML = '<strong>' + next.size + ' PIXELS</strong>$' + price().toFixed(2) + ' each · total $' + (next.size * price()).toFixed(2);
     }
     try { draw(); } catch (err) { console.warn(err); }
     try { updateFloat(); } catch (err) { console.warn(err); }
@@ -3421,15 +3455,20 @@ function getImg(src) {
     const n = selected.size;
     if (n > 0) {
       const issues = typeof selectionIssues === 'function'? selectionIssues() : [];
+      const unit = price();
       if (adminMode && editingRegion) {
-        $('selCount').textContent = n + ' px · resize claim';
+        $('selCount').textContent = n + ' pixels · resize';
         $('selPrice').textContent = 'SAVE';
         if ($('claimBtn')) $('claimBtn').textContent = 'SAVE SIZE';
       } else {
-        $('selCount').textContent = issues.length
-         ? (n + ' · ' + issues[0])
-          : (n + (n < MIN_BUY? ' (min ' + MIN_BUY + ')' : ''));
-        $('selPrice').textContent = '$' + (n * price()).toFixed(2);
+        if (issues.length) {
+          $('selCount').textContent = n + ' pixels · ' + issues[0];
+        } else if (n < MIN_BUY) {
+          $('selCount').textContent = n + ' pixels (min ' + MIN_BUY + ') · $' + unit.toFixed(2) + ' each';
+        } else {
+          $('selCount').textContent = n + ' pixels · $' + unit.toFixed(2) + ' each';
+        }
+        $('selPrice').textContent = '$' + (n * unit).toFixed(2);
         if ($('claimBtn')) $('claimBtn').textContent = 'CLAIM';
       }
       floatBar.classList.add('visible');
@@ -5855,7 +5894,9 @@ function clearPending() {
     buyMode = !!on;
     const btn = $('buyModeBtn');
     if (btn) {
-      btn.textContent = buyMode ? '✓ VIEW MODE' : '★ BUY PIXELS ★';
+      const label = btn.querySelector('.pixel-buy__text');
+      if (label) label.textContent = buyMode ? 'VIEW WALL' : 'BUY PIXELS';
+      else btn.textContent = buyMode ? 'VIEW WALL' : 'BUY PIXELS';
       btn.classList.toggle('is-active', buyMode);
       btn.style.background = '';
       btn.style.color = '';
@@ -5872,7 +5913,8 @@ function clearPending() {
       toolMode = 'select';
       $('toolSelect')?.classList.add('tool-active');
       $('toolDrag')?.classList.remove('tool-active');
-      toast('BUY MODE — SELECT 10+ PIXELS');
+      toast('ZOOM IN · each square = 1 pixel · drag to select · $' + price().toFixed(2) + ' each');
+      try { draw(); } catch (e) {}
     } else {
       toolMode = 'drag';
       $('toolSelect')?.classList.remove('tool-active');
@@ -5880,7 +5922,7 @@ function clearPending() {
       selected.clear();
       try { updateFloat(); } catch (e) {}
       try { draw(); } catch (e) {}
-      toast('VIEW MODE — CLICK LOGOS TO VISIT');
+      toast('VIEW MODE');
     }
   }
 

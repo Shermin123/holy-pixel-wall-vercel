@@ -1570,26 +1570,15 @@
         </div>
         <input type="url" id="imgUrl" placeholder="Or paste photo link (https://…)" style="width:100%;margin-top:8px;padding:8px 10px;background:#fff;border:3px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1.05rem">
         <div id="blockPreviewWrap" style="display:none;margin-top:12px">
-          <p style="font-family:'Press Start 2P',monospace;font-size:0.38rem;color:var(--dark);margin-bottom:6px">CROP YOUR IMAGE</p>
-          <p style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Drag to reposition · zoom to crop · arrows to nudge</p>
+          <p style="font-family:'Press Start 2P',monospace;font-size:0.38rem;color:var(--dark);margin-bottom:6px">CROP</p>
+          <p style="font-size:0.95rem;color:var(--muted);margin-bottom:8px">Drag image · slide to zoom · then SAVE</p>
           <div id="previewStage" style="position:relative;margin:0 auto;background:#1a1512;border:3px solid var(--gold);box-shadow:3px 3px 0 rgba(92,61,30,0.3);overflow:hidden;cursor:grab;max-width:100%;touch-action:none">
             <canvas id="blockPreview" style="display:block;width:100%;height:100%"></canvas>
           </div>
-          <div style="margin-top:10px">
-            <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;color:var(--muted);margin-bottom:8px">
-              <span style="min-width:40px">Zoom</span>
-              <input type="range" id="cropZoomSlider" min="100" max="500" value="100" step="5" style="flex:1;accent-color:var(--gold)">
-              <span id="zoomPreviewLabel" style="font-family:'Press Start 2P',monospace;font-size:0.32rem;color:var(--dark);min-width:42px;text-align:right">100%</span>
-            </label>
-            <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
-              <button type="button" class="btn btn-sec" id="zoomOutPreview" style="padding:8px 12px" title="Zoom out">−</button>
-              <button type="button" class="btn btn-sec" id="zoomInPreview" style="padding:8px 12px" title="Zoom in">+</button>
-              <button type="button" class="btn btn-sec" id="cropNudgeUp" style="padding:8px 10px" title="Nudge up">↑</button>
-              <button type="button" class="btn btn-sec" id="cropNudgeDown" style="padding:8px 10px" title="Nudge down">↓</button>
-              <button type="button" class="btn btn-sec" id="cropNudgeLeft" style="padding:8px 10px" title="Nudge left">←</button>
-              <button type="button" class="btn btn-sec" id="cropNudgeRight" style="padding:8px 10px" title="Nudge right">→</button>
-              <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:8px 12px">RESET</button>
-            </div>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+            <input type="range" id="cropZoomSlider" min="100" max="400" value="100" step="5" style="flex:1;accent-color:var(--gold)">
+            <span id="zoomPreviewLabel" style="font-family:'Press Start 2P',monospace;font-size:0.32rem;color:var(--dark);min-width:42px;text-align:right">100%</span>
+            <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:8px 12px">RESET</button>
           </div>
         </div>
         <div class="fit-row" id="fitRow" style="display:none"></div>
@@ -3474,7 +3463,6 @@ function getImg(src) {
       const rzBtn = document.getElementById('adminResizeBtn');
       if (rzBtn) {
         rzBtn.onclick = () => {
-          // Hide modal but keep editingRegion so selection can resize this claim
           if ($('claimModal')) $('claimModal').style.display = 'none';
           document.body.style.overflow = '';
           buyMode = true;
@@ -3482,8 +3470,24 @@ function getImg(src) {
           try {
             viewport.classList.add('buy-mode');
             viewport.classList.remove('drag-mode');
+            if (canvas) canvas.style.cursor = 'crosshair';
           } catch (e) {}
-          toast('Drag a bigger or smaller rectangle, then press Enter to save', 'ok');
+          // Keep claim selected so you drag from the existing image block
+          selected = new Set();
+          const cells = (editingRegion.cells && editingRegion.cells.length)
+            ? editingRegion.cells
+            : (function() {
+                const out = [];
+                const r = editingRegion;
+                for (let c = r.minC; c <= r.maxC; c++)
+                  for (let row = r.minR; row <= r.maxR; row++)
+                    out.push(c + ',' + row);
+                return out;
+              })();
+          cells.forEach(k => selected.add(k));
+          try { updateFloat(); draw(); } catch (e) {}
+          try { focusRegion(editingRegion); } catch (e) {}
+          toast('Drag the block larger or smaller · then SAVE SIZE', 'ok');
         };
       }
 const delBtn = document.getElementById('adminDeleteClaimBtn');
@@ -3978,19 +3982,27 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     if (sl && document.activeElement !== sl) sl.value = String(Math.round(crop.scale * 100));
   }
 
-  function previewZoom(delta) {
-    crop.scale = Math.max(1, Math.min(5, crop.scale + delta));
-    const sl = $('cropZoomSlider');
-    if (sl) sl.value = String(Math.round(crop.scale * 100));
-    updateBlockPreview();
+  
+  function liveApplyCrop() {
+    if (!editingRegion) return;
+    editingRegion.cropScale = Number(crop.scale) || 1;
+    editingRegion.cropX = crop.x != null ? Number(crop.x) : 0.5;
+    editingRegion.cropY = crop.y != null ? Number(crop.y) : 0.5;
+    if (pendingMedia) {
+      editingRegion.media = pendingMedia;
+      editingRegion.mediaType = pendingType || 'image';
+    }
+    const id = editingRegion.id || editingRegion.claimId;
+    if (id) saveCropCache(id, editingRegion);
     try { draw(); } catch (e) {}
   }
 
-  function nudgeCrop(dx, dy) {
-    crop.x = Math.max(0, Math.min(1, crop.x + dx));
-    crop.y = Math.max(0, Math.min(1, crop.y + dy));
+  function previewZoom(delta) {
+    crop.scale = Math.max(1, Math.min(4, crop.scale + delta));
+    const sl = $('cropZoomSlider');
+    if (sl) sl.value = String(Math.round(crop.scale * 100));
     updateBlockPreview();
-    try { draw(); } catch (e) {}
+    liveApplyCrop();
   }
 
   function bindPreviewControls() {
@@ -3999,6 +4011,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     stage._bound = true;
     stage.addEventListener('pointerdown', e => {
       if (!pendingMedia) return;
+      e.preventDefault();
       stage.setPointerCapture(e.pointerId);
       previewDrag = { x: e.clientX, y: e.clientY, cx: crop.x, cy: crop.y };
       stage.style.cursor = 'grabbing';
@@ -4008,15 +4021,16 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       const rect = stage.getBoundingClientRect();
       const dx = (e.clientX - previewDrag.x) / Math.max(1, rect.width);
       const dy = (e.clientY - previewDrag.y) / Math.max(1, rect.height);
-      // dragging image: move focus opposite to drag
-      crop.x = Math.max(0, Math.min(1, previewDrag.cx - dx));
-      crop.y = Math.max(0, Math.min(1, previewDrag.cy - dy));
+      // Drag image with finger (natural direction)
+      crop.x = Math.max(0, Math.min(1, previewDrag.cx + dx));
+      crop.y = Math.max(0, Math.min(1, previewDrag.cy + dy));
       updateBlockPreview();
-      try { draw(); } catch (err) {}
+      liveApplyCrop();
     });
     const end = () => {
       previewDrag = null;
       if (stage) stage.style.cursor = 'grab';
+      liveApplyCrop();
     };
     stage.addEventListener('pointerup', end);
     stage.addEventListener('pointercancel', end);
@@ -4024,26 +4038,20 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       e.preventDefault();
       previewZoom(e.deltaY > 0 ? -0.1 : 0.1);
     }, { passive: false });
-    if ($('zoomInPreview')) $('zoomInPreview').onclick = () => previewZoom(0.15);
-    if ($('zoomOutPreview')) $('zoomOutPreview').onclick = () => previewZoom(-0.15);
     if ($('zoomResetPreview')) $('zoomResetPreview').onclick = () => {
       crop = { scale: 1, x: 0.5, y: 0.5 };
       const sl = $('cropZoomSlider');
       if (sl) sl.value = '100';
       updateBlockPreview();
-      try { draw(); } catch (e) {}
+      liveApplyCrop();
     };
     if ($('cropZoomSlider')) {
       $('cropZoomSlider').oninput = () => {
-        crop.scale = Math.max(1, Math.min(5, (parseInt($('cropZoomSlider').value, 10) || 100) / 100));
+        crop.scale = Math.max(1, Math.min(4, (parseInt($('cropZoomSlider').value, 10) || 100) / 100));
         updateBlockPreview();
-        try { draw(); } catch (e) {}
+        liveApplyCrop();
       };
     }
-    if ($('cropNudgeUp')) $('cropNudgeUp').onclick = () => nudgeCrop(0, -0.05);
-    if ($('cropNudgeDown')) $('cropNudgeDown').onclick = () => nudgeCrop(0, 0.05);
-    if ($('cropNudgeLeft')) $('cropNudgeLeft').onclick = () => nudgeCrop(-0.05, 0);
-    if ($('cropNudgeRight')) $('cropNudgeRight').onclick = () => nudgeCrop(0.05, 0);
   }
 
 function clearPending() {

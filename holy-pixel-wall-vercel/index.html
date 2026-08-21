@@ -1019,18 +1019,19 @@
   position: relative !important;
   isolation: isolate;
   display: grid !important;
-  grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) !important;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 1fr) !important;
   align-items: center !important;
-  column-gap: 20px !important;
-  min-height: 64px !important;
-  height: 64px !important;
-  padding: 0 18px !important;
+  column-gap: 16px !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  padding: 0 14px !important;
   overflow: hidden;
   background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
-  border-bottom: 3px solid #2a2118 !important;
-  box-shadow: 0 3px 0 #c9a34e !important;
+  border-bottom: 2px solid #2a2118 !important;
+  box-shadow: 0 2px 0 #c9a34e !important;
   color: #2a2118;
   box-sizing: border-box !important;
+  flex-shrink: 0;
 }
 
 /* subtle paper grain */
@@ -1416,9 +1417,30 @@
 }
 
 /* =========================================================
-   MILLION-DOLLAR-PAGE STYLE — wall is the page
-   Minimal chrome · full grid always visible · clean frame
+   BALANCED LAYOUT — complete UI on phone + desktop
+   Wall stretches to fill remaining space on both
    ========================================================= */
+
+/* Desktop / tablet: compact header so wall grows vertically */
+@media (min-width: 701px) {
+  .pixel-header {
+    min-height: 56px !important;
+    height: 56px !important;
+    padding: 0 14px !important;
+  }
+  .toolbar {
+    padding: 6px 10px !important;
+  }
+  .site-copy {
+    padding: 6px 10px !important;
+  }
+  .viewport {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    background: #faf7f0 !important;
+  }
+}
+
 @media (max-width: 700px) {
   html, body {
     height: 100dvh !important;
@@ -1426,18 +1448,18 @@
     background: #faf7f0 !important;
   }
 
-  /* Slim top bar: title + buy only */
+  /* Row 1: title · counter · buy */
   .pixel-header {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 8px !important;
-    height: 48px !important;
+    gap: 6px !important;
+    height: auto !important;
     min-height: 48px !important;
-    max-height: 48px !important;
-    padding: 0 10px !important;
+    max-height: none !important;
+    padding: 8px 10px !important;
     border-bottom: 2px solid #2a2118 !important;
     box-shadow: none !important;
     background: #fffdf8 !important;
@@ -1449,8 +1471,8 @@
     overflow: hidden;
   }
   .pixel-brand h1 {
-    font-size: 0.4rem !important;
-    letter-spacing: 0.5px !important;
+    font-size: 0.38rem !important;
+    letter-spacing: 0.4px !important;
     text-shadow: none !important;
   }
   .pixel-brand p,
@@ -1464,65 +1486,97 @@
     flex-shrink: 0 !important;
   }
   .pixel-price-card { display: none !important; }
-  .pixel-stats { display: none !important; }
+
+  /* Compact live counter (was missing on phone) */
+  .pixel-stats {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .pixel-stat {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 4px 8px !important;
+    min-width: 0 !important;
+    width: auto !important;
+    border: 2px solid #2a2118 !important;
+    background: #fff !important;
+  }
+  .pixel-stat__top,
+  .pixel-stat__foot,
+  .pixel-progress,
+  .pixel-stat__unit { display: none !important; }
+  .pixel-stat__main { margin: 0 !important; }
+  .pixel-stat .counter-num {
+    font-size: 0.34rem !important;
+    white-space: nowrap;
+  }
 
   .pixel-buy {
-    min-height: 34px !important;
-    height: 34px !important;
+    min-height: 36px !important;
+    height: 36px !important;
     padding: 0 12px !important;
     box-shadow: 2px 2px 0 #2a2118 !important;
     animation: none !important;
   }
-  .pixel-buy__text { font-size: 0.36rem !important; }
+  .pixel-buy__text { font-size: 0.34rem !important; }
   .pixel-buy__icon,
   .pixel-buy__arrow { display: none !important; }
 
-  /* Thin control strip under header */
+  /* Full toolbar — all actions available (swipe if needed) */
   .toolbar {
     display: flex !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
-    gap: 4px !important;
-    padding: 4px 8px !important;
-    justify-content: center !important;
+    gap: 5px !important;
+    padding: 6px 8px !important;
+    justify-content: flex-start !important;
     background: #f5efe4 !important;
     border-bottom: 1px solid #e0d4c0 !important;
     scrollbar-width: none;
   }
   .toolbar::-webkit-scrollbar { display: none; }
-  .toolbar .tool-gap { display: none; }
-  /* Keep only the essentials on phone */
+  .toolbar .tool-gap {
+    width: 6px;
+    flex-shrink: 0;
+    display: block !important;
+  }
   #toolClaims,
+  #ownersBtn,
   #storyBtn,
   #contactBtn,
-  #helpBtn {
-    display: none !important;
+  #helpBtn,
+  #zoomOut,
+  #zoomIn,
+  #zoomFit {
+    display: inline-flex !important;
   }
   .toolbar .tool-btn {
     flex: 0 0 auto;
-    min-height: 32px;
-    padding: 6px 9px !important;
+    min-height: 34px;
+    padding: 7px 10px !important;
     font-size: 0.32rem !important;
     white-space: nowrap;
     background: #fff !important;
   }
   .toolbar .zoom-lvl {
     flex: 0 0 auto;
-    min-width: 40px;
+    min-width: 42px;
     text-align: center;
-    font-size: 0.75rem;
-    line-height: 32px;
+    font-size: 0.8rem;
+    line-height: 34px;
     color: #5c4a32;
   }
 
-  /* Wall is the page — fills everything left */
+  /* Wall fills all remaining vertical space */
   .viewport {
     flex: 1 1 auto !important;
     min-height: 0 !important;
     background: #faf7f0 !important;
-    /* soft center frame like the original MDH white page */
-    display: block;
   }
 
   #wallWrap {
@@ -1530,15 +1584,17 @@
   }
 
   .stage {
-    box-shadow: 0 0 0 2px #2a2118, 4px 4px 0 rgba(42, 33, 24, 0.15) !important;
+    box-shadow: 0 0 0 2px #2a2118, 4px 4px 0 rgba(42, 33, 24, 0.12) !important;
   }
 
-  .site-copy { display: none !important; }
+  .site-copy {
+    display: none !important;
+  }
 
   .float-bar {
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
     width: calc(100% - 20px) !important;
-    max-width: 400px !important;
+    max-width: 420px !important;
     padding: 10px 12px !important;
   }
   .float-bar .btn-claim,
@@ -1547,6 +1603,7 @@
     padding: 8px 14px !important;
     font-size: 0.4rem !important;
   }
+  .sel-sum { font-size: 0.38rem !important; }
 
   .overlay {
     align-items: flex-end !important;
@@ -1555,20 +1612,22 @@
   .overlay .modal {
     max-width: 100% !important;
     width: 100% !important;
-    max-height: 90dvh !important;
+    max-height: 92dvh !important;
     border-radius: 14px 14px 0 0;
     margin: 0 !important;
   }
   .overlay .modal-body {
-    max-height: 58dvh;
+    max-height: 60dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 }
 
 @media (max-width: 380px) {
-  .pixel-brand h1 { font-size: 0.32rem !important; }
-  .pixel-buy__text { font-size: 0.3rem !important; }
+  .pixel-brand h1 { font-size: 0.3rem !important; }
+  .pixel-buy__text { font-size: 0.28rem !important; }
+  .pixel-stat .counter-num { font-size: 0.28rem !important; }
+  .toolbar .tool-btn { font-size: 0.28rem !important; padding: 6px 8px !important; }
 }
 
 </style>
@@ -2470,9 +2529,9 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Million-dollar-page style: full wall always fits in the view, centered.
-    // Phone and desktop use the same rule — only available space changes.
-    const margin = isPhoneLayout() ? 6 : 8;
+    // Stretch wall to fill available space on both phone and desktop.
+    // Tiny margin only — maximizes vertical and horizontal fill equally.
+    const margin = 2;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
@@ -2525,12 +2584,12 @@ Min 10 blocks · no maximum
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
   const Z_MIN = 1, Z_MAX = 14;
-  // Outer scroll margin only (does not shrink wall size). Minimal on phone.
+  // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      return w < 700 ? 2 : 32;
-    } catch (e) { return 16; }
+      return w < 700 ? 2 : 12;
+    } catch (e) { return 8; }
   }
   function isPhoneLayout() {
     try {

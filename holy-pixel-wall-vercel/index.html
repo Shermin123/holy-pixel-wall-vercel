@@ -3119,7 +3119,8 @@ function getImg(src) {
     if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
     const p = pos(e);
     const key = p.c + ',' + p.r;
-    if (sold.has(key)) {
+    const startOnEditingClaim = adminMode && editingRegion && cellOwnedByEditing(key);
+    if (sold.has(key) && !startOnEditingClaim) {
       dragging = false;
       didDrag = false;
       const owner = sold.get(key);
@@ -3133,9 +3134,29 @@ function getImg(src) {
     }
     dragging = true;
     didDrag = false;
+    if (startOnEditingClaim) {
+      const er = editingRegion;
+      selected = new Set();
+      if (er.cells && er.cells.length) {
+        er.cells.forEach(k => selected.add(k));
+      } else {
+        for (let c = er.minC; c <= er.maxC; c++)
+          for (let row = er.minR; row <= er.maxR; row++)
+            selected.add(c + ',' + row);
+      }
+      let aC = er.minC, aR = er.minR;
+      if (p.c >= (er.minC + er.maxC) / 2) aC = er.minC; else aC = er.maxC;
+      if (p.r >= (er.minR + er.maxR) / 2) aR = er.minR; else aR = er.maxR;
+      startC = aC; startR = aR;
+      curC = p.c; curR = p.r;
+      additiveSelect = false;
+      deselect = false;
+      dragBaseline = new Set();
+      applyDrag();
+      return;
+    }
     startC = curC = p.c;
     startR = curR = p.r;
-    // Only rectangular selection — always replace with current box
     additiveSelect = false;
     deselect = false;
     dragBaseline = new Set();
@@ -4548,21 +4569,23 @@ function clearPending() {
         name: ($('ownerName').value.trim() || er.name || 'ANON'),
         country: ($('country') && $('country').value) || er.country || '',
         desc: ($('desc').value || '').trim().slice(0, 120),
-        media: pendingMedia || '',
-        mediaType: pendingType || detectMediaType(pendingMedia) || 'image',
+        // Never wipe media when only resizing
+        media: pendingMedia || er.media || '',
+        mediaType: pendingType || er.mediaType || detectMediaType(pendingMedia || er.media) || 'image',
         fit: 'cover',
-        cropScale: Number(crop.scale) || 1,
-        cropX: crop.x != null ? Number(crop.x) : 0.5,
-        cropY: crop.y != null ? Number(crop.y) : 0.5,
-        link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
-        linkType: ($('linkType') && $('linkType').value) || 'none',
+        cropScale: Number(crop.scale) || Number(er.cropScale) || 1,
+        cropX: crop.x != null ? Number(crop.x) : (er.cropX != null ? Number(er.cropX) : 0.5),
+        cropY: crop.y != null ? Number(crop.y) : (er.cropY != null ? Number(er.cropY) : 0.5),
+        link: typeof buildLink === 'function' ? buildLink() : ($('link').value || er.link || ''),
+        linkType: ($('linkType') && $('linkType').value) || er.linkType || 'none',
         duration: ($('duration') && $('duration').value) || er.duration,
         minC: minC,
         maxC: maxC,
         minR: minR,
         maxR: maxR,
         pixels: newCells ? newCells.length : (er.pixels || (er.cells && er.cells.length) || 0),
-        cells: newCells || er.cells || []
+        cells: newCells || er.cells || [],
+        paid: er.paid != null ? Number(er.paid) : ((newCells || er.cells || []).length * price())
       };
       if (adminMode) {
         body.key = getAdminKey();
@@ -4570,12 +4593,16 @@ function clearPending() {
           saveCropCache(rid, body);
           // Rebuild local geometry if resized
           if (newCells) {
-            // free old cells
             (er.cells || []).forEach(k => { if (sold.get(k) === er) sold.delete(k); });
             er.cells = newCells.slice();
             er.minC = minC; er.maxC = maxC; er.minR = minR; er.maxR = maxR;
             er.pixels = newCells.length;
             newCells.forEach(k => sold.set(k, er));
+            // Persist across refresh + 15s pullWall
+            try {
+              setLocalGeomOverride(rid, body);
+              if (body.claimId && body.claimId !== rid) setLocalGeomOverride(body.claimId, body);
+            } catch (e) {}
           }
           Object.assign(er, {
             id: rid,
@@ -4591,7 +4618,8 @@ function clearPending() {
             cropY: body.cropY,
             link: body.link,
             linkType: body.linkType,
-            duration: body.duration
+            duration: body.duration,
+            paid: body.paid
           });
           try { draw(); syncMediaOverlays(); save(); } catch (e) {}
           await apiFetch('/api/admin/update', {
@@ -4601,7 +4629,7 @@ function clearPending() {
           }, 'Admin update');
           await pullWall();
           applyCropCacheToRegions();
-          // Ensure this claim keeps crop + size if API dropped fields
+          try { applyLocalGeomOverrides(); } catch (e) {}
           let synced = regions.find(x => x && (x.id === rid || x.claimId === rid || x.id === er.id));
           if (synced) {
             synced.cropScale = body.cropScale;
@@ -4612,20 +4640,24 @@ function clearPending() {
             synced.desc = body.desc;
             synced.link = body.link;
             synced.linkType = body.linkType;
+            if (body.paid != null) synced.paid = body.paid;
             if (newCells && newCells.length) {
-              // If server ignored resize, force local geometry again
               (synced.cells || []).forEach(k => { if (sold.get(k) === synced) sold.delete(k); });
               synced.cells = newCells.slice();
               synced.minC = minC; synced.maxC = maxC; synced.minR = minR; synced.maxR = maxR;
               synced.pixels = newCells.length;
               newCells.forEach(k => sold.set(k, synced));
+              try {
+                setLocalGeomOverride(rid, body);
+                if (body.claimId && body.claimId !== rid) setLocalGeomOverride(body.claimId, body);
+              } catch (e) {}
             }
           }
           try { draw(); syncMediaOverlays(); save(); } catch (e) {}
           selected.clear();
           clearPending();
           closeClaimModal();
-          toast(newCells ? ('SAVED — resized to ' + newCells.length + ' px + crop') : 'SAVED — crop applied', 'ok');
+          toast(newCells ? ('SAVED — resized to ' + newCells.length + ' px') : 'SAVED — crop applied', 'ok');
         } catch (e) {
           toast(friendlyError(e, 'Save failed'), 'error');
         }
@@ -4649,13 +4681,14 @@ function clearPending() {
       const nm = ($('ownerName').value || '').trim() || 'ADMIN';
       const claimId = makeClaimId();
       const pixelIds = buildPixelIds(claimId, keys);
+      const paidAmt = keys.length * price();
       const payload = {
         key: getAdminKey(),
         claimId: claimId,
         pixelIds: pixelIds,
         cells: keys,
         name: nm,
-      country: ($('country') && $('country').value) || '',
+        country: ($('country') && $('country').value) || '',
         desc: ($('desc').value || '').trim().slice(0, 120),
         duration: ($('duration') && $('duration').value) || 'permanent',
         media: pendingMedia || '',
@@ -4665,7 +4698,10 @@ function clearPending() {
         cropX: crop.x,
         cropY: crop.y,
         link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
-        linkType: ($('linkType') && $('linkType').value) || 'none'
+        linkType: ($('linkType') && $('linkType').value) || 'none',
+        // Owners board shows this — use current pixel price × count
+        paid: paidAmt,
+        claimedAt: Date.now()
       };
       const btn = $('confirmBtn');
       if (btn) { btn.disabled = true; btn.textContent = 'SAVING…'; }
@@ -4680,7 +4716,15 @@ function clearPending() {
         clearPending();
         closeClaimModal();
         await pullWall();
-        toast('ADDED FREE — ' + nm.toUpperCase(), 'ok');
+        // Ensure local region has paid if API dropped it
+        try {
+          const r = regions.find(x => x && (x.claimId === claimId || x.id === claimId));
+          if (r && !(Number(r.paid) > 0)) {
+            r.paid = paidAmt;
+            save();
+          }
+        } catch (e) {}
+        toast('ADDED — ' + nm.toUpperCase() + ' · $' + paidAmt.toFixed(2), 'ok');
       } catch (e) {
         toast(friendlyError(e, 'Free claim failed'), 'error');
       } finally {
@@ -5196,13 +5240,25 @@ function clearPending() {
   };
 
 
+  function priceForDuration(d) {
+    if (d === 'permanent') return 10;
+    if (d === '6month') return 1;
+    if (d === '3month') return 0.50;
+    if (d === '1month') return 0.50;
+    return 0.50;
+  }
+
   function buildOwnerStats() {
     const map = new Map();
     regions.forEach(r => {
       if (!r || expired(r)) return;
       const name = (r.name || 'Anonymous').trim() || 'Anonymous';
       const px = r.pixels || (r.cells && r.cells.length) || 0;
-      const paid = Number(r.paid) || 0;
+      // Use stored paid; if missing (common for admin adds), value at pixel rate
+      let paid = Number(r.paid);
+      if (!isFinite(paid) || paid <= 0) {
+        paid = px * priceForDuration(r.duration || '3month');
+      }
       const cc = (r.country || '').toUpperCase();
       if (!map.has(name)) map.set(name, { name, pixels: 0, spent: 0, claims: 0, desc: r.desc || '', country: cc || '' });
       const o = map.get(name);
@@ -5785,6 +5841,87 @@ let scrollDrawRaf = 0;
   }, { passive: true });
   window.addEventListener('resize', () => resize(false));
 
+  // Persist admin resizes across refresh (server often drops cells on update)
+  const GEOM_OVERRIDE_KEY = 'hpw_geom_override_v1';
+  const localGeomOverride = new Map();
+
+  function loadLocalGeomOverrides() {
+    try {
+      const raw = localStorage.getItem(GEOM_OVERRIDE_KEY);
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach(id => {
+        const g = obj[id];
+        if (!g || !Array.isArray(g.cells) || !g.cells.length) return;
+        localGeomOverride.set(String(id), g);
+      });
+    } catch (e) { console.warn('load geom overrides', e); }
+  }
+
+  function persistLocalGeomOverrides() {
+    try {
+      const obj = {};
+      localGeomOverride.forEach((g, id) => {
+        obj[id] = {
+          cells: g.cells,
+          minC: g.minC, maxC: g.maxC, minR: g.minR, maxR: g.maxR,
+          pixels: g.pixels,
+          cropScale: g.cropScale, cropX: g.cropX, cropY: g.cropY,
+          at: g.at || Date.now()
+        };
+      });
+      localStorage.setItem(GEOM_OVERRIDE_KEY, JSON.stringify(obj));
+    } catch (e) { console.warn('persist geom overrides', e); }
+  }
+
+  function setLocalGeomOverride(id, geom) {
+    if (!id || !geom || !geom.cells || !geom.cells.length) return;
+    localGeomOverride.set(String(id), {
+      cells: geom.cells.slice(),
+      minC: geom.minC, maxC: geom.maxC, minR: geom.minR, maxR: geom.maxR,
+      pixels: geom.pixels || geom.cells.length,
+      cropScale: geom.cropScale, cropX: geom.cropX, cropY: geom.cropY,
+      at: Date.now()
+    });
+    persistLocalGeomOverrides();
+  }
+
+  function applyLocalGeomOverrides() {
+    if (!localGeomOverride.size) return;
+    let changed = false;
+    regions.forEach(r => {
+      if (!r) return;
+      const candidates = [String(r.id || ''), String(r.claimId || '')].filter(Boolean);
+      let o = null, matchedKey = '';
+      for (const id of candidates) {
+        if (localGeomOverride.has(id)) { o = localGeomOverride.get(id); matchedKey = id; break; }
+      }
+      if (!o) return;
+      const serverPx = r.pixels || (r.cells && r.cells.length) || 0;
+      const sameBox =
+        Number(r.minC) === Number(o.minC) && Number(r.maxC) === Number(o.maxC) &&
+        Number(r.minR) === Number(o.minR) && Number(r.maxR) === Number(o.maxR) &&
+        serverPx === o.pixels;
+      if (sameBox) {
+        localGeomOverride.delete(matchedKey);
+        changed = true;
+        return;
+      }
+      (r.cells || []).forEach(k => { if (sold.get(k) === r) sold.delete(k); });
+      r.cells = o.cells.slice();
+      r.minC = o.minC; r.maxC = o.maxC; r.minR = o.minR; r.maxR = o.maxR;
+      r.pixels = o.pixels;
+      if (o.cropScale != null) r.cropScale = o.cropScale;
+      if (o.cropX != null) r.cropX = o.cropX;
+      if (o.cropY != null) r.cropY = o.cropY;
+      o.cells.forEach(k => sold.set(k, r));
+    });
+    if (changed) persistLocalGeomOverrides();
+  }
+
+  try { loadLocalGeomOverrides(); } catch (e) {}
+
   async function pullWall() {
     try {
       const data = await apiFetch('/api/wall', { timeout: 15000 }, 'Wall sync');
@@ -5798,6 +5935,8 @@ let scrollDrawRaf = 0;
         } catch (err) { console.warn(err); }
       });
       try { applyCropCacheToRegions(); } catch (e) {}
+      try { applyLocalGeomOverrides(); } catch (e) {}
+      try { save(); } catch (e) {}
       draw();
       syncMediaOverlays();
       return true;
@@ -5808,9 +5947,11 @@ let scrollDrawRaf = 0;
   }
 
   (async () => {
+    try { loadLocalGeomOverrides(); } catch (e) {}
     const ok = await pullWall();
     if (!ok) {
       load();
+      try { applyLocalGeomOverrides(); } catch (e) {}
       if (!navigator.onLine) toast('Offline — showing saved wall', 'error');
     }
     try { resize(true); } catch (e) { console.warn(e); }

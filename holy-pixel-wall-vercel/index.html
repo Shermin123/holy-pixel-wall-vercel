@@ -2608,7 +2608,7 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    canvas.style.imageRendering = 'auto';
+    canvas.style.imageRendering = 'pixelated';
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -3122,7 +3122,7 @@ function getImg(src) {
     if (buyMode && visCell >= 3.5) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.18)';
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.10)';
       ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
@@ -3136,7 +3136,7 @@ function getImg(src) {
         ctx.lineTo((gc1 + 1) * drawCell, y);
       }
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.32)';
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.18)';
       ctx.lineWidth = Math.max(1, drawCell * 0.09);
       ctx.beginPath();
       const sec = SECTION || 10;
@@ -3154,43 +3154,45 @@ function getImg(src) {
       ctx.restore();
     }
 
-    // 5) Selection — every selected cell drawn as its own pixel
-    if (selected.size) {
-      let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
-      const gap = Math.max(0.35, drawCell * 0.1);
-      selected.forEach(k => {
-        if (sold.has(k) && !(adminMode && editingRegion && typeof cellOwnedByEditing === 'function' && cellOwnedByEditing(k))) return;
-        const [c, r] = k.split(',').map(Number);
-        if (!Number.isFinite(c) || !Number.isFinite(r)) return;
-        if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
-        if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
-        const x = c * drawCell;
-        const y = r * drawCell;
-        ctx.fillStyle = 'rgba(168, 76, 50, 0.14)';
-        ctx.fillRect(x + gap * 0.5, y + gap * 0.5, Math.max(0.4, drawCell - gap), Math.max(0.4, drawCell - gap));
-        ctx.strokeRect(
-  x + gap * 0.5 + 0.5,
-  y + gap * 0.5 + 0.5,
-  Math.max(0.4, drawCell - gap - 1),
-  Math.max(0.4, drawCell - gap - 1)
-);
-        ctx.strokeRect(
-          x + gap * 0.5 + 0.5,
-          y + gap * 0.5 + 0.5,
-          Math.max(0.4, drawCell - gap - 1),
-          Math.max(0.4, drawCell - gap - 1)
-        );
-      });
-      if (sMaxC >= sMinC && sMaxR >= sMinR) {
-        const bx = sMinC * drawCell;
-        const by = sMinR * drawCell;
-        const bw = (sMaxC - sMinC + 1) * drawCell;
-        const bh = (sMaxR - sMinR + 1) * drawCell;
-        ctx.strokeStyle = 'rgba(168, 76, 50, 0.9)';
-        ctx.lineWidth = Math.max(1, Math.min(2, drawCell * 0.12));
-        ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
-      }
-    }
+    // 5) CLEAN TRANSPARENT SELECTION
+if (selected.size) {
+  selected.forEach(k => {
+    if (
+      sold.has(k) &&
+      !(adminMode &&
+        editingRegion &&
+        typeof cellOwnedByEditing === 'function' &&
+        cellOwnedByEditing(k))
+    ) return;
+
+    const parts = k.split(',');
+    const c = Number(parts[0]);
+    const r = Number(parts[1]);
+
+    const x = c * drawCell;
+    const y = r * drawCell;
+
+    // Transparent selection - image stays visible
+    ctx.fillStyle = 'rgba(232, 106, 60, 0.18)';
+    ctx.fillRect(
+      x + 0.5,
+      y + 0.5,
+      Math.max(1, drawCell - 1),
+      Math.max(1, drawCell - 1)
+    );
+
+    // Thin pixel border
+    ctx.strokeStyle = 'rgba(168, 76, 50, 0.65)';
+    ctx.lineWidth = 1;
+
+    ctx.strokeRect(
+      x + 0.5,
+      y + 0.5,
+      Math.max(1, drawCell - 1),
+      Math.max(1, drawCell - 1)
+    );
+  });
+}
 
     // 6) Dragging preview when selection not yet committed
     if (dragging && Number.isFinite(startC) && Number.isFinite(curC) && !selected.size) {

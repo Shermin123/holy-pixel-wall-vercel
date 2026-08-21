@@ -1512,6 +1512,7 @@
           <option value="NG">🇳🇬 Nigeria</option>
           <option value="NO">🇳🇴 Norway</option>
           <option value="PK">🇵🇰 Pakistan</option>
+          <option value="PS">🇵🇸 Palestine</option>
           <option value="PH">🇵🇭 Philippines</option>
           <option value="PL">🇵🇱 Poland</option>
           <option value="PT">🇵🇹 Portugal</option>
@@ -1569,16 +1570,26 @@
         </div>
         <input type="url" id="imgUrl" placeholder="Or paste photo link (https://…)" style="width:100%;margin-top:8px;padding:8px 10px;background:#fff;border:3px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1.05rem">
         <div id="blockPreviewWrap" style="display:none;margin-top:12px">
-          <p style="font-size:0.95rem;color:var(--dark);margin-bottom:6px;font-family:'Press Start 2P',monospace;font-size:0.38rem">PREVIEW ON YOUR BLOCK</p>
-          <p style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Drag to move · scroll or buttons to zoom</p>
+          <p style="font-family:'Press Start 2P',monospace;font-size:0.38rem;color:var(--dark);margin-bottom:6px">CROP YOUR IMAGE</p>
+          <p style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Drag to reposition · zoom to crop · arrows to nudge</p>
           <div id="previewStage" style="position:relative;margin:0 auto;background:#1a1512;border:3px solid var(--gold);box-shadow:3px 3px 0 rgba(92,61,30,0.3);overflow:hidden;cursor:grab;max-width:100%;touch-action:none">
             <canvas id="blockPreview" style="display:block;width:100%;height:100%"></canvas>
           </div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px">
-            <button type="button" class="btn btn-sec" id="zoomOutPreview" style="padding:8px 12px">−</button>
-            <span id="zoomPreviewLabel" style="font-family:'Press Start 2P',monospace;font-size:0.4rem;color:var(--dark);min-width:48px;text-align:center">100%</span>
-            <button type="button" class="btn btn-sec" id="zoomInPreview" style="padding:8px 12px">+</button>
-            <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:8px 12px">RESET</button>
+          <div style="margin-top:10px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;color:var(--muted);margin-bottom:8px">
+              <span style="min-width:40px">Zoom</span>
+              <input type="range" id="cropZoomSlider" min="100" max="500" value="100" step="5" style="flex:1;accent-color:var(--gold)">
+              <span id="zoomPreviewLabel" style="font-family:'Press Start 2P',monospace;font-size:0.32rem;color:var(--dark);min-width:42px;text-align:right">100%</span>
+            </label>
+            <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn btn-sec" id="zoomOutPreview" style="padding:8px 12px" title="Zoom out">−</button>
+              <button type="button" class="btn btn-sec" id="zoomInPreview" style="padding:8px 12px" title="Zoom in">+</button>
+              <button type="button" class="btn btn-sec" id="cropNudgeUp" style="padding:8px 10px" title="Nudge up">↑</button>
+              <button type="button" class="btn btn-sec" id="cropNudgeDown" style="padding:8px 10px" title="Nudge down">↓</button>
+              <button type="button" class="btn btn-sec" id="cropNudgeLeft" style="padding:8px 10px" title="Nudge left">←</button>
+              <button type="button" class="btn btn-sec" id="cropNudgeRight" style="padding:8px 10px" title="Nudge right">→</button>
+              <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:8px 12px">RESET</button>
+            </div>
           </div>
         </div>
         <div class="fit-row" id="fitRow" style="display:none"></div>
@@ -3796,10 +3807,21 @@ function getImg(src) {
     c.strokeRect(1, 1, pw - 2, ph - 2);
     const zl = $('zoomPreviewLabel');
     if (zl) zl.textContent = Math.round(crop.scale * 100) + '%';
+    const sl = $('cropZoomSlider');
+    if (sl && document.activeElement !== sl) sl.value = String(Math.round(crop.scale * 100));
   }
 
   function previewZoom(delta) {
-    crop.scale = Math.max(1, Math.min(4, crop.scale + delta));
+    crop.scale = Math.max(1, Math.min(5, crop.scale + delta));
+    const sl = $('cropZoomSlider');
+    if (sl) sl.value = String(Math.round(crop.scale * 100));
+    updateBlockPreview();
+    try { draw(); } catch (e) {}
+  }
+
+  function nudgeCrop(dx, dy) {
+    crop.x = Math.max(0, Math.min(1, crop.x + dx));
+    crop.y = Math.max(0, Math.min(1, crop.y + dy));
     updateBlockPreview();
     try { draw(); } catch (e) {}
   }
@@ -3839,9 +3861,22 @@ function getImg(src) {
     if ($('zoomOutPreview')) $('zoomOutPreview').onclick = () => previewZoom(-0.15);
     if ($('zoomResetPreview')) $('zoomResetPreview').onclick = () => {
       crop = { scale: 1, x: 0.5, y: 0.5 };
+      const sl = $('cropZoomSlider');
+      if (sl) sl.value = '100';
       updateBlockPreview();
       try { draw(); } catch (e) {}
     };
+    if ($('cropZoomSlider')) {
+      $('cropZoomSlider').oninput = () => {
+        crop.scale = Math.max(1, Math.min(5, (parseInt($('cropZoomSlider').value, 10) || 100) / 100));
+        updateBlockPreview();
+        try { draw(); } catch (e) {}
+      };
+    }
+    if ($('cropNudgeUp')) $('cropNudgeUp').onclick = () => nudgeCrop(0, -0.05);
+    if ($('cropNudgeDown')) $('cropNudgeDown').onclick = () => nudgeCrop(0, 0.05);
+    if ($('cropNudgeLeft')) $('cropNudgeLeft').onclick = () => nudgeCrop(-0.05, 0);
+    if ($('cropNudgeRight')) $('cropNudgeRight').onclick = () => nudgeCrop(0.05, 0);
   }
 
 function clearPending() {
@@ -4905,16 +4940,17 @@ function clearPending() {
       if (!r || expired(r)) return;
       const name = (r.name || 'Anonymous').trim() || 'Anonymous';
       const px = r.pixels || (r.cells && r.cells.length) || 0;
+      const paid = Number(r.paid) || 0;
       const cc = (r.country || '').toUpperCase();
-      if (!map.has(name)) map.set(name, { name, pixels: 0, claims: 0, desc: r.desc || '', country: cc || '' });
+      if (!map.has(name)) map.set(name, { name, pixels: 0, spent: 0, claims: 0, desc: r.desc || '', country: cc || '' });
       const o = map.get(name);
       o.pixels += px;
+      o.spent += paid;
       o.claims += 1;
       if (!o.desc && r.desc) o.desc = r.desc;
-      // Keep a country if we have one (prefer first non-empty)
       if (!o.country && cc) o.country = cc;
     });
-    return Array.from(map.values()).sort((a, b) => b.pixels - a.pixels || a.name.localeCompare(b.name));
+    return Array.from(map.values()).sort((a, b) => b.pixels - a.pixels || b.spent - a.spent || a.name.localeCompare(b.name));
   }
 
   let ownersTab = 'board'; // board | log
@@ -4939,30 +4975,46 @@ function clearPending() {
     }
     const all = buildOwnerStats();
     const totalPx = all.reduce((s, o) => s + o.pixels, 0);
-    // Cap DOM for performance with hundreds of owners
+    const totalSpent = all.reduce((s, o) => s + (o.spent || 0), 0);
     const MAX_SHOW = 200;
     const show = stats.slice(0, MAX_SHOW);
+    const ordinal = (n) => {
+      const j = n % 10, k = n % 100;
+      if (j === 1 && k !== 11) return n + 'st';
+      if (j === 2 && k !== 12) return n + 'nd';
+      if (j === 3 && k !== 13) return n + 'rd';
+      return n + 'th';
+    };
     list.innerHTML =
-      '<div style="position:sticky;top:0;background:var(--surface);z-index:1;padding:0 0 6px;margin-bottom:4px;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted)">' +
-      all.length + ' people · ' + totalPx + ' px' +
+      '<div style="position:sticky;top:0;background:var(--surface);z-index:1;padding:0 0 8px;margin-bottom:6px;border-bottom:2px solid var(--border)">' +
+      '<div style="font-family:Press Start 2P,monospace;font-size:0.32rem;color:var(--dark);margin-bottom:4px">TOP BUYERS</div>' +
+      '<div style="font-size:0.85rem;color:var(--muted)">' + all.length + ' people · ' + totalPx + ' px · $' + totalSpent.toFixed(2) +
       (q ? ' · ' + stats.length + ' match' : '') +
-      (stats.length > MAX_SHOW ? ' · showing ' + MAX_SHOW : '') +
-      ' · tap row to locate</div>' +
-      '<div style="display:grid;grid-template-columns:28px 22px 1fr auto;gap:4px 6px;align-items:center;font-size:0.8rem;color:var(--muted);padding:2px 4px 6px;border-bottom:1px solid var(--border)">' +
-      '<span>#</span><span></span><span>Name</span><span style="text-align:right">PX</span></div>' +
+      ' · tap to show on wall</div></div>' +
       show.map((o) => {
         const safe = escapeHtml(o.name);
         const rank = all.findIndex(x => x.name === o.name) + 1;
         const flag = countryFlag(o.country);
         const attr = encodeURIComponent(o.name);
+        const rankLabel = ordinal(rank);
+        const spentStr = '$' + (Number(o.spent) || 0).toFixed(2);
+        const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : ''));
         return '<button type="button" class="owner-row" data-owner="' + attr + '" title="Show on wall" ' +
-          'style="display:grid;grid-template-columns:28px 22px 1fr auto;gap:4px 6px;align-items:center;width:100%;text-align:left;' +
-          'border:none;border-bottom:1px solid var(--border);background:transparent;padding:5px 4px;cursor:pointer;font:inherit;color:inherit">' +
-          '<span style="font-family:Press Start 2P,monospace;font-size:0.22rem;color:var(--gold)">' + rank + '</span>' +
-          '<span style="font-size:0.95rem;line-height:1;text-align:center">' + flag + '</span>' +
-          '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dark);font-size:1rem">' + safe + '</span>' +
-          '<span style="font-family:Press Start 2P,monospace;font-size:0.26rem;color:var(--dark);white-space:nowrap;text-align:right">' + o.pixels + '</span>' +
-          '</button>';
+          'style="display:grid;grid-template-columns:52px 28px 1fr;gap:6px 8px;align-items:center;width:100%;text-align:left;' +
+          'border:2px solid var(--border);background:#fff;padding:10px 8px;margin-bottom:6px;cursor:pointer;font:inherit;color:inherit">' +
+          '<div style="text-align:center">' +
+          '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--gold);line-height:1.3">' + rankLabel + '</div>' +
+          (medal ? '<div style="font-size:1rem;line-height:1.2">' + medal + '</div>' : '') +
+          '</div>' +
+          '<div style="font-size:1.35rem;line-height:1;text-align:center">' + flag + '</div>' +
+          '<div style="min-width:0">' +
+          '<div style="color:var(--dark);font-size:1.15rem;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safe + '</div>' +
+          '<div style="display:flex;gap:12px;align-items:baseline;margin-top:4px;flex-wrap:wrap">' +
+          '<span style="font-family:Press Start 2P,monospace;font-size:0.42rem;color:var(--dark)">' + o.pixels + ' <span style="font-size:0.28rem;color:var(--muted)">PX</span></span>' +
+          '<span style="font-family:Press Start 2P,monospace;font-size:0.42rem;color:#8b5a2b">' + spentStr + '</span>' +
+          '</div>' +
+          '<div style="color:var(--muted);font-size:0.8rem;margin-top:2px">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
+          '</div></button>';
       }).join('');
 
     list.querySelectorAll('.owner-row').forEach(btn => {
@@ -4996,7 +5048,7 @@ function clearPending() {
         }
       };
       btn.onmouseenter = () => { btn.style.background = '#fff8e0'; };
-      btn.onmouseleave = () => { btn.style.background = 'transparent'; };
+      btn.onmouseleave = () => { btn.style.background = '#fff'; };
     });
   }
 

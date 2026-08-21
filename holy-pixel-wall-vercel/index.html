@@ -3119,7 +3119,10 @@ function getImg(src) {
     if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
     const p = pos(e);
     const key = p.c + ',' + p.r;
-    if (sold.has(key)) {
+    // Admin resize: allow starting the drag ON the claim being edited
+    // so you can pull the image block bigger or smaller from itself
+    const startOnEditingClaim = adminMode && editingRegion && cellOwnedByEditing(key);
+    if (sold.has(key) && !startOnEditingClaim) {
       dragging = false;
       didDrag = false;
       const owner = sold.get(key);
@@ -3140,6 +3143,40 @@ function getImg(src) {
     deselect = false;
     dragBaseline = new Set();
     selected = new Set();
+    if (startOnEditingClaim) {
+      // Resize from the existing image: anchor the far edge, move the near edge
+      const midC = (editingRegion.minC + editingRegion.maxC) / 2;
+      const midR = (editingRegion.minR + editingRegion.maxR) / 2;
+      const w = editingRegion.maxC - editingRegion.minC + 1;
+      const h = editingRegion.maxR - editingRegion.minR + 1;
+      const edgeTolC = Math.max(1, Math.floor(w * 0.3));
+      const edgeTolR = Math.max(1, Math.floor(h * 0.3));
+      const nearLeft = p.c <= editingRegion.minC + edgeTolC;
+      const nearRight = p.c >= editingRegion.maxC - edgeTolC;
+      const nearTop = p.r <= editingRegion.minR + edgeTolR;
+      const nearBottom = p.r >= editingRegion.maxR - edgeTolR;
+      if (nearLeft || nearRight || nearTop || nearBottom) {
+        // Pin the opposite edge so drag feels like stretching the block
+        startC = nearLeft ? editingRegion.maxC : (nearRight ? editingRegion.minC : editingRegion.minC);
+        curC = nearLeft || nearRight ? p.c : editingRegion.maxC;
+        startR = nearTop ? editingRegion.maxR : (nearBottom ? editingRegion.minR : editingRegion.minR);
+        curR = nearTop || nearBottom ? p.r : editingRegion.maxR;
+        // If only horizontal edge, keep full vertical span
+        if ((nearLeft || nearRight) && !(nearTop || nearBottom)) {
+          startR = editingRegion.minR;
+          curR = editingRegion.maxR;
+        }
+        // If only vertical edge, keep full horizontal span
+        if ((nearTop || nearBottom) && !(nearLeft || nearRight)) {
+          startC = editingRegion.minC;
+          curC = editingRegion.maxC;
+        }
+      } else {
+        // Click deep inside → new free-form box from this point (same as free pixels)
+        startC = curC = p.c;
+        startR = curR = p.r;
+      }
+    }
     applyDrag();
   }
 
@@ -3415,7 +3452,7 @@ function getImg(src) {
           })();
       cells.forEach(k => selected.add(k));
       try { updateFloat(); draw(); } catch (e) {}
-      toast('ADMIN: drag a new area on the wall to resize, then SAVE', 'ok');
+      toast('ADMIN: use RESIZE ON WALL, then drag the image edges bigger/smaller · SAVE SIZE', 'ok');
     }
     setVal('infoPixels', (r.pixels || 0) + ' PIXELS (OWNED)');
     setVal('infoPrice', '');
@@ -3439,7 +3476,7 @@ function getImg(src) {
     if (head) head.textContent = adminMode ? 'ADMIN EDIT CLAIM' : 'EDIT YOUR PIXELS';
     const sub = document.querySelector('#claimModal .modal-head p');
     if (sub) sub.textContent = adminMode
-      ? 'Edit or delete this claim. REMOVE IMAGE or DELETE CLAIM below.'
+      ? 'RESIZE ON WALL to drag the image bigger/smaller. Or edit fields and SAVE.'
       : 'Update image, name, description or link. Ownership stays yours.';
 
     // Admin delete / remove image controls
@@ -3487,7 +3524,7 @@ function getImg(src) {
           cells.forEach(k => selected.add(k));
           try { updateFloat(); draw(); } catch (e) {}
           try { focusRegion(editingRegion); } catch (e) {}
-          toast('Drag the block larger or smaller · then SAVE SIZE', 'ok');
+          toast('Drag from the IMAGE EDGES to grow/shrink · or drag free pixels · then SAVE SIZE', 'ok');
         };
       }
 const delBtn = document.getElementById('adminDeleteClaimBtn');

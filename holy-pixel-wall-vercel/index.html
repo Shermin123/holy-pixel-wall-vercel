@@ -3422,7 +3422,27 @@ function getImg(src) {
     }
 
     if ($('claimModal')) $('claimModal').style.display = 'flex';
-    try { updateBlockPreview(); } catch (e) {}
+    document.body.style.overflow = 'hidden';
+    // Force crop tools for admin / edit of existing media
+    try {
+      bindPreviewControls();
+      if (pendingMedia && pendingType !== 'video') {
+        if ($('blockPreviewWrap')) $('blockPreviewWrap').style.display = 'block';
+        if ($('fitRow')) $('fitRow').style.display = 'flex';
+      }
+      // Restore crop after setPending (which resets crop)
+      crop = {
+        scale: Math.max(1, Math.min(5, r.cropScale || 1)),
+        x: r.cropX == null ? 0.5 : r.cropX,
+        y: r.cropY == null ? 0.5 : r.cropY
+      };
+      const sl = $('cropZoomSlider');
+      if (sl) sl.value = String(Math.round(crop.scale * 100));
+      updateBlockPreview();
+      // Second pass after image decode
+      setTimeout(() => { try { updateBlockPreview(); } catch (e) {} }, 50);
+      setTimeout(() => { try { updateBlockPreview(); } catch (e) {} }, 250);
+    } catch (e) { console.warn(e); }
   }
 
   function closeClaimModal() {
@@ -3749,12 +3769,34 @@ function getImg(src) {
     return { minC, maxC, minR, maxR, w: maxC - minC + 1, h: maxR - minR + 1 };
   }
 
+  function previewBlockBounds() {
+    // Prefer live selection; in admin/edit mode use the claim's rectangle
+    const sel = selectionBounds();
+    if (sel) return sel;
+    if (editingRegion) {
+      const r = editingRegion;
+      const w = Math.max(1, (r.maxC - r.minC + 1) || 1);
+      const h = Math.max(1, (r.maxR - r.minR + 1) || 1);
+      return {
+        minC: r.minC || 0,
+        maxC: r.maxC != null ? r.maxC : (r.minC || 0),
+        minR: r.minR || 0,
+        maxR: r.maxR != null ? r.maxR : (r.minR || 0),
+        w: w,
+        h: h
+      };
+    }
+    // Fallback square so crop UI still works after re-upload in admin
+    if (pendingMedia) return { minC: 0, maxC: 9, minR: 0, maxR: 9, w: 10, h: 10 };
+    return null;
+  }
+
   function updateBlockPreview() {
     const wrap = $('blockPreviewWrap');
     const cv = $('blockPreview');
     const stage = $('previewStage');
     if (!wrap || !cv || !stage) return;
-    const b = selectionBounds();
+    const b = previewBlockBounds();
     if (!pendingMedia || !b || pendingType === 'video') {
       if (pendingType === 'video' && pendingMedia && b) {
         wrap.style.display = 'block';

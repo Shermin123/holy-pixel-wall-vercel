@@ -1549,7 +1549,7 @@
           <option value="permanent">PERMANENT — $10 / PIXEL (limited)</option>
         </select>
       </div>
-      <div class="field" style="display:flex;gap:10px">
+      <div class="field" id="priceSummaryRow" style="display:flex;gap:10px">
         <div style="flex:1">
           <label>PIXELS</label>
           <input type="text" id="infoPixels" readonly>
@@ -1614,7 +1614,7 @@
           </select>
         </div>
         <input type="text" id="link" placeholder="Paste profile or post link" style="display:none">
-      </div><div class="field">
+      </div><div class="field" id="paymentField">
         <label>PAYMENT</label>
         <p style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Secure Stripe Checkout · Card, Apple Pay & Google Pay</p>
         <div id="payment-element" style="padding:10px;background:#fff;border:3px solid var(--border);min-height:48px"></div>
@@ -2484,7 +2484,13 @@ Min 10 blocks · no maximum
       el.style.width = w + 'px';
       el.style.height = h + 'px';
       el.style.objectFit = r.fit || 'cover';
-      el.style.objectPosition = 'center';
+      const ox = (r.cropX != null ? Number(r.cropX) : 0.5) * 100;
+      const oy = (r.cropY != null ? Number(r.cropY) : 0.5) * 100;
+      el.style.objectPosition = ox + '% ' + oy + '%';
+      if (r.cropScale && Number(r.cropScale) > 1 && el.tagName === 'IMG') {
+        el.style.transform = 'scale(' + Number(r.cropScale) + ')';
+        el.style.transformOrigin = ox + '% ' + oy + '%';
+      }
       mediaLayer.appendChild(el);
     });
   }
@@ -2724,7 +2730,7 @@ function getImg(src) {
       if (r.media && r.mediaType === 'image') {
         const img = getImg(r.media);
         if (img && img.complete) {
-          drawCoverCrop(ctx, img, x0, y0, w, h, r.cropScale || 1, r.cropX ?? 0.5, r.cropY ?? 0.5);
+          drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
         }
       } else if (!r.media) {
         ctx.fillStyle = 'rgba(255,255,255,0.12)';
@@ -3345,10 +3351,19 @@ function getImg(src) {
     try { syncLinkUI(); } catch (e) {}
 
     setVal('infoPixels', (r.pixels || 0) + ' PIXELS (OWNED)');
-    setVal('infoPrice', 'EDIT MODE');
-    if ($('payTotalLine')) $('payTotalLine').textContent = 'SAVE CHANGES — NO NEW CHARGE';
+    setVal('infoPrice', '');
+    if ($('paymentField')) $('paymentField').style.display = 'none';
     const payField = $('payment-element') && $('payment-element').closest('.field');
     if (payField) payField.style.display = 'none';
+    if ($('payTotalLine')) $('payTotalLine').style.display = 'none';
+    // Hide TOTAL box in edit mode (keep pixels count only)
+    try {
+      const row = $('priceSummaryRow');
+      if (row) {
+        row.style.display = 'flex';
+        if (row.children[1]) row.children[1].style.display = 'none';
+      }
+    } catch (e) {}
     if ($('confirmBtn')) {
       $('confirmBtn').textContent = 'SAVE CHANGES';
       $('confirmBtn').disabled = false;
@@ -3468,6 +3483,11 @@ function getImg(src) {
     $('duration').disabled = false;
     const payField = $('payment-element') && $('payment-element').closest('.field');
     if (payField) payField.style.display = '';
+    if ($('paymentField')) $('paymentField').style.display = '';
+    if ($('priceSummaryRow')) {
+      $('priceSummaryRow').style.display = 'flex';
+      try { if ($('priceSummaryRow').children[1]) $('priceSummaryRow').children[1].style.display = ''; } catch (e) {}
+    }
     if ($('confirmBtn')) {
       $('confirmBtn').disabled = false;
       $('confirmBtn').classList.remove('is-blocked');
@@ -4404,15 +4424,54 @@ function clearPending() {
       if (adminMode) {
         body.key = getAdminKey();
         try {
+          // Apply crop locally immediately so the wall updates even if API omits crop fields
+          Object.assign(er, {
+            name: body.name,
+            country: body.country,
+            desc: body.desc,
+            media: body.media,
+            mediaType: body.mediaType,
+            fit: body.fit || 'cover',
+            cropScale: body.cropScale,
+            cropX: body.cropX,
+            cropY: body.cropY,
+            link: body.link,
+            linkType: body.linkType,
+            duration: body.duration
+          });
+          try { draw(); syncMediaOverlays(); } catch (e) {}
           await apiFetch('/api/admin/update', {
             method: 'POST',
             body: JSON.stringify(body),
             timeout: 90000
           }, 'Admin update');
           await pullWall();
+          // Re-apply crop after sync if server did not echo crop fields
+          const synced = regions.find(x => x && (x.id === body.id || x.id === er.id));
+          if (synced) {
+            if (synced.cropScale == null || Number(synced.cropScale) === 1 && body.cropScale !== 1) {
+              synced.cropScale = body.cropScale;
+              synced.cropX = body.cropX;
+              synced.cropY = body.cropY;
+            } else {
+              // Prefer what we just saved
+              synced.cropScale = body.cropScale;
+              synced.cropX = body.cropX;
+              synced.cropY = body.cropY;
+            }
+            if (body.media) {
+              synced.media = body.media;
+              synced.mediaType = body.mediaType;
+            }
+            synced.name = body.name;
+            synced.desc = body.desc;
+            synced.link = body.link;
+            synced.linkType = body.linkType;
+          }
+          try { draw(); syncMediaOverlays(); save(); } catch (e) {}
           clearPending();
           closeClaimModal();
-          toast('SAVED TO WALL — ' + body.name.toUpperCase(), 'ok');
+          toast('SAVED — crop applied', 'ok');
         } catch (e) {
           toast(friendlyError(e, 'Save failed'), 'error');
         }

@@ -2923,22 +2923,19 @@ function getImg(src) {
   }
 
   function showMyClaims() {
+    // PRIVATE: only packages saved on THIS device after purchase — never all wall claimIds
     const packages = loadMyPackages();
-    // Also include live regions that have claimId from this session
-    const fromWall = regions.filter(r => r && r.claimId).map(r => ({
-      claimId: r.claimId,
-      pixelIds: r.pixelIds || buildPixelIds(r.claimId, r.cells || []),
-      cells: r.cells || [],
-      name: r.name,
-      country: r.country || '',
-      desc: r.desc || '',
-      pixels: r.pixels || (r.cells && r.cells.length) || 0,
-      paid: r.paid,
-      duration: r.duration,
-      claimedAt: r.claimedAt
-    }));
-    const seen = new Set(packages.map(p => p.claimId));
-    fromWall.forEach(p => { if (p.claimId && !seen.has(p.claimId)) packages.push(p); });
+    // Optionally refresh size/name from wall for *our* claimIds only (no other buyers)
+    packages.forEach(p => {
+      if (!p || !p.claimId) return;
+      const live = regions.find(x => x && (x.claimId === p.claimId || x.id === p.claimId));
+      if (!live) return;
+      p.pixels = live.pixels || (live.cells && live.cells.length) || p.pixels;
+      p.cells = live.cells || p.cells;
+      if (live.pixelIds && live.pixelIds.length) p.pixelIds = live.pixelIds;
+      if (live.name) p.name = live.name;
+      if (live.duration) p.duration = live.duration;
+    });
     if (!packages.length) { toast('NO CLAIMS YET — buy pixels to get a package ID'); return; }
 
     const lines = packages.map((p, i) => {
@@ -2962,7 +2959,7 @@ function getImg(src) {
     const box = document.createElement('div');
     box.className = 'overlay';
     box.style.display = 'flex';
-    box.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-head"><h3>MY CLAIMS</h3><p>Each purchase has a unique package ID + pixel IDs — save them</p></div><div class="modal-body" style="max-height:60vh;overflow:auto">' + lines + '</div><div class="modal-foot"><button type="button" class="btn btn-sec" id="claimsClose">CLOSE</button></div></div>';
+    box.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-head"><h3>MY CLAIMS</h3><p>Private to you on this device — package ID + pixel IDs only you can see</p></div><div class="modal-body" style="max-height:60vh;overflow:auto">' + lines + '</div><div class="modal-foot"><button type="button" class="btn btn-sec" id="claimsClose">CLOSE</button></div></div>';
     document.body.appendChild(box);
     box.querySelector('#claimsClose').onclick = () => box.remove();
     box.querySelectorAll('.claim-focus').forEach(btn => {
@@ -3119,10 +3116,7 @@ function getImg(src) {
     if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
     const p = pos(e);
     const key = p.c + ',' + p.r;
-    // Admin resize: allow starting the drag ON the claim being edited
-    // so you can pull the image block bigger or smaller from itself
-    const startOnEditingClaim = adminMode && editingRegion && cellOwnedByEditing(key);
-    if (sold.has(key) && !startOnEditingClaim) {
+    if (sold.has(key)) {
       dragging = false;
       didDrag = false;
       const owner = sold.get(key);
@@ -3143,40 +3137,6 @@ function getImg(src) {
     deselect = false;
     dragBaseline = new Set();
     selected = new Set();
-    if (startOnEditingClaim) {
-      // Resize from the existing image: anchor the far edge, move the near edge
-      const midC = (editingRegion.minC + editingRegion.maxC) / 2;
-      const midR = (editingRegion.minR + editingRegion.maxR) / 2;
-      const w = editingRegion.maxC - editingRegion.minC + 1;
-      const h = editingRegion.maxR - editingRegion.minR + 1;
-      const edgeTolC = Math.max(1, Math.floor(w * 0.3));
-      const edgeTolR = Math.max(1, Math.floor(h * 0.3));
-      const nearLeft = p.c <= editingRegion.minC + edgeTolC;
-      const nearRight = p.c >= editingRegion.maxC - edgeTolC;
-      const nearTop = p.r <= editingRegion.minR + edgeTolR;
-      const nearBottom = p.r >= editingRegion.maxR - edgeTolR;
-      if (nearLeft || nearRight || nearTop || nearBottom) {
-        // Pin the opposite edge so drag feels like stretching the block
-        startC = nearLeft ? editingRegion.maxC : (nearRight ? editingRegion.minC : editingRegion.minC);
-        curC = nearLeft || nearRight ? p.c : editingRegion.maxC;
-        startR = nearTop ? editingRegion.maxR : (nearBottom ? editingRegion.minR : editingRegion.minR);
-        curR = nearTop || nearBottom ? p.r : editingRegion.maxR;
-        // If only horizontal edge, keep full vertical span
-        if ((nearLeft || nearRight) && !(nearTop || nearBottom)) {
-          startR = editingRegion.minR;
-          curR = editingRegion.maxR;
-        }
-        // If only vertical edge, keep full horizontal span
-        if ((nearTop || nearBottom) && !(nearLeft || nearRight)) {
-          startC = editingRegion.minC;
-          curC = editingRegion.maxC;
-        }
-      } else {
-        // Click deep inside → new free-form box from this point (same as free pixels)
-        startC = curC = p.c;
-        startR = curR = p.r;
-      }
-    }
     applyDrag();
   }
 
@@ -3452,7 +3412,7 @@ function getImg(src) {
           })();
       cells.forEach(k => selected.add(k));
       try { updateFloat(); draw(); } catch (e) {}
-      toast('ADMIN: use RESIZE ON WALL, then drag the image edges bigger/smaller · SAVE SIZE', 'ok');
+      toast('ADMIN: drag a new area on the wall to resize, then SAVE', 'ok');
     }
     setVal('infoPixels', (r.pixels || 0) + ' PIXELS (OWNED)');
     setVal('infoPrice', '');
@@ -3476,7 +3436,7 @@ function getImg(src) {
     if (head) head.textContent = adminMode ? 'ADMIN EDIT CLAIM' : 'EDIT YOUR PIXELS';
     const sub = document.querySelector('#claimModal .modal-head p');
     if (sub) sub.textContent = adminMode
-      ? 'RESIZE ON WALL to drag the image bigger/smaller. Or edit fields and SAVE.'
+      ? 'Edit or delete this claim. REMOVE IMAGE or DELETE CLAIM below.'
       : 'Update image, name, description or link. Ownership stays yours.';
 
     // Admin delete / remove image controls
@@ -3524,7 +3484,7 @@ function getImg(src) {
           cells.forEach(k => selected.add(k));
           try { updateFloat(); draw(); } catch (e) {}
           try { focusRegion(editingRegion); } catch (e) {}
-          toast('Drag from the IMAGE EDGES to grow/shrink · or drag free pixels · then SAVE SIZE', 'ok');
+          toast('Drag the block larger or smaller · then SAVE SIZE', 'ok');
         };
       }
 const delBtn = document.getElementById('adminDeleteClaimBtn');
@@ -5299,20 +5259,20 @@ function clearPending() {
         const spentStr = '$' + (Number(o.spent) || 0).toFixed(2);
         const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : ''));
         return '<button type="button" class="owner-row" data-owner="' + attr + '" title="Show on wall" ' +
-          'style="display:grid;grid-template-columns:52px 28px 1fr;gap:6px 8px;align-items:center;width:100%;text-align:left;' +
-          'border:2px solid var(--border);background:#fff;padding:10px 8px;margin-bottom:6px;cursor:pointer;font:inherit;color:inherit">' +
+          'style="display:grid;grid-template-columns:56px 32px 1fr;gap:8px 10px;align-items:center;width:100%;text-align:left;' +
+          'border:2px solid var(--border);background:#fff;padding:12px 10px;margin-bottom:8px;cursor:pointer;font:inherit;color:inherit">' +
           '<div style="text-align:center">' +
-          '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--gold);line-height:1.3">' + rankLabel + '</div>' +
-          (medal ? '<div style="font-size:1rem;line-height:1.2">' + medal + '</div>' : '') +
+          '<div style="font-family:Press Start 2P,monospace;font-size:0.45rem;color:var(--gold);line-height:1.3">' + rankLabel + '</div>' +
+          (medal ? '<div style="font-size:1.15rem;line-height:1.2">' + medal + '</div>' : '') +
           '</div>' +
-          '<div style="font-size:1.35rem;line-height:1;text-align:center">' + flag + '</div>' +
+          '<div style="font-size:1.5rem;line-height:1;text-align:center">' + flag + '</div>' +
           '<div style="min-width:0">' +
-          '<div style="color:var(--dark);font-size:1.15rem;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safe + '</div>' +
-          '<div style="display:flex;gap:12px;align-items:baseline;margin-top:4px;flex-wrap:wrap">' +
-          '<span style="font-family:Press Start 2P,monospace;font-size:0.42rem;color:var(--dark)">' + o.pixels + ' <span style="font-size:0.28rem;color:var(--muted)">PX</span></span>' +
-          '<span style="font-family:Press Start 2P,monospace;font-size:0.42rem;color:#8b5a2b">' + spentStr + '</span>' +
+          '<div style="color:var(--dark);font-size:1.25rem;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safe + '</div>' +
+          '<div style="display:flex;gap:14px;align-items:baseline;margin-top:6px;flex-wrap:wrap">' +
+          '<span style="font-family:VT323,monospace;font-size:1.45rem;line-height:1;color:var(--dark);font-weight:bold">' + o.pixels + ' <span style="font-size:1.05rem;color:var(--muted);font-weight:normal">PX</span></span>' +
+          '<span style="font-family:VT323,monospace;font-size:1.45rem;line-height:1;color:#8b5a2b;font-weight:bold">' + spentStr + '</span>' +
           '</div>' +
-          '<div style="color:var(--muted);font-size:0.8rem;margin-top:2px">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
+          '<div style="color:var(--muted);font-size:0.95rem;margin-top:3px">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
           '</div></button>';
       }).join('');
 
@@ -5390,12 +5350,14 @@ function clearPending() {
             if (reg) cc = reg.country;
           }
           const flag = countryFlag(cc);
-          return '<div style="display:flex;gap:8px;align-items:flex-start;border-bottom:1px solid var(--border);padding:8px 4px">' +
-            '<div style="font-size:1.3rem;line-height:1;min-width:28px;text-align:center" title="' + (cc || '') + '">' + flag + '</div>' +
+          return '<div style="display:flex;gap:8px;align-items:flex-start;border-bottom:1px solid var(--border);padding:10px 4px">' +
+            '<div style="font-size:1.4rem;line-height:1;min-width:28px;text-align:center" title="' + (cc || '') + '">' + flag + '</div>' +
             '<div style="flex:1;min-width:0">' +
-            '<strong style="color:var(--dark);font-size:1.1rem">' + safe + '</strong>' +
-            '<div style="color:var(--muted);font-size:0.9rem">' + (h.pixels || 0) + ' px · ' + (h.duration || '') +
-            (h.paid ? ' · $' + Number(h.paid).toFixed(2) : '') + ' · ' + when + '</div>' +
+            '<strong style="color:var(--dark);font-size:1.2rem">' + safe + '</strong>' +
+            '<div style="color:var(--muted);font-size:1.1rem;margin-top:2px">' +
+            '<span style="font-family:VT323,monospace;font-size:1.35rem;color:var(--dark);font-weight:bold">' + (h.pixels || 0) + ' px</span>' +
+            (h.paid ? ' · <span style="font-family:VT323,monospace;font-size:1.35rem;color:#8b5a2b;font-weight:bold">$' + Number(h.paid).toFixed(2) + '</span>' : '') +
+            ' · ' + (h.duration || '') + ' · ' + when + '</div>' +
             '</div>' +
             '<span style="font-family:Press Start 2P,monospace;font-size:0.32rem;color:' + col + ';white-space:nowrap">' + ev + '</span>' +
             '</div>';

@@ -2353,6 +2353,44 @@ Min 10 blocks · no maximum
     canvas.style.imageRendering = 'auto';
 
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
+    // Keep GIF/video overlays locked to the grid at every zoom level
+    try { positionMediaOverlays(); } catch (e) {}
+  }
+
+  // Lightweight: only update left/top/width/height (and crop box) without reloading media
+  function positionMediaOverlays() {
+    if (!mediaLayer) return;
+    const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
+    if (!clips.length) return;
+    const c = cell;
+    clips.forEach(clip => {
+      const minC = +clip.getAttribute('data-min-c');
+      const maxC = +clip.getAttribute('data-max-c');
+      const minR = +clip.getAttribute('data-min-r');
+      const maxR = +clip.getAttribute('data-max-r');
+      const scale = Math.max(1, +clip.getAttribute('data-crop-scale') || 1);
+      const fx = clip.getAttribute('data-crop-x') != null ? +clip.getAttribute('data-crop-x') : 0.5;
+      const fy = clip.getAttribute('data-crop-y') != null ? +clip.getAttribute('data-crop-y') : 0.5;
+      if (!Number.isFinite(minC) || !Number.isFinite(maxC)) return;
+      const x = minC * c;
+      const y = minR * c;
+      const w = (maxC - minC + 1) * c;
+      const h = (maxR - minR + 1) * c;
+      clip.style.left = x + 'px';
+      clip.style.top = y + 'px';
+      clip.style.width = w + 'px';
+      clip.style.height = h + 'px';
+      const el = clip.firstElementChild;
+      if (el) {
+        const mw = w * scale;
+        const mh = h * scale;
+        el.style.width = mw + 'px';
+        el.style.height = mh + 'px';
+        el.style.left = ((w - mw) * fx) + 'px';
+        el.style.top = ((h - mh) * fy) + 'px';
+        el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
+      }
+    });
   }
 
   function paintBase() {
@@ -2432,6 +2470,8 @@ Min 10 blocks · no maximum
       keepAnchor();
       zoomAnchor = null;
       clampScroll();
+      // Final pass: full media rebuild so crop boxes stay exact after zoom
+      try { syncMediaOverlays(); } catch (e) {}
       return;
     }
     zoom += diff * 0.32;
@@ -2491,6 +2531,13 @@ Min 10 blocks · no maximum
       // Clip wrapper so crop zoom never spills into neighbors
       const clip = document.createElement('div');
       clip.className = 'media-item';
+      clip.setAttribute('data-min-c', String(r.minC));
+      clip.setAttribute('data-max-c', String(r.maxC));
+      clip.setAttribute('data-min-r', String(r.minR));
+      clip.setAttribute('data-max-r', String(r.maxR));
+      clip.setAttribute('data-crop-scale', String(Math.max(1, Number(r.cropScale) || 1)));
+      clip.setAttribute('data-crop-x', String(r.cropX != null ? Number(r.cropX) : 0.5));
+      clip.setAttribute('data-crop-y', String(r.cropY != null ? Number(r.cropY) : 0.5));
       clip.style.left = x + 'px';
       clip.style.top = y + 'px';
       clip.style.width = w + 'px';
@@ -3891,18 +3938,28 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       er.cropY = body.cropY;
       keys.forEach(k => sold.set(k, er));
       saveCropCache(rid, body);
+      // Persist size across pullWall / 15s sync even if API omits cells
+      setLocalGeomOverride(rid, body);
+      if (er.claimId && er.claimId !== rid) setLocalGeomOverride(er.claimId, body);
       try { draw(); syncMediaOverlays(); save(); } catch (e) {}
 
-      await apiFetch('/api/admin/update', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        timeout: 90000
-      }, 'Admin resize');
+      try {
+        await apiFetch('/api/admin/update', {
+          method: 'POST',
+          body: JSON.stringify(body),
+          timeout: 90000
+        }, 'Admin resize');
+      } catch (apiErr) {
+        // Keep local resize anyway — override survives pullWall
+        console.warn('admin resize API', apiErr);
+        toast(friendlyError(apiErr, 'Saved locally — server may lag'), 'error');
+      }
 
       await pullWall();
       applyCropCacheToRegions();
+      applyLocalGeomOverrides();
       // Force geometry if server dropped size fields
-      let synced = regions.find(x => x && (x.id === rid || x.claimId === rid));
+      let synced = regions.find(x => x && (x.id === rid || x.claimId === rid || (er.claimId && x.claimId === er.claimId)));
       if (synced) {
         (synced.cells || []).forEach(k => { if (sold.get(k) === synced) sold.delete(k); });
         synced.cells = keys.slice();
@@ -3914,6 +3971,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         if (body.media) { synced.media = body.media; synced.mediaType = body.mediaType; }
         keys.forEach(k => sold.set(k, synced));
         editingRegion = synced;
+        setLocalGeomOverride(synced.id || synced.claimId || rid, body);
       }
       try { draw(); syncMediaOverlays(); save(); } catch (e) {}
       selected.clear();
@@ -4739,6 +4797,8 @@ function clearPending() {
             er.minC = minC; er.maxC = maxC; er.minR = minR; er.maxR = maxR;
             er.pixels = newCells.length;
             newCells.forEach(k => sold.set(k, er));
+            setLocalGeomOverride(rid, body);
+            if (body.claimId && body.claimId !== rid) setLocalGeomOverride(body.claimId, body);
           }
           Object.assign(er, {
             id: rid,
@@ -4764,6 +4824,7 @@ function clearPending() {
           }, 'Admin update');
           await pullWall();
           applyCropCacheToRegions();
+          try { applyLocalGeomOverrides(); } catch (e) {}
           // Ensure this claim keeps crop + size if API dropped fields
           let synced = regions.find(x => x && (x.id === rid || x.claimId === rid || x.id === er.id));
           if (synced) {
@@ -5940,6 +6001,55 @@ let scrollDrawRaf = 0;
   }, { passive: true });
   window.addEventListener('resize', () => resize(false));
 
+  // Local geometry overrides: keep admin resizes even if server lag/omits cells
+  const localGeomOverride = new Map();
+
+  function setLocalGeomOverride(id, geom) {
+    if (!id || !geom || !geom.cells || !geom.cells.length) return;
+    localGeomOverride.set(String(id), {
+      cells: geom.cells.slice(),
+      minC: geom.minC,
+      maxC: geom.maxC,
+      minR: geom.minR,
+      maxR: geom.maxR,
+      pixels: geom.pixels || geom.cells.length,
+      cropScale: geom.cropScale,
+      cropX: geom.cropX,
+      cropY: geom.cropY,
+      media: geom.media,
+      mediaType: geom.mediaType,
+      at: Date.now()
+    });
+  }
+
+  function applyLocalGeomOverrides() {
+    if (!localGeomOverride.size) return;
+    regions.forEach(r => {
+      if (!r) return;
+      const id = String(r.id || r.claimId || '');
+      if (!id || !localGeomOverride.has(id)) return;
+      const o = localGeomOverride.get(id);
+      // If server already matches our size, drop override
+      const serverPx = r.pixels || (r.cells && r.cells.length) || 0;
+      const sameBox =
+        r.minC === o.minC && r.maxC === o.maxC && r.minR === o.minR && r.maxR === o.maxR &&
+        serverPx === o.pixels;
+      if (sameBox) {
+        localGeomOverride.delete(id);
+        return;
+      }
+      (r.cells || []).forEach(k => { if (sold.get(k) === r) sold.delete(k); });
+      r.cells = o.cells.slice();
+      r.minC = o.minC; r.maxC = o.maxC; r.minR = o.minR; r.maxR = o.maxR;
+      r.pixels = o.pixels;
+      if (o.cropScale != null) r.cropScale = o.cropScale;
+      if (o.cropX != null) r.cropX = o.cropX;
+      if (o.cropY != null) r.cropY = o.cropY;
+      if (o.media) { r.media = o.media; r.mediaType = o.mediaType || r.mediaType; }
+      o.cells.forEach(k => sold.set(k, r));
+    });
+  }
+
   async function pullWall() {
     try {
       const data = await apiFetch('/api/wall', { timeout: 15000 }, 'Wall sync');
@@ -5953,6 +6063,7 @@ let scrollDrawRaf = 0;
         } catch (err) { console.warn(err); }
       });
       try { applyCropCacheToRegions(); } catch (e) {}
+      try { applyLocalGeomOverrides(); } catch (e) {}
       draw();
       syncMediaOverlays();
       return true;

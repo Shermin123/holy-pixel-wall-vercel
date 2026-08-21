@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <title>Holy Pixel Wall</title>
@@ -296,10 +296,8 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
-    width: 100%;
-    height: 100%;
-    height: 100dvh;
-    max-height: 100dvh;
+    width: 100vw;
+    height: 100vh;
     overflow: hidden;
     background: var(--bg);
     color: var(--text);
@@ -307,13 +305,6 @@
     font-size: 18px;
     display: flex;
     flex-direction: column;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    box-sizing: border-box;
-    -webkit-text-size-adjust: 100%;
-    touch-action: manipulation;
-  }
-  @supports not (height: 100dvh) {
-    html, body { height: 100vh; max-height: 100vh; }
   }
 
   header {
@@ -564,20 +555,14 @@
   }
   /* Wall cursor — sharp crosshair always (grab only while actively panning) */
   .viewport {
-    flex: 1 1 auto;
+    flex: 1;
     min-height: 0;
-    width: 100%;
     position: relative;
     overflow: auto;
     cursor: crosshair !important;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
     background: #f0ebe3;
     padding: 0;
-    touch-action: pan-x pan-y;
-  }
-  .viewport.buy-mode {
-    touch-action: none;
   }
   .viewport #canvas,
   .viewport .stage,
@@ -590,6 +575,7 @@
   .viewport.buy-mode canvas {
     cursor: crosshair !important;
   }
+  /* Only while finger/mouse is panning */
   .viewport.panning,
   .viewport.panning *,
   .viewport.drag-mode.panning,
@@ -602,7 +588,6 @@
     margin: 0 auto;
     box-sizing: content-box;
     background: #fffdf8;
-    transform: translateZ(0);
   }
 
   .stage {
@@ -610,15 +595,13 @@
     left: 0;
     top: 0;
     display: block;
-    /* No border-box border — it shrank content vs canvas and shifted media on mobile */
-    border: none;
-    box-sizing: content-box;
-    box-shadow: 0 0 0 1px #3d2b1a, 3px 3px 0 rgba(92,61,30,0.25);
+    border: 1px solid #3d2b1a;
+    box-sizing: border-box;
+    box-shadow: 3px 3px 0 rgba(92,61,30,0.25);
     outline: none;
     line-height: 0;
     background: #fffdf8;
     margin: 0;
-    padding: 0;
     transform-origin: 0 0;
     overflow: hidden;
     image-rendering: auto;
@@ -629,26 +612,16 @@
 
   canvas {
     display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
-    margin: 0;
-    padding: 0;
     background: #fffdf8;
+    /* Photos stay smooth/sharp — never pixelated */
     image-rendering: auto;
   }
 
   .media-layer {
     position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
+    inset: 0;
     pointer-events: none;
     overflow: hidden;
-    transform: translateZ(0);
   }
   .media-layer .media-item {
     position: absolute;
@@ -1597,8 +1570,8 @@
         </div>
         <input type="url" id="imgUrl" placeholder="Or paste photo link (https://…)" style="width:100%;margin-top:8px;padding:8px 10px;background:#fff;border:3px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1.05rem">
         <div id="blockPreviewWrap" style="display:none;margin-top:12px">
-          <p style="font-family:'Press Start 2P',monospace;font-size:0.38rem;color:var(--dark);margin-bottom:6px">CROP (PHOTO & GIF)</p>
-          <p style="font-size:0.95rem;color:var(--muted);margin-bottom:8px">Drag to pan · slide to zoom · works on GIF too · then SAVE</p>
+          <p style="font-family:'Press Start 2P',monospace;font-size:0.38rem;color:var(--dark);margin-bottom:6px">CROP</p>
+          <p style="font-size:0.95rem;color:var(--muted);margin-bottom:8px">Drag image · slide to zoom · then SAVE</p>
           <div id="previewStage" style="position:relative;margin:0 auto;background:#1a1512;border:3px solid var(--gold);box-shadow:3px 3px 0 rgba(92,61,30,0.3);overflow:hidden;cursor:grab;max-width:100%;touch-action:none">
             <canvas id="blockPreview" style="display:block;width:100%;height:100%"></canvas>
           </div>
@@ -2027,31 +2000,20 @@ Min 10 blocks · no maximum
   let gridCacheKey = '';
 
 
-  function viewportSize() {
-    let vw = viewport ? viewport.clientWidth : 0;
-    let vh = viewport ? viewport.clientHeight : 0;
-    try {
-      if (window.visualViewport) {
-        if (vw < 40) vw = window.visualViewport.width;
-        if (vh < 40) vh = window.visualViewport.height;
-      }
-    } catch (e) {}
-    if (vw < 40) vw = Math.min(window.innerWidth || 360, 420);
-    if (vh < 40) vh = Math.max(120, (window.innerHeight || 640) * 0.55);
-    return { vw: Math.max(vw, 80), vh: Math.max(vh, 80) };
-  }
-
   function computeGrid() {
     // ~500,000 pixels — shape follows screen, snapped to 10 for clean blocks
-    const { vw, vh } = viewportSize();
-    const aspect = vw / Math.max(vh, 1);
+    const vw = Math.max(viewport.clientWidth, 120);
+    const vh = Math.max(viewport.clientHeight, 120);
+    const aspect = vw / vh;
     const TARGET = 500000;
     let cols = Math.round(Math.sqrt(TARGET * aspect));
     let rows = Math.round(TARGET / cols);
+    // Snap to 10×10 sections; allow larger grid for 500k
     cols = Math.max(400, Math.min(1400, Math.round(cols / 10) * 10));
     rows = Math.max(300, Math.min(900, Math.round(rows / 10) * 10));
     while (cols * rows > 520000 && rows >= 320) rows -= 10;
     while (cols * rows < 480000 && cols <= 1380) cols += 10;
+    // Final snap: prefer clean TOTAL near 500000
     while (cols * rows > 520000 && cols >= 420) cols -= 10;
     COLS = cols;
     ROWS = rows;
@@ -2289,13 +2251,12 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Fit whole wall into visible area (phones included)
+    // Use almost full viewport so blocks are as large as possible
     const pad = 4;
-    const { vw: rawW, vh: rawH } = viewportSize();
-    const vw = Math.max(rawW - pad * 2, 80);
-    const vh = Math.max(rawH - pad * 2, 80);
+    const vw = Math.max(viewport.clientWidth - pad * 2, 80);
+    const vh = Math.max(viewport.clientHeight - pad * 2, 80);
     let s = Math.min(vw / COLS, vh / ROWS);
-    if (!isFinite(s) || s < 0.25) s = 0.25;
+    if (!isFinite(s) || s < 0.5) s = 0.5;
     baseCell = s;
     cell = s;
     baseW = COLS * s;
@@ -2310,22 +2271,18 @@ Min 10 blocks · no maximum
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
     }
     paintBase();
-    layoutAtZoom(zoom || 1);
-    try { syncMediaOverlays(); } catch (e) {}
+    layoutAtZoom(zoom);
     if (fitReset) {
-      requestAnimationFrame(() => {
-        const wrap = $('wallWrap');
-        if (wrap && viewport) {
-          const left = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
-          const top = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
-          viewport.scrollLeft = left;
-          viewport.scrollTop = top;
-        } else if (viewport) {
-          viewport.scrollLeft = 0;
-          viewport.scrollTop = 0;
-        }
-        try { positionMediaOverlays(); } catch (e) {}
-      });
+      const wrap = $('wallWrap');
+      if (wrap) {
+        const left = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
+        const top = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
+        viewport.scrollLeft = left;
+        viewport.scrollTop = top;
+      } else {
+        viewport.scrollLeft = 0;
+        viewport.scrollTop = 0;
+      }
     }
   }
 
@@ -2344,12 +2301,6 @@ Min 10 blocks · no maximum
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
   const Z_MIN = 1, Z_MAX = 14;
-  function getZPad() {
-    try {
-      const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      return w < 600 ? 16 : 48;
-    } catch (e) { return 24; }
-  }
   const Z_PAD = 48;
   let zoomRaf = 0;
   let zoomTarget = 1;
@@ -2382,67 +2333,26 @@ Min 10 blocks · no maximum
     sizeW = w;
     sizeH = h;
     cell = baseCell * z;
-    const pad = (typeof getZPad === 'function') ? getZPad() : Z_PAD;
 
     if (wrap) {
-      wrap.style.width = Math.ceil(w + pad * 2) + 'px';
-      wrap.style.height = Math.ceil(h + pad * 2) + 'px';
+      wrap.style.width = Math.ceil(w + Z_PAD * 2) + 'px';
+      wrap.style.height = Math.ceil(h + Z_PAD * 2) + 'px';
     }
-    // Stage fills the scaled layout box — pad must match so images stay on cells
-    stage.style.left = pad + 'px';
-    stage.style.top = pad + 'px';
+    // Stage fills the scaled layout box — NO transform:scale (avoids disappear bugs)
+    stage.style.left = Z_PAD + 'px';
+    stage.style.top = Z_PAD + 'px';
     stage.style.width = w + 'px';
     stage.style.height = h + 'px';
     stage.style.margin = '0';
-    stage.style.padding = '0';
     stage.style.transform = 'none';
     stage.style.overflow = 'hidden';
 
-    // Canvas and media share the same origin inside stage
-    canvas.style.left = '0';
-    canvas.style.top = '0';
+    // Bitmap stays baseW×baseH; browser scales CSS size with pixelated rendering
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     canvas.style.imageRendering = 'auto';
 
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
-    try { positionMediaOverlays(); } catch (e) {}
-  }
-
-  // Lightweight: only update left/top/width/height (and crop box) without reloading media
-  function positionMediaOverlays() {
-    if (!mediaLayer) return;
-    const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
-    if (!clips.length) return;
-    const c = cell;
-    clips.forEach(clip => {
-      const minC = +clip.getAttribute('data-min-c');
-      const maxC = +clip.getAttribute('data-max-c');
-      const minR = +clip.getAttribute('data-min-r');
-      const maxR = +clip.getAttribute('data-max-r');
-      const scale = Math.max(1, +clip.getAttribute('data-crop-scale') || 1);
-      const fx = clip.getAttribute('data-crop-x') != null ? +clip.getAttribute('data-crop-x') : 0.5;
-      const fy = clip.getAttribute('data-crop-y') != null ? +clip.getAttribute('data-crop-y') : 0.5;
-      if (!Number.isFinite(minC) || !Number.isFinite(maxC)) return;
-      const x = minC * c;
-      const y = minR * c;
-      const w = (maxC - minC + 1) * c;
-      const h = (maxR - minR + 1) * c;
-      clip.style.left = x + 'px';
-      clip.style.top = y + 'px';
-      clip.style.width = w + 'px';
-      clip.style.height = h + 'px';
-      const el = clip.firstElementChild;
-      if (el) {
-        const mw = w * scale;
-        const mh = h * scale;
-        el.style.width = mw + 'px';
-        el.style.height = mh + 'px';
-        el.style.left = ((w - mw) * fx) + 'px';
-        el.style.top = ((h - mh) * fy) + 'px';
-        el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
-      }
-    });
   }
 
   function paintBase() {
@@ -2522,8 +2432,6 @@ Min 10 blocks · no maximum
       keepAnchor();
       zoomAnchor = null;
       clampScroll();
-      // Final pass: full media rebuild so crop boxes stay exact after zoom
-      try { syncMediaOverlays(); } catch (e) {}
       return;
     }
     zoom += diff * 0.32;
@@ -2580,24 +2488,6 @@ Min 10 blocks · no maximum
       const y = r.minR * cell;
       const w = (r.maxC - r.minC + 1) * cell;
       const h = (r.maxR - r.minR + 1) * cell;
-      // Clip wrapper so crop zoom never spills into neighbors
-      const clip = document.createElement('div');
-      clip.className = 'media-item';
-      clip.setAttribute('data-min-c', String(r.minC));
-      clip.setAttribute('data-max-c', String(r.maxC));
-      clip.setAttribute('data-min-r', String(r.minR));
-      clip.setAttribute('data-max-r', String(r.maxR));
-      clip.setAttribute('data-crop-scale', String(Math.max(1, Number(r.cropScale) || 1)));
-      clip.setAttribute('data-crop-x', String(r.cropX != null ? Number(r.cropX) : 0.5));
-      clip.setAttribute('data-crop-y', String(r.cropY != null ? Number(r.cropY) : 0.5));
-      clip.style.left = x + 'px';
-      clip.style.top = y + 'px';
-      clip.style.width = w + 'px';
-      clip.style.height = h + 'px';
-      clip.style.overflow = 'hidden';
-      clip.style.pointerEvents = 'none';
-      clip.style.background = '#1a1512';
-
       let el;
       if (r.mediaType === 'video') {
         el = document.createElement('video');
@@ -2612,31 +2502,26 @@ Min 10 blocks · no maximum
         try { el.disablePictureInPicture = true; } catch (e) {}
         el.play().catch(() => {});
       } else {
-        // GIF (animated) — crop via size + position inside clip
+        // GIF or other animated/static overlay media
         el = document.createElement('img');
         el.src = r.media;
         el.alt = r.name || '';
         el.decoding = 'async';
       }
-      el.style.pointerEvents = 'none';
-      el.style.display = 'block';
-      const scale = Math.max(1, Number(r.cropScale) || 1);
-      const fx = r.cropX != null ? Number(r.cropX) : 0.5;
-      const fy = r.cropY != null ? Number(r.cropY) : 0.5;
-      // Cover-fit at scale: media is larger than block, focus (fx,fy) stays in view
-      const mw = w * scale;
-      const mh = h * scale;
-      el.style.width = mw + 'px';
-      el.style.height = mh + 'px';
-      el.style.objectFit = 'cover';
-      el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
-      el.style.position = 'absolute';
-      el.style.left = ((w - mw) * fx) + 'px';
-      el.style.top = ((h - mh) * fy) + 'px';
-      el.style.maxWidth = 'none';
-      el.style.maxHeight = 'none';
-      clip.appendChild(el);
-      mediaLayer.appendChild(clip);
+      el.className = 'media-item';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.style.width = w + 'px';
+      el.style.height = h + 'px';
+      el.style.objectFit = r.fit || 'cover';
+      const ox = (r.cropX != null ? Number(r.cropX) : 0.5) * 100;
+      const oy = (r.cropY != null ? Number(r.cropY) : 0.5) * 100;
+      el.style.objectPosition = ox + '% ' + oy + '%';
+      if (r.cropScale && Number(r.cropScale) > 1 && el.tagName === 'IMG') {
+        el.style.transform = 'scale(' + Number(r.cropScale) + ')';
+        el.style.transformOrigin = ox + '% ' + oy + '%';
+      }
+      mediaLayer.appendChild(el);
     });
   }
 
@@ -3234,9 +3119,7 @@ function getImg(src) {
     if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
     const p = pos(e);
     const key = p.c + ',' + p.r;
-    // Admin resize: allow starting drag ON the claim being edited (photo or GIF)
-    const startOnEditingClaim = adminMode && editingRegion && cellOwnedByEditing(key);
-    if (sold.has(key) && !startOnEditingClaim) {
+    if (sold.has(key)) {
       dragging = false;
       didDrag = false;
       const owner = sold.get(key);
@@ -3252,39 +3135,11 @@ function getImg(src) {
     didDrag = false;
     startC = curC = p.c;
     startR = curR = p.r;
+    // Only rectangular selection — always replace with current box
     additiveSelect = false;
     deselect = false;
     dragBaseline = new Set();
     selected = new Set();
-    if (startOnEditingClaim) {
-      // Resize from image edges: pin opposite side, move the side you grab
-      const w = editingRegion.maxC - editingRegion.minC + 1;
-      const h = editingRegion.maxR - editingRegion.minR + 1;
-      const edgeTolC = Math.max(1, Math.floor(w * 0.35));
-      const edgeTolR = Math.max(1, Math.floor(h * 0.35));
-      const nearLeft = p.c <= editingRegion.minC + edgeTolC;
-      const nearRight = p.c >= editingRegion.maxC - edgeTolC;
-      const nearTop = p.r <= editingRegion.minR + edgeTolR;
-      const nearBottom = p.r >= editingRegion.maxR - edgeTolR;
-      if (nearLeft || nearRight || nearTop || nearBottom) {
-        startC = nearLeft ? editingRegion.maxC : (nearRight ? editingRegion.minC : editingRegion.minC);
-        curC = (nearLeft || nearRight) ? p.c : editingRegion.maxC;
-        startR = nearTop ? editingRegion.maxR : (nearBottom ? editingRegion.minR : editingRegion.minR);
-        curR = (nearTop || nearBottom) ? p.r : editingRegion.maxR;
-        if ((nearLeft || nearRight) && !(nearTop || nearBottom)) {
-          startR = editingRegion.minR;
-          curR = editingRegion.maxR;
-        }
-        if ((nearTop || nearBottom) && !(nearLeft || nearRight)) {
-          startC = editingRegion.minC;
-          curC = editingRegion.maxC;
-        }
-      } else {
-        // Click deep inside → start a fresh box from this point
-        startC = curC = p.c;
-        startR = curR = p.r;
-      }
-    }
     applyDrag();
   }
 
@@ -3337,23 +3192,9 @@ function getImg(src) {
   canvas.addEventListener('mousedown', onDown);
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
-  // Mobile: only lock touch while selecting. View mode must scroll/pan the full wall.
-  canvas.addEventListener('touchstart', e => {
-    if (buyMode && toolMode === 'select' && !spaceHeld) {
-      onDown(e);
-      e.preventDefault();
-    } else if (buyMode) {
-      onDown(e);
-    }
-  }, { passive: false });
-  window.addEventListener('touchmove', e => {
-    if (dragging) {
-      onMove(e);
-      try { e.preventDefault(); } catch (err) {}
-    }
-  }, { passive: false });
+  canvas.addEventListener('touchstart', e => { onDown(e); e.preventDefault(); }, { passive: false });
+  window.addEventListener('touchmove', e => { onMove(e); if (dragging) e.preventDefault(); }, { passive: false });
   window.addEventListener('touchend', onUp);
-  window.addEventListener('touchcancel', onUp);
   function forceCrosshair() {
     try {
       if (canvas) canvas.style.cursor = 'crosshair';
@@ -3622,7 +3463,6 @@ function getImg(src) {
       const rzBtn = document.getElementById('adminResizeBtn');
       if (rzBtn) {
         rzBtn.onclick = () => {
-          // Keep editingRegion — do NOT call closeClaimModal (that clears it)
           if ($('claimModal')) $('claimModal').style.display = 'none';
           document.body.style.overflow = '';
           buyMode = true;
@@ -3631,14 +3471,9 @@ function getImg(src) {
             viewport.classList.add('buy-mode');
             viewport.classList.remove('drag-mode');
             if (canvas) canvas.style.cursor = 'crosshair';
-            if (stage) stage.style.cursor = 'crosshair';
           } catch (e) {}
-          // Pre-select this claim so drag from edges grows/shrinks it (GIF or photo)
+          // Keep claim selected so you drag from the existing image block
           selected = new Set();
-          if (!editingRegion) {
-            toast('No claim to resize', 'error');
-            return;
-          }
           const cells = (editingRegion.cells && editingRegion.cells.length)
             ? editingRegion.cells
             : (function() {
@@ -3650,9 +3485,9 @@ function getImg(src) {
                 return out;
               })();
           cells.forEach(k => selected.add(k));
-          try { updateFloat(); draw(); syncMediaOverlays(); } catch (e) {}
+          try { updateFloat(); draw(); } catch (e) {}
           try { focusRegion(editingRegion); } catch (e) {}
-          toast('Drag from the IMAGE EDGES (or free pixels) · then SAVE SIZE', 'ok');
+          toast('Drag the block larger or smaller · then SAVE SIZE', 'ok');
         };
       }
 const delBtn = document.getElementById('adminDeleteClaimBtn');
@@ -3938,128 +3773,12 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   }
 
 
-  // Apply new rectangle size to the claim being admin-edited (no modal needed)
-  async function applyAdminResize() {
-    if (!adminMode || !editingRegion || !selected.size) {
-      toast('Select the new size first', 'error');
-      return false;
-    }
-    purgeSelectedOwned();
-    const keys = Array.from(selected);
-    if (!keys.length) {
-      toast('Select pixels for the new size', 'error');
-      return false;
-    }
-    for (const k of keys) {
-      if (sold.has(k) && !cellOwnedByEditing(k)) {
-        toast('New area overlaps another claim', 'error');
-        return false;
-      }
-    }
-    if (!isSolidRectangle(keys)) {
-      toast('Selection must be one solid rectangle', 'error');
-      return false;
-    }
-    const er = editingRegion;
-    const rid = er.id || er.claimId || '';
-    let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
-    keys.forEach(k => {
-      const p = k.split(',').map(Number);
-      minC = Math.min(minC, p[0]); maxC = Math.max(maxC, p[0]);
-      minR = Math.min(minR, p[1]); maxR = Math.max(maxR, p[1]);
-    });
-    const body = {
-      key: getAdminKey(),
-      id: rid,
-      claimId: er.claimId || rid,
-      name: er.name || 'ANON',
-      country: er.country || '',
-      desc: er.desc || '',
-      media: er.media || pendingMedia || '',
-      mediaType: er.mediaType || pendingType || 'image',
-      fit: 'cover',
-      cropScale: Number(er.cropScale != null ? er.cropScale : crop.scale) || 1,
-      cropX: er.cropX != null ? Number(er.cropX) : (crop.x != null ? Number(crop.x) : 0.5),
-      cropY: er.cropY != null ? Number(er.cropY) : (crop.y != null ? Number(crop.y) : 0.5),
-      link: er.link || '',
-      linkType: er.linkType || 'none',
-      duration: er.duration || 'permanent',
-      minC: minC,
-      maxC: maxC,
-      minR: minR,
-      maxR: maxR,
-      pixels: keys.length,
-      cells: keys.slice()
-    };
-    const btn = $('claimBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'SAVING…'; }
-    try {
-      // Local geometry first so wall updates immediately
-      (er.cells || []).forEach(k => { if (sold.get(k) === er) sold.delete(k); });
-      er.cells = keys.slice();
-      er.minC = minC; er.maxC = maxC; er.minR = minR; er.maxR = maxR;
-      er.pixels = keys.length;
-      er.cropScale = body.cropScale;
-      er.cropX = body.cropX;
-      er.cropY = body.cropY;
-      keys.forEach(k => sold.set(k, er));
-      saveCropCache(rid, body);
-      // Persist size across pullWall / 15s sync even if API omits cells
-      setLocalGeomOverride(rid, body);
-      if (er.claimId && er.claimId !== rid) setLocalGeomOverride(er.claimId, body);
-      try { draw(); syncMediaOverlays(); save(); } catch (e) {}
-
-      try {
-        await apiFetch('/api/admin/update', {
-          method: 'POST',
-          body: JSON.stringify(body),
-          timeout: 90000
-        }, 'Admin resize');
-      } catch (apiErr) {
-        // Keep local resize anyway — override survives pullWall
-        console.warn('admin resize API', apiErr);
-        toast(friendlyError(apiErr, 'Saved locally — server may lag'), 'error');
-      }
-
-      await pullWall();
-      applyCropCacheToRegions();
-      applyLocalGeomOverrides();
-      // Force geometry if server dropped size fields
-      let synced = regions.find(x => x && (x.id === rid || x.claimId === rid || (er.claimId && x.claimId === er.claimId)));
-      if (synced) {
-        (synced.cells || []).forEach(k => { if (sold.get(k) === synced) sold.delete(k); });
-        synced.cells = keys.slice();
-        synced.minC = minC; synced.maxC = maxC; synced.minR = minR; synced.maxR = maxR;
-        synced.pixels = keys.length;
-        synced.cropScale = body.cropScale;
-        synced.cropX = body.cropX;
-        synced.cropY = body.cropY;
-        if (body.media) { synced.media = body.media; synced.mediaType = body.mediaType; }
-        keys.forEach(k => sold.set(k, synced));
-        editingRegion = synced;
-        setLocalGeomOverride(synced.id || synced.claimId || rid, body);
-      }
-      try { draw(); syncMediaOverlays(); save(); } catch (e) {}
-      selected.clear();
-      updateFloat();
-      toast('RESIZED to ' + keys.length + ' px', 'ok');
-      return true;
-    } catch (e) {
-      toast(friendlyError(e, 'Resize failed'), 'error');
-      return false;
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = (adminMode && editingRegion) ? 'SAVE SIZE' : 'CLAIM';
-      }
-    }
-  }
-
   if ($('claimBtn')) $('claimBtn').onclick = () => {
     purgeSelectedOwned();
-    // Admin resizing existing claim — apply directly (works for GIF + photo)
+    // Admin resizing existing claim
     if (adminMode && editingRegion && selected.size > 0) {
-      applyAdminResize();
+      if ($('claimModal')) $('claimModal').style.display = 'flex';
+      if ($('confirmBtn')) $('confirmBtn').click();
       return;
     }
     const issues = selectionIssues();
@@ -4169,17 +3888,13 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
 
   function selectionBounds() {
     let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
-    let any = false;
     selected.forEach(k => {
-      // Include free cells AND cells of the claim being admin-edited
-      if (sold.has(k) && !(adminMode && cellOwnedByEditing(k))) return;
+      if (sold.has(k)) return;
       const [c, r] = k.split(',').map(Number);
-      if (!Number.isFinite(c) || !Number.isFinite(r)) return;
       minC = Math.min(minC, c); maxC = Math.max(maxC, c);
       minR = Math.min(minR, r); maxR = Math.max(maxR, r);
-      any = true;
     });
-    if (!any || maxC < minC) return null;
+    if (maxC < minC) return null;
     return { minC, maxC, minR, maxR, w: maxC - minC + 1, h: maxR - minR + 1 };
   }
 
@@ -4280,8 +3995,6 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     const id = editingRegion.id || editingRegion.claimId;
     if (id) saveCropCache(id, editingRegion);
     try { draw(); } catch (e) {}
-    // GIFs/videos live on the media layer — must re-sync for live crop preview
-    try { syncMediaOverlays(); } catch (e) {}
   }
 
   function previewZoom(delta) {
@@ -4863,8 +4576,6 @@ function clearPending() {
             er.minC = minC; er.maxC = maxC; er.minR = minR; er.maxR = maxR;
             er.pixels = newCells.length;
             newCells.forEach(k => sold.set(k, er));
-            setLocalGeomOverride(rid, body);
-            if (body.claimId && body.claimId !== rid) setLocalGeomOverride(body.claimId, body);
           }
           Object.assign(er, {
             id: rid,
@@ -4890,7 +4601,6 @@ function clearPending() {
           }, 'Admin update');
           await pullWall();
           applyCropCacheToRegions();
-          try { applyLocalGeomOverrides(); } catch (e) {}
           // Ensure this claim keeps crop + size if API dropped fields
           let synced = regions.find(x => x && (x.id === rid || x.claimId === rid || x.id === er.id));
           if (synced) {
@@ -5538,11 +5248,12 @@ function clearPending() {
       return n + 'th';
     };
     list.innerHTML =
-      '<div style="position:sticky;top:0;background:var(--surface);z-index:1;padding:0 0 8px;margin-bottom:6px;border-bottom:2px solid var(--border)">' +
-      '<div style="font-family:Press Start 2P,monospace;font-size:0.32rem;color:var(--dark);margin-bottom:4px">TOP BUYERS</div>' +
-      '<div style="font-size:0.85rem;color:var(--muted)">' + all.length + ' people · ' + totalPx + ' px · $' + totalSpent.toFixed(2) +
+      '<div style="position:sticky;top:0;background:var(--surface);z-index:1;padding:0 0 10px;margin-bottom:8px;border-bottom:2px solid var(--border)">' +
+      '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--dark);margin-bottom:6px">TOP BUYERS</div>' +
+      '<div style="font-family:VT323,monospace;font-size:1.25rem;color:var(--muted);line-height:1.35">' +
+      all.length + ' people · <strong style="color:var(--dark)">' + totalPx + ' PX</strong> · <strong style="color:#8b5a2b">$' + totalSpent.toFixed(2) + '</strong>' +
       (q ? ' · ' + stats.length + ' match' : '') +
-      ' · tap to show on wall</div></div>' +
+      '<br><span style="font-size:1.05rem">tap a row to show on wall</span></div></div>' +
       show.map((o) => {
         const safe = escapeHtml(o.name);
         const rank = all.findIndex(x => x.name === o.name) + 1;
@@ -5552,20 +5263,25 @@ function clearPending() {
         const spentStr = '$' + (Number(o.spent) || 0).toFixed(2);
         const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : ''));
         return '<button type="button" class="owner-row" data-owner="' + attr + '" title="Show on wall" ' +
-          'style="display:grid;grid-template-columns:52px 28px 1fr;gap:6px 8px;align-items:center;width:100%;text-align:left;' +
-          'border:2px solid var(--border);background:#fff;padding:10px 8px;margin-bottom:6px;cursor:pointer;font:inherit;color:inherit">' +
+          'style="display:grid;grid-template-columns:56px 36px 1fr;gap:8px 12px;align-items:center;width:100%;text-align:left;' +
+          'border:2px solid var(--border);background:#fff;padding:14px 12px;margin-bottom:8px;cursor:pointer;font:inherit;color:inherit">' +
           '<div style="text-align:center">' +
-          '<div style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--gold);line-height:1.3">' + rankLabel + '</div>' +
-          (medal ? '<div style="font-size:1rem;line-height:1.2">' + medal + '</div>' : '') +
+          '<div style="font-family:Press Start 2P,monospace;font-size:0.48rem;color:var(--gold);line-height:1.35">' + rankLabel + '</div>' +
+          (medal ? '<div style="font-size:1.25rem;line-height:1.2;margin-top:2px">' + medal + '</div>' : '') +
           '</div>' +
-          '<div style="font-size:1.35rem;line-height:1;text-align:center">' + flag + '</div>' +
+          '<div style="font-size:1.6rem;line-height:1;text-align:center">' + flag + '</div>' +
           '<div style="min-width:0">' +
-          '<div style="color:var(--dark);font-size:1.15rem;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safe + '</div>' +
-          '<div style="display:flex;gap:12px;align-items:baseline;margin-top:4px;flex-wrap:wrap">' +
-          '<span style="font-family:Press Start 2P,monospace;font-size:0.42rem;color:var(--dark)">' + o.pixels + ' <span style="font-size:0.28rem;color:var(--muted)">PX</span></span>' +
-          '<span style="font-family:Press Start 2P,monospace;font-size:0.42rem;color:#8b5a2b">' + spentStr + '</span>' +
+          '<div style="color:var(--dark);font-size:1.3rem;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">' + safe + '</div>' +
+          '<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">' +
+          '<div style="display:flex;align-items:baseline;gap:6px">' +
+          '<span style="font-family:VT323,monospace;font-size:1.85rem;line-height:1;color:var(--dark);font-weight:bold">' + o.pixels + '</span>' +
+          '<span style="font-family:Press Start 2P,monospace;font-size:0.4rem;color:var(--muted);letter-spacing:0.5px">PX</span>' +
           '</div>' +
-          '<div style="color:var(--muted);font-size:0.8rem;margin-top:2px">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
+          '<div style="display:flex;align-items:baseline">' +
+          '<span style="font-family:VT323,monospace;font-size:1.85rem;line-height:1;color:#8b5a2b;font-weight:bold">' + spentStr + '</span>' +
+          '</div>' +
+          '</div>' +
+          '<div style="color:var(--muted);font-size:1.05rem;margin-top:4px">' + o.claims + ' claim' + (o.claims === 1 ? '' : 's') + '</div>' +
           '</div></button>';
       }).join('');
 
@@ -5643,14 +5359,16 @@ function clearPending() {
             if (reg) cc = reg.country;
           }
           const flag = countryFlag(cc);
-          return '<div style="display:flex;gap:8px;align-items:flex-start;border-bottom:1px solid var(--border);padding:8px 4px">' +
-            '<div style="font-size:1.3rem;line-height:1;min-width:28px;text-align:center" title="' + (cc || '') + '">' + flag + '</div>' +
+          return '<div style="display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--border);padding:12px 4px">' +
+            '<div style="font-size:1.5rem;line-height:1;min-width:32px;text-align:center" title="' + (cc || '') + '">' + flag + '</div>' +
             '<div style="flex:1;min-width:0">' +
-            '<strong style="color:var(--dark);font-size:1.1rem">' + safe + '</strong>' +
-            '<div style="color:var(--muted);font-size:0.9rem">' + (h.pixels || 0) + ' px · ' + (h.duration || '') +
-            (h.paid ? ' · $' + Number(h.paid).toFixed(2) : '') + ' · ' + when + '</div>' +
-            '</div>' +
-            '<span style="font-family:Press Start 2P,monospace;font-size:0.32rem;color:' + col + ';white-space:nowrap">' + ev + '</span>' +
+            '<strong style="color:var(--dark);font-size:1.25rem">' + safe + '</strong>' +
+            '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:10px;align-items:baseline">' +
+            '<span style="font-family:VT323,monospace;font-size:1.55rem;color:var(--dark);font-weight:bold;line-height:1">' + (h.pixels || 0) + ' PX</span>' +
+            (h.paid ? '<span style="font-family:VT323,monospace;font-size:1.55rem;color:#8b5a2b;font-weight:bold;line-height:1">$' + Number(h.paid).toFixed(2) + '</span>' : '') +
+            '<span style="color:var(--muted);font-size:1rem">' + (h.duration || '') + ' · ' + when + '</span>' +
+            '</div></div>' +
+            '<span style="font-family:Press Start 2P,monospace;font-size:0.36rem;color:' + col + ';white-space:nowrap;margin-top:4px">' + ev + '</span>' +
             '</div>';
         }).join('');
     } catch (e) {
@@ -6065,121 +5783,7 @@ let scrollDrawRaf = 0;
       if (cell >= 1.15) scheduleDraw();
     });
   }, { passive: true });
-  let resizeTimer = 0;
-  function scheduleMobileResize(fit) {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      try { resize(!!fit); } catch (e) { console.warn(e); }
-    }, 120);
-  }
-  window.addEventListener('resize', () => scheduleMobileResize(false));
-  window.addEventListener('orientationchange', () => {
-    setTimeout(() => scheduleMobileResize(true), 250);
-    setTimeout(() => scheduleMobileResize(true), 600);
-  });
-  try {
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', () => scheduleMobileResize(false));
-    }
-  } catch (e) {}
-
-  // Local geometry overrides — persisted so resize survives refresh when API omits cells
-  const GEOM_OVERRIDE_KEY = 'hpw_geom_override_v1';
-  const localGeomOverride = new Map();
-
-  function loadLocalGeomOverrides() {
-    try {
-      const raw = localStorage.getItem(GEOM_OVERRIDE_KEY);
-      if (!raw) return;
-      const obj = JSON.parse(raw);
-      if (!obj || typeof obj !== 'object') return;
-      Object.keys(obj).forEach(id => {
-        const g = obj[id];
-        if (!g || !Array.isArray(g.cells) || !g.cells.length) return;
-        localGeomOverride.set(String(id), g);
-      });
-    } catch (e) { console.warn('load geom overrides', e); }
-  }
-
-  function persistLocalGeomOverrides() {
-    try {
-      const obj = {};
-      localGeomOverride.forEach((g, id) => {
-        obj[id] = {
-          cells: g.cells,
-          minC: g.minC,
-          maxC: g.maxC,
-          minR: g.minR,
-          maxR: g.maxR,
-          pixels: g.pixels,
-          cropScale: g.cropScale,
-          cropX: g.cropX,
-          cropY: g.cropY,
-          mediaType: g.mediaType,
-          at: g.at || Date.now()
-        };
-      });
-      localStorage.setItem(GEOM_OVERRIDE_KEY, JSON.stringify(obj));
-    } catch (e) { console.warn('persist geom overrides', e); }
-  }
-
-  function setLocalGeomOverride(id, geom) {
-    if (!id || !geom || !geom.cells || !geom.cells.length) return;
-    localGeomOverride.set(String(id), {
-      cells: geom.cells.slice(),
-      minC: geom.minC,
-      maxC: geom.maxC,
-      minR: geom.minR,
-      maxR: geom.maxR,
-      pixels: geom.pixels || geom.cells.length,
-      cropScale: geom.cropScale,
-      cropX: geom.cropX,
-      cropY: geom.cropY,
-      mediaType: geom.mediaType,
-      at: Date.now()
-    });
-    persistLocalGeomOverrides();
-  }
-
-  function applyLocalGeomOverrides() {
-    if (!localGeomOverride.size) return;
-    let changed = false;
-    regions.forEach(r => {
-      if (!r) return;
-      const candidates = [String(r.id || ''), String(r.claimId || '')].filter(Boolean);
-      let o = null;
-      let matchedKey = '';
-      for (const id of candidates) {
-        if (localGeomOverride.has(id)) {
-          o = localGeomOverride.get(id);
-          matchedKey = id;
-          break;
-        }
-      }
-      if (!o) return;
-      const serverPx = r.pixels || (r.cells && r.cells.length) || 0;
-      const sameBox =
-        Number(r.minC) === Number(o.minC) && Number(r.maxC) === Number(o.maxC) &&
-        Number(r.minR) === Number(o.minR) && Number(r.maxR) === Number(o.maxR) &&
-        serverPx === o.pixels;
-      if (sameBox) {
-        localGeomOverride.delete(matchedKey);
-        changed = true;
-        return;
-      }
-      (r.cells || []).forEach(k => { if (sold.get(k) === r) sold.delete(k); });
-      r.cells = o.cells.slice();
-      r.minC = o.minC; r.maxC = o.maxC; r.minR = o.minR; r.maxR = o.maxR;
-      r.pixels = o.pixels;
-      if (o.cropScale != null) r.cropScale = o.cropScale;
-      if (o.cropX != null) r.cropX = o.cropX;
-      if (o.cropY != null) r.cropY = o.cropY;
-      o.cells.forEach(k => sold.set(k, r));
-    });
-    if (changed) persistLocalGeomOverrides();
-  }
-
-  try { loadLocalGeomOverrides(); } catch (e) {}
+  window.addEventListener('resize', () => resize(false));
 
   async function pullWall() {
     try {
@@ -6194,8 +5798,6 @@ let scrollDrawRaf = 0;
         } catch (err) { console.warn(err); }
       });
       try { applyCropCacheToRegions(); } catch (e) {}
-      try { applyLocalGeomOverrides(); } catch (e) {}
-      try { save(); } catch (e) {}
       draw();
       syncMediaOverlays();
       return true;
@@ -6206,18 +5808,13 @@ let scrollDrawRaf = 0;
   }
 
   (async () => {
-    try { loadLocalGeomOverrides(); } catch (e) {}
     const ok = await pullWall();
     if (!ok) {
       load();
-      try { applyLocalGeomOverrides(); } catch (e) {}
       if (!navigator.onLine) toast('Offline — showing saved wall', 'error');
     }
     try { resize(true); } catch (e) { console.warn(e); }
-    requestAnimationFrame(() => { try { resize(true); } catch (e) {} });
-    // Phones: layout often settles after first paint (address bar / safe area)
-    setTimeout(() => { try { resize(true); } catch (e) {} }, 300);
-    setTimeout(() => { try { resize(true); } catch (e) {} }, 800);
+        requestAnimationFrame(() => resize(true));
     setBuyMode(false);
     setInterval(pullWall, 15000);
 

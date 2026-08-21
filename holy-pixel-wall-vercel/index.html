@@ -1868,6 +1868,47 @@ Min 10 blocks · no maximum
   }
 
 
+  const CROP_CACHE_KEY = 'hpw_crop_cache_v1';
+  function loadCropCache() {
+    try {
+      const j = JSON.parse(localStorage.getItem(CROP_CACHE_KEY) || '{}');
+      return j && typeof j === 'object' ? j : {};
+    } catch (e) { return {}; }
+  }
+  function saveCropCache(id, cropObj) {
+    if (!id) return;
+    try {
+      const all = loadCropCache();
+      all[id] = {
+        cropScale: Number(cropObj.cropScale) || 1,
+        cropX: cropObj.cropX != null ? Number(cropObj.cropX) : 0.5,
+        cropY: cropObj.cropY != null ? Number(cropObj.cropY) : 0.5
+      };
+      localStorage.setItem(CROP_CACHE_KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
+  function applyCropCacheToRegions() {
+    const all = loadCropCache();
+    regions.forEach(r => {
+      if (!r) return;
+      const id = r.id || r.claimId;
+      if (!id || !all[id]) return;
+      const c = all[id];
+      r.cropScale = c.cropScale;
+      r.cropX = c.cropX;
+      r.cropY = c.cropY;
+    });
+  }
+  function regionMediaIsImage(r) {
+    if (!r || !r.media) return false;
+    const t = (r.mediaType || '').toLowerCase();
+    if (t === 'video') return false;
+    if (t === 'gif') return false; // animated via overlay
+    // image, empty, unknown, or data:image
+    if (!t || t === 'image' || t === 'none') return true;
+    if (String(r.media).startsWith('data:image/') && !String(r.media).startsWith('data:image/gif')) return true;
+    return t === 'image';
+  }
   function makeClaimId() {
     const t = Date.now().toString(36).toUpperCase();
     const r = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -2727,7 +2768,7 @@ function getImg(src) {
 
       ctx.fillStyle = r.color || '#c9a227';
       ctx.fillRect(x0, y0, w, h);
-      if (r.media && r.mediaType === 'image') {
+      if (regionMediaIsImage(r)) {
         const img = getImg(r.media);
         if (img && img.complete) {
           drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
@@ -2856,9 +2897,16 @@ function getImg(src) {
     }
   }
 
+  function cellOwnedByEditing(k) {
+    if (!editingRegion) return false;
+    const owner = sold.get(k);
+    return owner && (owner === editingRegion || owner.id === editingRegion.id || owner.claimId === editingRegion.claimId);
+  }
   function purgeSelectedOwned() {
     const keep = [];
-    selected.forEach(k => { if (!sold.has(k)) keep.push(k); });
+    selected.forEach(k => {
+      if (!sold.has(k) || cellOwnedByEditing(k)) keep.push(k);
+    });
     selected = new Set(keep);
   }
 
@@ -2974,7 +3022,7 @@ function getImg(src) {
     if (maxC < minC || maxR < minR) return;
 
     const aC = startC, aR = startR;
-    if (sold.has(aC + ',' + aR)) {
+    if (sold.has(aC + ',' + aR) && !(adminMode && cellOwnedByEditing(aC + ',' + aR))) {
       selected = new Set();
       try { draw(); } catch (err) {}
       try { updateFloat(); } catch (err) {}
@@ -2983,8 +3031,12 @@ function getImg(src) {
 
     function rectHasSold(c0, c1, r0, r1) {
       for (let c = c0; c <= c1; c++)
-        for (let r = r0; r <= r1; r++)
-          if (sold.has(c + ',' + r)) return true;
+        for (let r = r0; r <= r1; r++) {
+          const k = c + ',' + r;
+          if (!sold.has(k)) continue;
+          if (adminMode && cellOwnedByEditing(k)) continue;
+          return true;
+        }
       return false;
     }
 
@@ -2995,12 +3047,14 @@ function getImg(src) {
       snapped = true;
       let shrinkMaxC = false, shrinkMinC = false, shrinkMaxR = false, shrinkMinR = false;
       for (let r = minR; r <= maxR; r++) {
-        if (sold.has(maxC + ',' + r)) shrinkMaxC = true;
-        if (sold.has(minC + ',' + r)) shrinkMinC = true;
+        const k1 = maxC + ',' + r, k2 = minC + ',' + r;
+        if (sold.has(k1) && !(adminMode && cellOwnedByEditing(k1))) shrinkMaxC = true;
+        if (sold.has(k2) && !(adminMode && cellOwnedByEditing(k2))) shrinkMinC = true;
       }
       for (let c = minC; c <= maxC; c++) {
-        if (sold.has(c + ',' + maxR)) shrinkMaxR = true;
-        if (sold.has(c + ',' + minR)) shrinkMinR = true;
+        const k3 = c + ',' + maxR, k4 = c + ',' + minR;
+        if (sold.has(k3) && !(adminMode && cellOwnedByEditing(k3))) shrinkMaxR = true;
+        if (sold.has(k4) && !(adminMode && cellOwnedByEditing(k4))) shrinkMinR = true;
       }
       const opts = [];
       // Prefer shrinking edges away from the drag start point
@@ -3053,10 +3107,17 @@ function getImg(src) {
     const n = selected.size;
     if (n > 0) {
       const issues = typeof selectionIssues === 'function'? selectionIssues() : [];
-      $('selCount').textContent = issues.length
-       ? (n + ' · ' + issues[0])
-        : (n + (n < MIN_BUY? ' (min ' + MIN_BUY + ')' : ''));
-      $('selPrice').textContent = '$' + (n * price()).toFixed(2);
+      if (adminMode && editingRegion) {
+        $('selCount').textContent = n + ' px · resize claim';
+        $('selPrice').textContent = 'SAVE';
+        if ($('claimBtn')) $('claimBtn').textContent = 'SAVE SIZE';
+      } else {
+        $('selCount').textContent = issues.length
+         ? (n + ' · ' + issues[0])
+          : (n + (n < MIN_BUY? ' (min ' + MIN_BUY + ')' : ''));
+        $('selPrice').textContent = '$' + (n * price()).toFixed(2);
+        if ($('claimBtn')) $('claimBtn').textContent = 'CLAIM';
+      }
       floatBar.classList.add('visible');
     } else {
       floatBar.classList.remove('visible');
@@ -3350,6 +3411,23 @@ function getImg(src) {
     if (link) link.value = r.link || '';
     try { syncLinkUI(); } catch (e) {}
 
+    
+    // Admin resize: pre-select this claim's cells so admin can drag a new rectangle
+    if (adminMode) {
+      selected = new Set();
+      const cells = r.cells && r.cells.length
+        ? r.cells
+        : (function() {
+            const out = [];
+            for (let c = r.minC; c <= r.maxC; c++)
+              for (let row = r.minR; row <= r.maxR; row++)
+                out.push(c + ',' + row);
+            return out;
+          })();
+      cells.forEach(k => selected.add(k));
+      try { updateFloat(); draw(); } catch (e) {}
+      toast('ADMIN: drag a new area on the wall to resize, then SAVE', 'ok');
+    }
     setVal('infoPixels', (r.pixels || 0) + ' PIXELS (OWNED)');
     setVal('infoPrice', '');
     if ($('paymentField')) $('paymentField').style.display = 'none';
@@ -3388,10 +3466,27 @@ function getImg(src) {
       const claimId = r.id;
       adminActions.style.display = 'flex';
       adminActions.innerHTML =
+        '<button type="button" class="btn btn-sec" id="adminResizeBtn">RESIZE ON WALL</button>' +
         '<button type="button" class="btn btn-sec" id="adminRemoveImgBtn" style="border-color:var(--danger);color:var(--danger)">REMOVE IMAGE</button>' +
         '<button type="button" class="btn" id="adminDeleteClaimBtn" style="background:var(--danger);color:#fff;border:2px solid #fff">DELETE CLAIM</button>';
       const rmBtn = document.getElementById('adminRemoveImgBtn');
-      const delBtn = document.getElementById('adminDeleteClaimBtn');
+      
+      const rzBtn = document.getElementById('adminResizeBtn');
+      if (rzBtn) {
+        rzBtn.onclick = () => {
+          // Hide modal but keep editingRegion so selection can resize this claim
+          if ($('claimModal')) $('claimModal').style.display = 'none';
+          document.body.style.overflow = '';
+          buyMode = true;
+          toolMode = 'select';
+          try {
+            viewport.classList.add('buy-mode');
+            viewport.classList.remove('drag-mode');
+          } catch (e) {}
+          toast('Drag a bigger or smaller rectangle, then press Enter to save', 'ok');
+        };
+      }
+const delBtn = document.getElementById('adminDeleteClaimBtn');
       if (rmBtn) {
         rmBtn.onclick = async () => {
           if (!confirm('Remove the image from this claim?')) return;
@@ -3511,9 +3606,13 @@ function getImg(src) {
     });
     const need = (maxC - minC + 1) * (maxR - minR + 1);
     if (need !== keys.length) return false;
-    for (let c = minC; c <= maxC; c++)
-      for (let r = minR; r <= maxR; r++)
-        if (!set.has(c + ',' + r) || sold.has(c + ',' + r)) return false;
+    for (let c = minC; c <= maxC; c++) {
+      for (let r = minR; r <= maxR; r++) {
+        const k = c + ',' + r;
+        if (!set.has(k)) return false;
+        if (sold.has(k) && !cellOwnedByEditing(k)) return false;
+      }
+    }
     return true;
   }
 
@@ -3524,7 +3623,7 @@ function getImg(src) {
     if (!n) issues.push('Select pixels on the wall');
     else if (n < minNeed) issues.push('Need at least ' + minNeed + ' free pixels (now ' + n + ')');
     for (const k of selected) {
-      if (sold.has(k)) {
+      if (sold.has(k) && !(adminMode && cellOwnedByEditing(k))) {
         issues.push('Selection includes owned pixels');
         break;
       }
@@ -3672,6 +3771,12 @@ function getImg(src) {
 
   if ($('claimBtn')) $('claimBtn').onclick = () => {
     purgeSelectedOwned();
+    // Admin resizing existing claim
+    if (adminMode && editingRegion && selected.size > 0) {
+      if ($('claimModal')) $('claimModal').style.display = 'flex';
+      if ($('confirmBtn')) $('confirmBtn').click();
+      return;
+    }
     const issues = selectionIssues();
     if (issues.length) {
       toast(issues[0].toUpperCase());
@@ -4406,32 +4511,73 @@ function clearPending() {
     // Edit existing claim — admin saves to server for ALL users
     if (editingRegion) {
       const er = editingRegion;
+      const rid = er.id || er.claimId || '';
+      // Optional admin resize from current selection
+      let newCells = null;
+      let minC = er.minC, maxC = er.maxC, minR = er.minR, maxR = er.maxR;
+      if (adminMode && selected.size > 0) {
+        const keys = Array.from(selected);
+        let ok = true;
+        for (const k of keys) {
+          if (sold.has(k) && !cellOwnedByEditing(k)) { ok = false; break; }
+        }
+        if (ok && isSolidRectangle(keys)) {
+          newCells = keys;
+          minC = COLS; maxC = -1; minR = ROWS; maxR = -1;
+          keys.forEach(k => {
+            const p = k.split(',').map(Number);
+            minC = Math.min(minC, p[0]); maxC = Math.max(maxC, p[0]);
+            minR = Math.min(minR, p[1]); maxR = Math.max(maxR, p[1]);
+          });
+        } else if (!ok) {
+          toast('New area overlaps another claim', 'error');
+          return;
+        }
+      }
       const body = {
-        id: er.id,
+        id: rid,
+        claimId: er.claimId || rid,
         name: ($('ownerName').value.trim() || er.name || 'ANON'),
         country: ($('country') && $('country').value) || er.country || '',
         desc: ($('desc').value || '').trim().slice(0, 120),
         media: pendingMedia || '',
-        mediaType: pendingType || 'image',
+        mediaType: pendingType || detectMediaType(pendingMedia) || 'image',
         fit: 'cover',
-        cropScale: crop.scale,
-        cropX: crop.x,
-        cropY: crop.y,
+        cropScale: Number(crop.scale) || 1,
+        cropX: crop.x != null ? Number(crop.x) : 0.5,
+        cropY: crop.y != null ? Number(crop.y) : 0.5,
         link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
         linkType: ($('linkType') && $('linkType').value) || 'none',
-        duration: ($('duration') && $('duration').value) || er.duration
+        duration: ($('duration') && $('duration').value) || er.duration,
+        minC: minC,
+        maxC: maxC,
+        minR: minR,
+        maxR: maxR,
+        pixels: newCells ? newCells.length : (er.pixels || (er.cells && er.cells.length) || 0),
+        cells: newCells || er.cells || []
       };
       if (adminMode) {
         body.key = getAdminKey();
         try {
-          // Apply crop locally immediately so the wall updates even if API omits crop fields
+          saveCropCache(rid, body);
+          // Rebuild local geometry if resized
+          if (newCells) {
+            // free old cells
+            (er.cells || []).forEach(k => { if (sold.get(k) === er) sold.delete(k); });
+            er.cells = newCells.slice();
+            er.minC = minC; er.maxC = maxC; er.minR = minR; er.maxR = maxR;
+            er.pixels = newCells.length;
+            newCells.forEach(k => sold.set(k, er));
+          }
           Object.assign(er, {
+            id: rid,
+            claimId: body.claimId,
             name: body.name,
             country: body.country,
             desc: body.desc,
             media: body.media,
             mediaType: body.mediaType,
-            fit: body.fit || 'cover',
+            fit: 'cover',
             cropScale: body.cropScale,
             cropX: body.cropX,
             cropY: body.cropY,
@@ -4439,39 +4585,39 @@ function clearPending() {
             linkType: body.linkType,
             duration: body.duration
           });
-          try { draw(); syncMediaOverlays(); } catch (e) {}
+          try { draw(); syncMediaOverlays(); save(); } catch (e) {}
           await apiFetch('/api/admin/update', {
             method: 'POST',
             body: JSON.stringify(body),
             timeout: 90000
           }, 'Admin update');
           await pullWall();
-          // Re-apply crop after sync if server did not echo crop fields
-          const synced = regions.find(x => x && (x.id === body.id || x.id === er.id));
+          applyCropCacheToRegions();
+          // Ensure this claim keeps crop + size if API dropped fields
+          let synced = regions.find(x => x && (x.id === rid || x.claimId === rid || x.id === er.id));
           if (synced) {
-            if (synced.cropScale == null || Number(synced.cropScale) === 1 && body.cropScale !== 1) {
-              synced.cropScale = body.cropScale;
-              synced.cropX = body.cropX;
-              synced.cropY = body.cropY;
-            } else {
-              // Prefer what we just saved
-              synced.cropScale = body.cropScale;
-              synced.cropX = body.cropX;
-              synced.cropY = body.cropY;
-            }
-            if (body.media) {
-              synced.media = body.media;
-              synced.mediaType = body.mediaType;
-            }
+            synced.cropScale = body.cropScale;
+            synced.cropX = body.cropX;
+            synced.cropY = body.cropY;
+            if (body.media) { synced.media = body.media; synced.mediaType = body.mediaType; }
             synced.name = body.name;
             synced.desc = body.desc;
             synced.link = body.link;
             synced.linkType = body.linkType;
+            if (newCells && newCells.length) {
+              // If server ignored resize, force local geometry again
+              (synced.cells || []).forEach(k => { if (sold.get(k) === synced) sold.delete(k); });
+              synced.cells = newCells.slice();
+              synced.minC = minC; synced.maxC = maxC; synced.minR = minR; synced.maxR = maxR;
+              synced.pixels = newCells.length;
+              newCells.forEach(k => sold.set(k, synced));
+            }
           }
           try { draw(); syncMediaOverlays(); save(); } catch (e) {}
+          selected.clear();
           clearPending();
           closeClaimModal();
-          toast('SAVED — crop applied', 'ok');
+          toast(newCells ? ('SAVED — resized to ' + newCells.length + ' px + crop') : 'SAVED — crop applied', 'ok');
         } catch (e) {
           toast(friendlyError(e, 'Save failed'), 'error');
         }
@@ -4675,6 +4821,13 @@ function clearPending() {
     if (e.key === '+' || e.key === '=') { e.preventDefault(); bumpZoom(0.25, lastMouseX, lastMouseY); return; }
     if (e.key === '-' || e.key === '_') { e.preventDefault(); bumpZoom(-0.25, lastMouseX, lastMouseY); return; }
     if (e.key === '0') { e.preventDefault(); resize(true); return; }
+    if (e.key === 'Enter' && adminMode && editingRegion && selected.size >= 1) {
+      e.preventDefault();
+      // Re-open is not needed — save current crop + new size
+      if ($('claimModal')) $('claimModal').style.display = 'flex';
+      if ($('confirmBtn')) $('confirmBtn').click();
+      return;
+    }
     if (e.key === 'Enter' && selected.size >= MIN_BUY) {
       e.preventDefault();
       $('claimBtn').click();
@@ -5628,6 +5781,7 @@ let scrollDrawRaf = 0;
           (r.cells || []).forEach(k => sold.set(k, r));
         } catch (err) { console.warn(err); }
       });
+      try { applyCropCacheToRegions(); } catch (e) {}
       draw();
       syncMediaOverlays();
       return true;

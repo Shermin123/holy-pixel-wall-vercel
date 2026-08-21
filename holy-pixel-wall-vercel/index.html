@@ -3417,6 +3417,14 @@ function getImg(src) {
   function closeClaimModal() {
     $('claimModal').style.display = 'none';
     document.body.style.overflow = '';
+    paying = false;
+    try {
+      const btn = $('confirmBtn');
+      if (btn && btn.textContent !== 'SAVE CHANGES') {
+        btn.disabled = false;
+        btn.textContent = adminMode ? 'ADD FREE TO WALL' : 'PAY & CLAIM';
+      }
+    } catch (e) {}
     editingRegion = null;
     stripe = null;
     stripeElements = null;
@@ -3429,7 +3437,11 @@ function getImg(src) {
     $('duration').disabled = false;
     const payField = $('payment-element') && $('payment-element').closest('.field');
     if (payField) payField.style.display = '';
-    $('confirmBtn').textContent = 'PAY & CLAIM';
+    if ($('confirmBtn')) {
+      $('confirmBtn').disabled = false;
+      $('confirmBtn').classList.remove('is-blocked');
+      $('confirmBtn').textContent = 'PAY & CLAIM';
+    }
     const head = document.querySelector('#claimModal .modal-head h3');
     if (head) head.textContent = 'CLAIM PIXELS';
     const sub = document.querySelector('#claimModal .modal-head p');
@@ -3566,7 +3578,7 @@ function getImg(src) {
     if (editing) {
       const ei = [];
       if (!nameOk) ei.push('Enter owner / brand name');
-      if (!mediaOk) ei.push('Add a photo for your block');
+      if (!mediaOk) ei.push('Add a photo, GIF, or video for your block');
       ei.push.apply(ei, lIssues);
       if (status) {
         if (!ei.length) {
@@ -3593,16 +3605,21 @@ function getImg(src) {
     }
     if (btn && !paying) {
       const canPay = issues.length === 0;
-      btn.disabled = !canPay;
-      if (canPay && btn.textContent === 'PAY & CLAIM') {
-        /* keep label */
+      // Prefer class block over disabled so a click can still explain what's missing
+      btn.disabled = false;
+      btn.classList.toggle('is-blocked', !canPay);
+      btn.setAttribute('aria-disabled', canPay ? 'false' : 'true');
+      if (canPay) {
+        if (btn.textContent === 'SAVING…' || btn.textContent === 'OPENING PAY…') {
+          btn.textContent = adminMode ? 'ADD FREE TO WALL' : 'PAY & CLAIM';
+        }
       }
     }
     return issues.length === 0;
   }
 
 
-  $('claimBtn').onclick = () => {
+  if ($('claimBtn')) $('claimBtn').onclick = () => {
     purgeSelectedOwned();
     const issues = selectionIssues();
     if (issues.length) {
@@ -3626,13 +3643,30 @@ function getImg(src) {
       const payField = $('payment-element') && $('payment-element').closest('.field');
       if (payField) payField.style.display = '';
     }
+    paying = false;
+    const cbtn = $('confirmBtn');
+    if (cbtn) {
+      cbtn.disabled = false;
+      if (!adminMode) cbtn.textContent = 'PAY & CLAIM';
+    }
     $('claimModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     try { updateBlockPreview(); refreshClaimValidation(); } catch (e) {}
+    // Ensure pay button is interactive after open
+    setTimeout(() => {
+      try {
+        paying = false;
+        const b = $('confirmBtn');
+        if (b) {
+          b.disabled = false;
+          refreshClaimValidation();
+        }
+      } catch (e) {}
+    }, 0);
   };
   $('cancelBtn').onclick = () => {
     closeClaimModal();
-    $('confirmBtn').disabled = false;
+    resetPayButton();
   };
   $('duration').onchange = () => {
     updateFloat();
@@ -4098,6 +4132,15 @@ function clearPending() {
   let payMethod = 'card';
   let editingRegion = null;
   let paying = false;
+  function resetPayButton(label) {
+    paying = false;
+    const btn = $('confirmBtn');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.textContent = label || (adminMode ? 'ADD FREE TO WALL' : (editingRegion ? 'SAVE CHANGES' : 'PAY & CLAIM'));
+    try { refreshClaimValidation(); } catch (e) {}
+  }
+
   let stripe = null;
   let stripeElements = null;
   let paymentElement = null;
@@ -4249,7 +4292,20 @@ function clearPending() {
     toast('PAID $' + total.toFixed(2) + ' · SOLD BY ' + region.name.toUpperCase());
   }
 
-  $('confirmBtn').onclick = async () => {
+  if ($('confirmBtn')) $('confirmBtn').onclick = async () => {
+    // If form incomplete, explain instead of silently doing nothing
+    if (!editingRegion && !adminMode) {
+      const issues = claimFormIssues();
+      if (issues.length) {
+        toast(issues[0], 'error');
+        try { refreshClaimValidation(); } catch (e) {}
+        return;
+      }
+    }
+    if (paying) {
+      toast('Already processing payment — please wait');
+      return;
+    }
     // Edit existing claim — admin saves to server for ALL users
     if (editingRegion) {
       const er = editingRegion;
@@ -4388,15 +4444,24 @@ function clearPending() {
       });
     } catch (e) {}
 
-    // Media too large for API?
-    if (payload.media && payload.media.length > 1200000) {
-      toast('IMAGE TOO LARGE — TRY A SMALLER FILE', 'error');
-      return;
+    // Large media is OK — stored in IndexedDB; checkout body is small
+    if (payload.media && payload.media.length > 15e6) {
+      toast('FILE VERY LARGE — try a smaller photo/video if payment fails', 'error');
+      // still allow attempt
     }
 
     const btn = $('confirmBtn');
+    if (!btn) {
+      toast('Payment button missing — refresh the page', 'error');
+      return;
+    }
     const msg = $('payment-message');
     if (msg) msg.textContent = '';
+    // Prevent double-submit but always recoverable
+    if (paying) {
+      toast('Already processing — wait a moment or close and reopen');
+      return;
+    }
     paying = true;
     btn.disabled = true;
     btn.textContent = 'SAVING…';

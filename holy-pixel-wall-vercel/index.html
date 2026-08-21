@@ -3154,42 +3154,35 @@ function getImg(src) {
       ctx.restore();
     }
 
-    // 5) CLEAN TRANSPARENT SELECTION
+    // 5) SEE-THROUGH SELECTION
 if (selected.size) {
   selected.forEach(k => {
-    if (
-      sold.has(k) &&
-      !(adminMode &&
-        editingRegion &&
-        typeof cellOwnedByEditing === 'function' &&
-        cellOwnedByEditing(k))
-    ) return;
+    const [c, r] = k.split(',').map(Number);
 
-    const parts = k.split(',');
-    const c = Number(parts[0]);
-    const r = Number(parts[1]);
+    if (!Number.isFinite(c) || !Number.isFinite(r)) return;
 
     const x = c * drawCell;
     const y = r * drawCell;
 
-    // Transparent selection - image stays visible
-    ctx.fillStyle = 'rgba(232, 106, 60, 0.18)';
+    // VERY LIGHT transparent overlay
+    // Image underneath remains clearly visible
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
     ctx.fillRect(
-      x + 0.5,
-      y + 0.5,
-      Math.max(1, drawCell - 1),
-      Math.max(1, drawCell - 1)
+      x,
+      y,
+      drawCell,
+      drawCell
     );
 
-    // Thin pixel border
-    ctx.strokeStyle = 'rgba(168, 76, 50, 0.65)';
-    ctx.lineWidth = 1;
+    // Clean thin border around each pixel
+    ctx.strokeStyle = 'rgba(255, 80, 40, 0.85)';
+    ctx.lineWidth = Math.max(0.5, 1 / (zoom || 1));
 
     ctx.strokeRect(
       x + 0.5,
       y + 0.5,
-      Math.max(1, drawCell - 1),
-      Math.max(1, drawCell - 1)
+      drawCell - 1,
+      drawCell - 1
     );
   });
 }

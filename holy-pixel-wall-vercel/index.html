@@ -224,10 +224,10 @@
     align-items: center !important;
     justify-content: center !important;
     gap: 6px !important;
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
     flex-wrap: wrap !important;
     background: #f3e6c8 !important;
-    border-bottom: 3px solid #d4a017 !important;
+    border-bottom: 2px solid #d4a017 !important;
     flex-shrink: 0;
     z-index: 40;
   }
@@ -1022,9 +1022,9 @@
   grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) !important;
   align-items: center !important;
   column-gap: 20px !important;
-  min-height: 64px !important;
-  height: 64px !important;
-  padding: 0 18px !important;
+  min-height: 52px !important;
+  height: 52px !important;
+  padding: 0 16px !important;
   overflow: hidden;
   background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
   border-bottom: 3px solid #2a2118 !important;
@@ -2481,13 +2481,22 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Fit full wall in viewport — same on phone and desktop.
-    // 4px inset so the 2px wall frame is fully visible, no outer box.
-    const margin = 4;
+    // Desktop: maximize wall size; allow a little vertical scroll for balance.
+    // Phone: still fit fully in view.
+    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
+    const margin = phone ? 4 : 8;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s = Math.min(vw / COLS, vh / ROWS);
+    let s;
+    if (phone) {
+      s = Math.min(vw / COLS, vh / ROWS);
+    } else {
+      // Prefer large wall: fill width when possible, allow ~8% extra height to scroll
+      const byW = vw / COLS;
+      const byH = (vh * 1.08) / ROWS;
+      s = Math.min(byW, byH);
+    }
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;
@@ -2608,7 +2617,7 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    canvas.style.imageRendering = 'pixelated';
+    canvas.style.imageRendering = 'auto';
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -2623,6 +2632,13 @@ Min 10 blocks · no maximum
 
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
     try { positionMediaOverlays(); } catch (e) {}
+    // Keep GIF/video clips locked to the same cells as the canvas while zooming
+    try {
+      if (mediaLayer) {
+        mediaLayer.style.width = w + 'px';
+        mediaLayer.style.height = h + 'px';
+      }
+    } catch (e) {}
   }
 
   function paintBase() {
@@ -2704,7 +2720,7 @@ Min 10 blocks · no maximum
       keepAnchor();
       zoomAnchor = null;
       clampScroll();
-      // Redraw so buy-mode pixel grid matches the new zoom
+      try { positionMediaOverlays(); } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;
     }
@@ -2752,7 +2768,8 @@ Min 10 blocks · no maximum
     if (!mediaLayer) return;
     const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
     if (!clips.length) return;
-    const c = cell;
+    // Use current layout cell (baseCell * zoom) so overlays track canvas exactly
+    const c = (typeof cell === 'number' && cell > 0) ? cell : ((baseCell || 1) * (zoom || 1));
     clips.forEach(clip => {
       const minC = +clip.getAttribute('data-min-c');
       const maxC = +clip.getAttribute('data-max-c');
@@ -2762,23 +2779,28 @@ Min 10 blocks · no maximum
       const fx = clip.getAttribute('data-crop-x') != null ? +clip.getAttribute('data-crop-x') : 0.5;
       const fy = clip.getAttribute('data-crop-y') != null ? +clip.getAttribute('data-crop-y') : 0.5;
       if (!Number.isFinite(minC) || !Number.isFinite(maxC)) return;
-      const x = minC * c;
-      const y = minR * c;
-      const w = (maxC - minC + 1) * c;
-      const h = (maxR - minR + 1) * c;
+      // Floor positions so GIF/video never drift off the painted claim box
+      const x = Math.round(minC * c);
+      const y = Math.round(minR * c);
+      const w = Math.max(1, Math.round((maxC - minC + 1) * c));
+      const h = Math.max(1, Math.round((maxR - minR + 1) * c));
       clip.style.left = x + 'px';
       clip.style.top = y + 'px';
       clip.style.width = w + 'px';
       clip.style.height = h + 'px';
+      clip.style.overflow = 'hidden';
       const el = clip.firstElementChild;
       if (el) {
-        const mw = w * scale;
-        const mh = h * scale;
+        const mw = Math.round(w * scale);
+        const mh = Math.round(h * scale);
         el.style.width = mw + 'px';
         el.style.height = mh + 'px';
-        el.style.left = ((w - mw) * fx) + 'px';
-        el.style.top = ((h - mh) * fy) + 'px';
+        el.style.left = Math.round((w - mw) * fx) + 'px';
+        el.style.top = Math.round((h - mh) * fy) + 'px';
+        el.style.objectFit = 'cover';
         el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
+        el.style.maxWidth = 'none';
+        el.style.maxHeight = 'none';
       }
     });
   }

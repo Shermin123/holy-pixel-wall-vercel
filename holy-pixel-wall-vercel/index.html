@@ -64,8 +64,8 @@
     --line-gold: 2px solid var(--gold);
   }
 
-  /* ========== TOP BAR (single source of truth) ========== */
-  header {
+  /* ========== TOP BAR (legacy header tags disabled — use .pixel-header) ========== */
+  header:not(.pixel-header) {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
@@ -269,7 +269,7 @@
   }
 
   @media (max-width: 780px) {
-    header {
+    header:not(.pixel-header) {
       flex-wrap: wrap !important;
       gap: 10px !important;
       padding: 10px 12px !important;
@@ -316,7 +316,7 @@
     html, body { height: 100vh; max-height: 100vh; }
   }
 
-  header {
+  header:not(.pixel-header) {
     min-height: 64px;
     display: flex;
     align-items: center;
@@ -1398,66 +1398,7 @@
 }
 
 
-/* Toolbar groups — clean layout desktop + mobile */
-.toolbar {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-wrap: wrap !important;
-  gap: 8px !important;
-}
-.tool-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.tool-group--zoom {
-  background: rgba(255,255,255,0.55);
-  border: 1px solid #e0d4c0;
-  padding: 2px 4px;
-  border-radius: 2px;
-}
-.tb-short { display: none; }
-.tb-full { display: inline; }
 
-@media (max-width: 700px) {
-  .toolbar {
-    justify-content: flex-start !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    gap: 6px !important;
-    padding: 6px 8px !important;
-    scrollbar-width: none;
-  }
-  .toolbar::-webkit-scrollbar { display: none; }
-  .tool-group {
-    gap: 4px;
-  }
-  .tool-group--zoom {
-    padding: 2px 3px;
-  }
-  .toolbar .tool-gap {
-    width: 1px !important;
-    height: 18px !important;
-    background: #d2b48c !important;
-    align-self: center;
-  }
-  .tb-full { display: none !important; }
-  .tb-short { display: inline !important; }
-  .toolbar .tool-btn {
-    min-height: 22px !important;
-    padding: 2px 5px !important;
-    font-size: 0.2rem !important;
-    border-radius: 2px;
-  }
-  .toolbar .zoom-lvl {
-    min-width: 28px !important;
-    font-size: 0.55rem !important;
-    line-height: 22px !important;
-  }
-}
 
 
 .hpw-chip {
@@ -1495,61 +1436,70 @@
 
 
 
+
 /* ============================================================
-   TOP BARS — clean desktop + mobile (final)
+   MOBILE + DESKTOP TOP BARS — final working layout
    ============================================================ */
+.pixel-header {
+  display: grid !important;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr) !important;
+  align-items: center !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  padding: 0 14px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+}
 
-/* Desktop header already defined via .pixel-header */
-
-/* Toolbar desktop — centered, tidy */
 .toolbar {
   display: flex !important;
   flex-wrap: wrap !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
-  padding: 8px 12px !important;
+  padding: 8px 10px !important;
   background: #f3e6c8 !important;
   border-bottom: 2px solid #d4a017 !important;
   flex-shrink: 0 !important;
+  box-sizing: border-box !important;
 }
 .toolbar .tool-btn {
   font-family: 'Press Start 2P', monospace !important;
-  font-size: 0.34rem !important;
-  padding: 8px 10px !important;
+  font-size: 0.32rem !important;
+  padding: 7px 9px !important;
   line-height: 1.2 !important;
   color: #5c3d0e !important;
   background: #fffdf8 !important;
   border: 2px solid #8b5a2b !important;
   box-shadow: 2px 2px 0 #c9a66b !important;
-  cursor: pointer !important;
   animation: none !important;
   white-space: nowrap !important;
-}
-.toolbar .tool-btn:hover { background: #f0c14b !important; }
-.toolbar .tool-btn:active {
-  transform: translate(1px, 1px) !important;
-  box-shadow: 1px 1px 0 #c9a66b !important;
+  cursor: pointer !important;
 }
 .toolbar .zoom-lvl {
   font-family: 'Press Start 2P', monospace !important;
-  font-size: 0.34rem !important;
-  min-width: 48px !important;
+  font-size: 0.32rem !important;
+  min-width: 44px !important;
   text-align: center !important;
   padding: 6px 4px !important;
-  color: #8b5a2b !important;
-  background: #fff !important;
   border: 2px solid #d2b48c !important;
-}
-.toolbar .tool-gap {
-  width: 8px !important;
-  height: 2px !important;
-  background: #d2b48c !important;
-  flex-shrink: 0 !important;
+  background: #fff !important;
+  color: #8b5a2b !important;
 }
 
 @media (max-width: 700px) {
-  /* Header: title | buy | counter — one clean row */
+  html, body {
+    width: 100% !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
   .pixel-header {
     display: flex !important;
     flex-direction: row !important;
@@ -1558,109 +1508,97 @@
     justify-content: space-between !important;
     grid-template-columns: none !important;
     grid-template-rows: none !important;
-    column-gap: 0 !important;
-    gap: 8px !important;
-    height: 50px !important;
-    min-height: 50px !important;
-    max-height: 50px !important;
-    padding: 0 10px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    padding: 0 8px !important;
+    gap: 6px !important;
     overflow: hidden !important;
     background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
     border-bottom: 2px solid #2a2118 !important;
-    box-shadow: 0 2px 0 #c9a34e !important;
   }
   .pixel-header__grid { display: none !important; }
 
   .pixel-brand {
     flex: 1 1 auto !important;
     min-width: 0 !important;
-    max-width: 45% !important;
+    max-width: 48% !important;
   }
-  .pixel-brand__eyebrow { display: none !important; }
+  .pixel-brand__eyebrow,
   .pixel-brand p { display: none !important; }
   .pixel-brand h1 {
-    font-size: 0.36rem !important;
-    line-height: 1.25 !important;
-    letter-spacing: 0.3px !important;
+    font-size: 0.34rem !important;
+    line-height: 1.2 !important;
     text-shadow: 1px 1px 0 #e8d5b0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .pixel-center {
     display: flex !important;
-    flex-direction: row !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 5px !important;
     flex: 0 0 auto !important;
   }
   .pixel-price-card { display: none !important; }
 
   .pixel-buy {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 32px !important;
-    min-height: 32px !important;
-    padding: 0 12px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 10px !important;
     animation: none !important;
-    box-shadow: 2px 2px 0 #2a2118 !important;
   }
   .pixel-buy__icon,
   .pixel-buy__arrow { display: none !important; }
-  .pixel-buy__text { font-size: 0.3rem !important; line-height: 1 !important; }
+  .pixel-buy__text { font-size: 0.28rem !important; }
 
-  .pixel-stats { flex: 0 0 auto !important; margin: 0 !important; }
+  .pixel-stats { flex: 0 0 auto !important; }
   .pixel-stat {
-    padding: 5px 8px !important;
+    padding: 4px 7px !important;
     box-shadow: none !important;
-    border: 1.5px solid #c9a34e !important;
-    background: #fff !important;
   }
   .pixel-stat__top,
   .pixel-stat__foot,
   .pixel-progress,
   .pixel-stat__unit { display: none !important; }
-  .pixel-stat .counter-num {
-    font-size: 0.28rem !important;
-    line-height: 1 !important;
-  }
+  .pixel-stat .counter-num { font-size: 0.26rem !important; }
 
-  /* Second bar: scrollable row of same buttons as desktop */
   .toolbar {
     display: flex !important;
     flex-wrap: nowrap !important;
-    align-items: center !important;
     justify-content: flex-start !important;
-    gap: 5px !important;
-    padding: 6px 8px !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 5px 6px !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    background: #f3e6c8 !important;
-    border-bottom: 2px solid #d4a017 !important;
   }
   .toolbar::-webkit-scrollbar { display: none; }
   .toolbar .tool-btn {
     flex: 0 0 auto !important;
-    padding: 7px 9px !important;
-    font-size: 0.26rem !important;
-    line-height: 1.2 !important;
+    padding: 6px 8px !important;
+    font-size: 0.24rem !important;
     box-shadow: 1px 1px 0 #c9a66b !important;
-    animation: none !important;
   }
   .toolbar .zoom-lvl {
     flex: 0 0 auto !important;
-    min-width: 42px !important;
-    padding: 5px 3px !important;
-    font-size: 0.28rem !important;
+    min-width: 38px !important;
+    font-size: 0.26rem !important;
+    padding: 4px 2px !important;
   }
-  .toolbar .tool-gap {
-    width: 6px !important;
-    flex-shrink: 0 !important;
+  .toolbar .tool-gap { width: 4px !important; flex-shrink: 0 !important; }
+
+  .viewport {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
   }
 
   .site-copy {
-    font-size: 0.65rem !important;
-    padding: 4px 8px !important;
+    font-size: 0.6rem !important;
+    padding: 3px 6px !important;
   }
 }
 

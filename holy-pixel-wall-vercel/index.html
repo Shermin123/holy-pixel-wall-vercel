@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -962,14 +961,14 @@
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: 6px;
+    padding: 4px 10px;
     background: #fffdf8;
-    border-top: 2px solid var(--gold);
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.32rem;
+    border-top: 1px solid #e0d4c0;
+    font-family: 'VT323', monospace;
+    font-size: 0.7rem;
     color: var(--muted);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     z-index: 70;
     text-align: center;
   }
@@ -1518,10 +1517,10 @@
     display: flex !important;
     justify-content: center;
     align-items: center;
-    gap: 6px;
-    font-size: 0.75rem !important;
-    padding: 5px 8px !important;
-    padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px)) !important;
+    gap: 4px;
+    font-size: 0.65rem !important;
+    padding: 3px 8px !important;
+    padding-bottom: calc(3px + env(safe-area-inset-bottom, 0px)) !important;
     background: #f3ebe0 !important;
     border-top: 1px solid #e0d4c0 !important;
     color: #5c4a32;
@@ -1592,13 +1591,732 @@
     font-size: 0.28rem !important;
   }
   .site-copy {
-    padding: 4px 10px !important;
-    font-size: 0.75rem !important;
+    padding: 3px 10px !important;
+    font-size: 0.65rem !important;
   }
   .viewport {
     flex: 1 1 auto !important;
     min-height: 0 !important;
   }
+}
+
+
+/* Toolbar groups — clean layout desktop + mobile */
+.toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+.tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.tool-group--zoom {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid #e0d4c0;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+.tb-short { display: none; }
+.tb-full { display: inline; }
+
+@media (max-width: 700px) {
+  .toolbar {
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .tool-group {
+    gap: 4px;
+  }
+  .tool-group--zoom {
+    padding: 2px 3px;
+  }
+  .toolbar .tool-gap {
+    width: 1px !important;
+    height: 18px !important;
+    background: #d2b48c !important;
+    align-self: center;
+  }
+  .tb-full { display: none !important; }
+  .tb-short { display: inline !important; }
+  .toolbar .tool-btn {
+    min-height: 22px !important;
+    padding: 2px 5px !important;
+    font-size: 0.2rem !important;
+    border-radius: 2px;
+  }
+  .toolbar .zoom-lvl {
+    min-width: 28px !important;
+    font-size: 0.55rem !important;
+    line-height: 22px !important;
+  }
+}
+
+
+.hpw-chip {
+  display: inline-block;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.32rem;
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  border: 2px solid #2a2118;
+  background: linear-gradient(180deg, #fff8e8 0%, #f0c14b 100%);
+  color: #2a2118;
+  box-shadow: 2px 2px 0 #2a2118;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.hpw-chip:hover { filter: brightness(1.05); }
+.hpw-chip[aria-expanded="true"] {
+  background: #2a2118;
+  color: #f0c14b;
+}
+.hpw-seo-box {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 2px solid #c9a34e;
+  background: #fffdf8;
+  color: #5c4a32;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.hpw-seo-box[hidden] { display: none !important; }
+.hpw-seo-box strong { color: #2a2118; }
+
+
+
+/* =========================================================
+   MOBILE CHROME — desktop-like small boxes, clean layout
+   ========================================================= */
+@media (max-width: 700px) {
+  html, body {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  /* Header: title left · counter + buy right (like desktop) */
+  .pixel-header {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 0 8px !important;
+    background: #fffef9 !important;
+    border-bottom: 2px solid #2a2118 !important;
+    box-shadow: 0 1px 0 #e8d9b8 !important;
+  }
+  .pixel-header__grid { display: none !important; }
+
+  .pixel-brand {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .pixel-brand h1 {
+    font-size: 0.34rem !important;
+    letter-spacing: 0.3px !important;
+    text-shadow: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .pixel-brand p,
+  .pixel-brand__eyebrow { display: none !important; }
+
+  .pixel-center {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex: 0 0 auto !important;
+  }
+  .pixel-price-card { display: none !important; }
+
+  /* Small counter box (desktop style) */
+  .pixel-stats {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+  }
+  .pixel-stat {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px 8px !important;
+    min-width: 0 !important;
+    width: auto !important;
+    border: 1.5px solid #c9b896 !important;
+    background: #fff !important;
+    box-shadow: 1px 1px 0 rgba(42,33,24,0.1) !important;
+    border-radius: 2px !important;
+  }
+  .pixel-stat__top,
+  .pixel-stat__foot,
+  .pixel-progress,
+  .pixel-stat__unit { display: none !important; }
+  .pixel-stat__main { margin: 0 !important; }
+  .pixel-stat .counter-num {
+    font-size: 0.26rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* Small buy box */
+  .pixel-buy {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 0 10px !important;
+    border: 1.5px solid #2a2118 !important;
+    background: linear-gradient(180deg, #e86a3c 0%, #c24e2e 100%) !important;
+    box-shadow: 1px 1px 0 #2a2118 !important;
+    animation: none !important;
+    border-radius: 2px !important;
+  }
+  .pixel-buy__text {
+    font-size: 0.26rem !important;
+    letter-spacing: 0.3px !important;
+  }
+  .pixel-buy__icon,
+  .pixel-buy__arrow { display: none !important; }
+
+  /* Toolbar: three neat boxes */
+  .toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: nowrap !important;
+
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  gap: 8px !important;
+  padding: 7px 10px !important;
+
+  background: #f7f0df !important;
+  border-bottom: 2px solid #2a2118 !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important;
+}
+
+.toolbar::-webkit-scrollbar {
+  display: none !important;
+}
+  .toolbar::-webkit-scrollbar { display: none; }
+
+  .toolbar .tool-gap { display: none !important; }
+
+  .tool-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 5px !important;
+  flex: 0 0 auto !important;
+
+  padding: 3px !important;
+
+  background: #fffdf8 !important;
+  border: 2px solid #2a2118 !important;
+  border-radius: 2px !important;
+
+  box-shadow: 2px 2px 0 #c9a34e !important;
+}
+  
+  .tool-group--zoom {
+    background: #fff !important;
+    border: 1.5px solid #c9b896 !important;
+    padding: 3px 4px !important;
+  }
+
+  .tb-full { display: none !important; }
+  .tb-short { display: inline !important; }
+
+  .toolbar .tool-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  height: 30px !important;
+  min-height: 30px !important;
+
+  padding: 0 10px !important;
+
+  font-size: 0.28rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+
+  border: 1px solid #2a2118 !important;
+  background: #fffef9 !important;
+
+  box-shadow: none !important;
+  border-radius: 1px !important;
+}
+  .toolbar .tool-btn:active {
+    background: #f0c14b !important;
+  }
+  .toolbar .zoom-lvl {
+    min-width: 34px !important;
+    font-size: 0.7rem !important;
+    line-height: 26px !important;
+    padding: 0 3px !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .site-copy {
+    font-size: 0.6rem !important;
+    padding: 3px 8px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .pixel-brand h1 { font-size: 0.28rem !important; }
+  .pixel-buy { padding: 0 7px !important; }
+  .pixel-buy__text { font-size: 0.22rem !important; }
+  .toolbar .tool-btn { padding: 0 5px !important; font-size: 0.2rem !important; }
+}
+
+
+/* ============================================================
+   MOBILE TOP BAR — single source of truth (overrides all above)
+   ============================================================ */
+@media (max-width: 700px) {
+  .pixel-header {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
+    column-gap: 0 !important;
+    row-gap: 0 !important;
+    gap: 6px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 0 8px !important;
+    overflow: visible !important;
+    background: #fffef9 !important;
+    border-bottom: 2px solid #2a2118 !important;
+    box-shadow: none !important;
+  }
+  .pixel-header__grid,
+  .pixel-header::before,
+  .pixel-header::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .pixel-brand {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: 42% !important;
+    justify-self: auto !important;
+    overflow: hidden !important;
+  }
+  .pixel-brand__copy {
+    min-width: 0 !important;
+    gap: 0 !important;
+  }
+  .pixel-brand__eyebrow { display: none !important; }
+  .pixel-brand p { display: none !important; }
+  .pixel-brand h1 {
+    font-size: 0.32rem !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0.2px !important;
+    text-shadow: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .pixel-center {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 5px !important;
+    flex: 0 0 auto !important;
+    justify-self: auto !important;
+  }
+  .pixel-price-card { display: none !important; }
+
+  .pixel-buy {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    border: 1.5px solid #2a2118 !important;
+    background: linear-gradient(180deg, #e86a3c 0%, #c24e2e 100%) !important;
+    box-shadow: 1px 1px 0 #2a2118 !important;
+    animation: none !important;
+    border-radius: 2px !important;
+  }
+  .pixel-buy__icon,
+  .pixel-buy__arrow { display: none !important; }
+  .pixel-buy__text {
+    font-size: 0.26rem !important;
+    line-height: 1 !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  .pixel-stats {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    order: 0 !important;
+  }
+  .pixel-stat {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px 7px !important;
+    margin: 0 !important;
+    border: 1.5px solid #c9b896 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border-radius: 2px !important;
+    min-width: 0 !important;
+    width: auto !important;
+  }
+  .pixel-stat__top,
+  .pixel-stat__foot,
+  .pixel-progress,
+  .pixel-stat__unit { display: none !important; }
+  .pixel-stat__main { margin: 0 !important; line-height: 1 !important; }
+  .pixel-stat .counter-num {
+    font-size: 0.24rem !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  /* Reorder: brand | buy | stats via flex order if needed */
+  .pixel-brand { order: 1 !important; }
+  .pixel-center { order: 2 !important; }
+  .pixel-stats { order: 3 !important; }
+
+  /* Toolbar — tight chip groups */
+  .toolbar {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 5px !important;
+    padding: 5px 6px !important;
+    background: #f5efe4 !important;
+    border-bottom: 1px solid #e0d4c0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  .toolbar::-webkit-scrollbar { display: none !important; }
+  .toolbar .tool-gap { display: none !important; }
+
+  .tool-group {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 2px !important;
+    flex: 0 0 auto !important;
+    padding: 2px !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff !important;
+    border: 1.5px solid #c9b896 !important;
+    border-radius: 3px !important;
+    box-shadow: none !important;
+  }
+  .tool-group--zoom {
+    border: 1.5px solid #c9b896 !important;
+    padding: 2px !important;
+  }
+
+  .tb-full { display: none !important; }
+  .tb-short { display: inline !important; line-height: 1 !important; }
+
+  .toolbar .tool-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 6px 7px !important;
+    margin: 0 !important;
+    font-size: 0.22rem !important;
+    line-height: 1 !important;
+    border: 1px solid #e8dcc8 !important;
+    background: #fffef9 !important;
+    box-shadow: none !important;
+    animation: none !important;
+    white-space: nowrap !important;
+    border-radius: 2px !important;
+  }
+  .toolbar .tool-btn:active {
+    background: #f0c14b !important;
+  }
+  .toolbar .zoom-lvl {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 34px !important;
+    height: auto !important;
+    padding: 4px 2px !important;
+    font-size: 0.65rem !important;
+    line-height: 1 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .site-copy {
+    font-size: 0.6rem !important;
+    padding: 3px 8px !important;
+  }
+}
+
+
+/* ============================================================
+   SECOND BAR (toolbar) — pixel theme, clean & visible
+   ============================================================ */
+@media (max-width: 700px) {
+  .toolbar {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+    margin: 0 !important;
+    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
+    border-bottom: 3px solid #2a2118 !important;
+    box-shadow: 0 2px 0 #c9a34e !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none !important;
+    height: auto !important;
+    min-height: 40px !important;
+    max-height: none !important;
+    box-sizing: border-box !important;
+  }
+  .toolbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+  .toolbar .tool-gap { display: none !important; }
+
+  /* Flat pixel chips — no nested boxes, just buttons in a row group */
+  .toolbar .tool-group {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+  }
+
+  .toolbar .tool-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.3rem !important;
+    line-height: 1 !important;
+    letter-spacing: 0.4px !important;
+    color: #2a2118 !important;
+    background: #fffdf8 !important;
+    border: 2px solid #2a2118 !important;
+    border-radius: 0 !important;
+    box-shadow: 2px 2px 0 #c9a34e !important;
+    animation: none !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+  }
+  /* Join buttons in a group: shared border, single outer shadow */
+  .toolbar .tool-group .tool-btn + .tool-btn {
+    margin-left: -2px !important;
+  }
+  .toolbar .tool-group .tool-btn:not(:last-child) {
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group .tool-btn:last-child {
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
+  .toolbar .tool-group .tool-btn:only-child {
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
+
+  .toolbar .tool-btn:active,
+  .toolbar .tool-btn.tool-active {
+    background: #f0c14b !important;
+    color: #2a2118 !important;
+    border-color: #2a2118 !important;
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0 #c9a34e !important;
+  }
+
+  /* Zoom cluster: − 100% + FIT as one joined strip */
+  .toolbar .tool-group--zoom {
+    gap: 0 !important;
+  }
+  .toolbar .zoom-lvl {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 28px !important;
+    min-width: 42px !important;
+    padding: 0 4px !important;
+    margin: 0 0 0 -2px !important;
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.28rem !important;
+    line-height: 1 !important;
+    color: #2a2118 !important;
+    background: #fff8e0 !important;
+    border: 2px solid #2a2118 !important;
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+  }
+  .toolbar .tool-group--zoom #zoomOut {
+    border-right-width: 0 !important;
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group--zoom #zoomIn {
+    margin-left: 0 !important;
+    border-left-width: 0 !important;
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group--zoom #zoomFit {
+    margin-left: -2px !important;
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
+
+  #toolSelect, #toolDrag, #toolDev, #exportBtn {
+    display: none !important;
+  }
+}
+
+/* Desktop second bar — pixel chips, same language */
+@media (min-width: 701px) {
+  .toolbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+    padding: 6px 10px !important;
+    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
+    border-bottom: 3px solid #2a2118 !important;
+    box-shadow: 0 2px 0 #c9a34e !important;
+  }
+  .toolbar .tool-group {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .toolbar .tool-gap { display: none !important; }
+  .toolbar .tool-btn {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.32rem !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 12px !important;
+    color: #2a2118 !important;
+    background: #fffdf8 !important;
+    border: 2px solid #2a2118 !important;
+    border-radius: 0 !important;
+    box-shadow: 2px 2px 0 #c9a34e !important;
+    animation: none !important;
+  }
+  .toolbar .tool-group .tool-btn + .tool-btn {
+    margin-left: -2px !important;
+  }
+  .toolbar .tool-group .tool-btn:not(:last-child) {
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group .tool-btn:last-child {
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
+  .toolbar .tool-btn:hover {
+    background: #fff8e0 !important;
+  }
+  .toolbar .tool-btn:active,
+  .toolbar .tool-btn.tool-active {
+    background: #f0c14b !important;
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0 #c9a34e !important;
+  }
+  .toolbar .zoom-lvl {
+    height: 30px !important;
+    min-width: 48px !important;
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.3rem !important;
+    color: #2a2118 !important;
+    background: #fff8e0 !important;
+    border: 2px solid #2a2118 !important;
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group--zoom #zoomOut { border-right-width: 0 !important; box-shadow: none !important; }
+  .toolbar .tool-group--zoom #zoomIn { margin-left: 0 !important; border-left-width: 0 !important; box-shadow: none !important; }
+  .toolbar .tool-group--zoom #zoomFit { margin-left: -2px !important; box-shadow: 2px 2px 0 #c9a34e !important; }
 }
 
 </style>
@@ -1651,23 +2369,26 @@
   <div id="willow" style="display:none"></div>
 </header>
 
-<div class="toolbar">
+<div class="toolbar" role="toolbar" aria-label="Wall tools">
   <button class="tool-btn" id="toolSelect" type="button" style="display:none">SELECT</button>
   <button class="tool-btn" id="toolDrag" type="button" style="display:none">DRAG</button>
   <button class="tool-btn" id="toolDev" type="button" style="display:none">DEV</button>
-  <button class="tool-btn" id="toolClaims" type="button" title="My claims">MY CLAIMS</button>
-  <button class="tool-btn" id="ownersBtn" type="button" title="All owners">OWNERS</button>
-  <span class="tool-gap"></span>
-  <button class="tool-btn" id="zoomOut" type="button" title="Zoom out">−</button>
-  <span id="zoomLvl" class="zoom-lvl">100%</span>
-  <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
-  <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
-  <span class="tool-gap"></span>
-  <button class="tool-btn" id="storyBtn" type="button">STORY</button>
-  <button class="tool-btn" id="contactBtn" type="button">CONTACT</button>
-  <button class="tool-btn" id="helpBtn" type="button">HOW IT WORKS</button>
+  <div class="tool-group tool-group--nav">
+    <button class="tool-btn" id="toolClaims" type="button" title="My claims">CLAIMS</button>
+    <button class="tool-btn" id="ownersBtn" type="button" title="Owners">OWNERS</button>
+  </div>
+  <div class="tool-group tool-group--zoom">
+    <button class="tool-btn" id="zoomOut" type="button" title="Zoom out">−</button>
+    <span id="zoomLvl" class="zoom-lvl">100%</span>
+    <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
+    <button class="tool-btn" id="zoomFit" type="button" title="Fit">FIT</button>
+  </div>
+  <div class="tool-group tool-group--info">
+    <button class="tool-btn" id="storyBtn" type="button">STORY</button>
+    <button class="tool-btn" id="contactBtn" type="button">MAIL</button>
+    <button class="tool-btn" id="helpBtn" type="button">HELP</button>
+  </div>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
-  <!-- admin: Ctrl+Shift+A only -->
 </div>
 <div class="viewport" id="viewport">
   <div id="wallWrap">
@@ -1933,9 +2654,20 @@ Min 10 blocks · no maximum
       <p style="margin-bottom:12px">
         Every pixel you claim helps cover education costs. You’re not just buying space on a grid — you’re helping someone stay in school.
       </p>
-      <p style="color:var(--dark)">
+      <p style="margin-bottom:14px;color:var(--dark)">
         Thank you for being here. It means more than you know.
       </p>
+      <button type="button" id="hpwSeoBtn" class="hpw-chip" aria-expanded="false" aria-controls="hpwSeoBox">HPW</button>
+      <div id="hpwSeoBox" class="hpw-seo-box" hidden>
+        <p>
+          <strong>Holy Pixel Wall (HPW)</strong> is an online pixel wall and digital fundraising page where anyone can
+          <strong>buy pixels</strong>, claim a block on a public grid, and display a photo, logo, or message.
+          Inspired by the classic million-dollar homepage idea, HPW is a modern
+          <strong>pixel art billboard</strong> built to help raise money for
+          <strong>university education</strong>, tuition fees, and student costs.
+          Own a piece of the wall, support education, and join a growing community of pixel owners worldwide.
+        </p>
+      </div>
     </div>
     <div class="modal-foot">
       <button type="button" class="btn btn-sec" id="storyClose">CLOSE</button>
@@ -2507,13 +3239,24 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Maximize wall on desktop AND phone — full FIT, no forced scroll.
-    // Wall uses nearly the entire viewport so it is large and fully visible.
-    const margin = 2;
+    // Phone: full wall fits in view.
+    // Desktop: clean vertical wall — mostly height-fit, only a slight
+    // bump in size so it reads taller/clearer without extreme stretch.
+    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
+    const margin = phone ? 6 : 16;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s = Math.min(vw / COLS, vh / ROWS);
+    let s;
+    if (phone) {
+      s = Math.min(vw / COLS, vh / ROWS);
+    } else {
+      const fit = Math.min(vw / COLS, vh / ROWS);
+      const wide = vw / COLS;
+      // ~25% toward full-width — mild size boost, still vertical/centered
+      s = fit + (wide - fit) * 0.25;
+      if (s < fit) s = fit;
+    }
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;
@@ -2535,6 +3278,7 @@ Min 10 blocks · no maximum
       requestAnimationFrame(() => {
         const wrap = $('wallWrap');
         if (wrap && viewport) {
+          // Center the wall — clean vertical panel in the middle
           viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
           viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
         } else if (viewport) {
@@ -2561,15 +3305,15 @@ Min 10 blocks · no maximum
   // ===== Smooth zoom (layout-sized, no transform glitch) =====
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 1, Z_MAX = 14;
+  const Z_MIN = 1, Z_MAX = 24;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
-    // At fit (zoom≈1): no outer margin so the wall sits flush — no colored box.
-    // When zoomed in: padding so corners stay reachable by scrolling.
     try {
-      if ((zoom || 1) <= 1.05) return 0;
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      return w < 700 ? 36 : 48;
+      const phone = w < 700;
+      // Fit: tiny pad so the wall reads as a clean centered panel
+      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
+      return phone ? 36 : 40;
     } catch (e) { return 0; }
   }
   function isPhoneLayout() {
@@ -2584,7 +3328,8 @@ Min 10 blocks · no maximum
 
   function zClamp(z) {
     z = Number(z);
-    if (!isFinite(z) || z < Z_MIN) return Z_MIN;
+    if (!isFinite(z) || z <= 0) return Z_MIN;
+    if (z < Z_MIN) return Z_MIN;
     if (z > Z_MAX) return Z_MAX;
     return z;
   }
@@ -2662,10 +3407,10 @@ Min 10 blocks · no maximum
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
     // High internal resolution so claim photos stay sharp (esp. phone zoom)
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const minLong = isPhoneLayout() ? 3200 : 2800;
+    const minLong = isPhoneLayout() ? 3600 : 4200;
     const long = Math.max(baseW, baseH);
     const boost = long < minLong ? (minLong / long) : 1;
-    const scale = dpr * Math.min(boost, 3.5);
+    const scale = dpr * Math.min(boost, 4);
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -2730,9 +3475,17 @@ Min 10 blocks · no maximum
   function zoomFrame() {
     zoomRaf = 0;
     const target = zClamp(zoomTarget);
+    if (!isFinite(target) || !isFinite(zoom)) {
+      zoom = Z_MIN;
+      zoomTarget = Z_MIN;
+      layoutAtZoom(zoom);
+      clampScroll();
+      return;
+    }
     const diff = target - zoom;
-    if (Math.abs(diff) < 0.002) {
+    if (Math.abs(diff) < 0.0015) {
       zoom = target;
+      zoomTarget = target;
       layoutAtZoom(zoom);
       keepAnchor();
       zoomAnchor = null;
@@ -2741,7 +3494,9 @@ Min 10 blocks · no maximum
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;
     }
-    zoom += diff * 0.32;
+    // Ease toward target; larger steps when far for responsive zoom
+    const step = Math.abs(diff) > 0.5 ? 0.4 : 0.28;
+    zoom = zClamp(zoom + diff * step);
     layoutAtZoom(zoom);
     keepAnchor();
     zoomRaf = requestAnimationFrame(zoomFrame);
@@ -2750,21 +3505,25 @@ Min 10 blocks · no maximum
   function bumpZoom(d, clientX, clientY, continuous) {
     let factor;
     if (continuous) {
-      const clamped = Math.max(-0.25, Math.min(0.25, d));
+      const clamped = Math.max(-0.35, Math.min(0.35, d));
       factor = Math.exp(clamped);
     } else {
-      factor = d > 0 ? 1.2 : 1 / 1.2;
+      // Button / key: ~25% steps, stable
+      factor = d > 0 ? 1.25 : 0.8;
     }
     if (!isFinite(factor) || factor <= 0) return;
 
-    if (!zoomAnchor) anchorAt(clientX, clientY);
-    else if (clientX != null && isFinite(clientX)) {
-      const vr = viewport.getBoundingClientRect();
-      zoomAnchor.mx = clientX - vr.left;
-      zoomAnchor.my = clientY - vr.top;
-    }
+    try {
+      if (!zoomAnchor) anchorAt(clientX, clientY);
+      else if (clientX != null && isFinite(clientX)) {
+        const vr = viewport.getBoundingClientRect();
+        zoomAnchor.mx = clientX - vr.left;
+        zoomAnchor.my = clientY - vr.top;
+      }
+    } catch (e) {}
 
-    zoomTarget = zClamp(zoomTarget * factor);
+    const base = isFinite(zoomTarget) ? zoomTarget : (zoom || 1);
+    zoomTarget = zClamp(base * factor);
     if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
   }
 
@@ -3158,11 +3917,13 @@ function getImg(src) {
 
     // 4) Buy-mode grid — soft lines when zoomed so each pixel is clear
     const visCell = (baseCell || drawCell) * (zoom || 1);
-    if (buyMode && visCell >= 4) {
+    if (buyMode && visCell >= 3) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.12)';
-      ctx.lineWidth = Math.max(0.4, drawCell * 0.03);
+      // Stronger lines when zoomed in so each pixel is obvious
+      const lineA = visCell >= 12 ? 0.28 : 0.14;
+      ctx.strokeStyle = 'rgba(42, 33, 24, ' + lineA + ')';
+      ctx.lineWidth = Math.max(0.4, drawCell * (visCell >= 12 ? 0.05 : 0.03));
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
         const x = Math.floor(c * drawCell) + 0.5;
@@ -3221,8 +3982,8 @@ function getImg(src) {
         });
 
         // Inner pixel lines only when cells are large enough (zoomed in)
-        if (visCell >= 5) {
-          ctx.strokeStyle = 'rgba(5, 120, 90, 0.35)';
+        if (visCell >= 3) {
+          ctx.strokeStyle = 'rgba(5, 120, 90, 0.45)';
           ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
           ctx.beginPath();
           for (let c = sMinC; c <= sMaxC + 1; c++) {
@@ -3256,8 +4017,8 @@ function getImg(src) {
       ctx.save();
       ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
       ctx.fillRect(dx, dy, dw, dh);
-      if (visCell >= 5) {
-        ctx.strokeStyle = 'rgba(5, 120, 90, 0.3)';
+      if (visCell >= 3) {
+        ctx.strokeStyle = 'rgba(5, 120, 90, 0.4)';
         ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
         ctx.beginPath();
         for (let c = minC; c <= maxC + 1; c++) {
@@ -5387,6 +6148,21 @@ function clearPending() {
   if ($('helpClose')) $('helpClose').onclick = () => { $('helpModal').style.display = 'none'; };
   if ($('storyBtn')) $('storyBtn').onclick = () => { $('storyModal').style.display = 'flex'; };
   if ($('storyClose')) $('storyClose').onclick = () => { $('storyModal').style.display = 'none'; };
+  (function wireHpwSeo() {
+    const btn = $('hpwSeoBtn');
+    const box = $('hpwSeoBox');
+    if (!btn || !box) return;
+    btn.onclick = () => {
+      const open = box.hasAttribute('hidden');
+      if (open) {
+        box.removeAttribute('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+      } else {
+        box.setAttribute('hidden', '');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    };
+  })();
   if ($('storyBuy')) $('storyBuy').onclick = () => {
     $('storyModal').style.display = 'none';
     if (typeof setBuyMode === 'function') setBuyMode(true);
@@ -6233,7 +7009,7 @@ function clearPending() {
   }, { passive: false });
   viewport.addEventListener('gesturechange', e => {
     e.preventDefault();
-    const target = Math.max(1, Math.min(12, gestureStartZoom * e.scale));
+    const target = Math.max(Z_MIN, Math.min(Z_MAX, gestureStartZoom * e.scale));
     const delta = target - zoom;
     if (Math.abs(delta) > 0.001) {
       bumpZoom(delta, e.clientX || lastMouseX, e.clientY || lastMouseY, true);

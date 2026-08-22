@@ -1799,35 +1799,51 @@
 
   /* Toolbar: three neat boxes */
   .toolbar {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 6px !important;
-    padding: 6px 8px !important;
-    background: #f7f2e8 !important;
-    border-bottom: 1px solid #e5d9c4 !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: nowrap !important;
+
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  gap: 8px !important;
+  padding: 7px 10px !important;
+
+  background: #f7f0df !important;
+  border-bottom: 2px solid #2a2118 !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important;
+}
+
+.toolbar::-webkit-scrollbar {
+  display: none !important;
+}
   .toolbar::-webkit-scrollbar { display: none; }
 
   .toolbar .tool-gap { display: none !important; }
 
   .tool-group {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 3px !important;
-    flex: 0 0 auto !important;
-    padding: 3px 4px !important;
-    background: #fff !important;
-    border: 1.5px solid #c9b896 !important;
-    border-radius: 3px !important;
-    box-shadow: 1px 1px 0 rgba(42,33,24,0.08) !important;
-  }
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 5px !important;
+  flex: 0 0 auto !important;
+
+  padding: 3px !important;
+
+  background: #fffdf8 !important;
+  border: 2px solid #2a2118 !important;
+  border-radius: 2px !important;
+
+  box-shadow: 2px 2px 0 #c9a34e !important;
+}
+  
   .tool-group--zoom {
     background: #fff !important;
     border: 1.5px solid #c9b896 !important;
@@ -1838,16 +1854,25 @@
   .tb-short { display: inline !important; }
 
   .toolbar .tool-btn {
-    min-height: 26px !important;
-    height: 26px !important;
-    padding: 0 7px !important;
-    font-size: 0.22rem !important;
-    border: 1px solid #e0d4c0 !important;
-    background: #fffef9 !important;
-    box-shadow: none !important;
-    border-radius: 2px !important;
-    animation: none !important;
-  }
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  height: 30px !important;
+  min-height: 30px !important;
+
+  padding: 0 10px !important;
+
+  font-size: 0.28rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+
+  border: 1px solid #2a2118 !important;
+  background: #fffef9 !important;
+
+  box-shadow: none !important;
+  border-radius: 1px !important;
+}
   .toolbar .tool-btn:active {
     background: #f0c14b !important;
   }

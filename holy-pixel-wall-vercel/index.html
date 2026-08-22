@@ -3286,16 +3286,32 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // 4) Buy-mode grid — hairline strokes (stay ~1px on screen at any zoom)
+    // 4) Buy-mode pixel grid — clear at full zoom, ~1.5 screen-px lines
     const visCell = (baseCell || drawCell) * (zoom || 1);
-    // Canvas is CSS-scaled by zoom, so divide by zoom for true thin lines
     const zNow = Math.max(zoom || 1, 1);
-    const hair = Math.max(0.04, 0.9 / zNow);       // ~1 screen px
-    const hairBold = Math.max(0.06, 1.4 / zNow);   // slightly thicker section lines
-    if (buyMode && visCell >= 3) {
+    // Keep lines readable on retina without swallowing the cell
+    const hair = Math.max(0.06, 1.35 / zNow);
+    const hairBold = Math.max(0.1, 2.2 / zNow);
+    const hairFrame = Math.max(0.12, 2.5 / zNow);
+
+    if (buyMode && visCell >= 2.5) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.22)';
+      // Subtle free-cell tint when zoomed so empty pixels read as squares
+      if (visCell >= 8) {
+        for (let c = gc0; c <= gc1; c++) {
+          for (let r = gr0; r <= gr1; r++) {
+            if (sold.has(c + ',' + r)) continue;
+            if ((c + r) % 2 === 0) {
+              ctx.fillStyle = 'rgba(212, 160, 23, 0.06)';
+              ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
+            }
+          }
+        }
+      }
+      // Per-pixel lines — warm brown, stronger when zoomed in
+      const gridAlpha = visCell >= 14 ? 0.45 : (visCell >= 8 ? 0.32 : 0.2);
+      ctx.strokeStyle = 'rgba(58, 42, 26, ' + gridAlpha + ')';
       ctx.lineWidth = hair;
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
@@ -3309,8 +3325,8 @@ function getImg(src) {
         ctx.lineTo((gc1 + 1) * drawCell, y);
       }
       ctx.stroke();
-      // 10×10 section lines — still thin
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.35)';
+      // 10×10 blocks
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.5)';
       ctx.lineWidth = hairBold;
       ctx.beginPath();
       const sec = SECTION || 10;
@@ -3328,7 +3344,7 @@ function getImg(src) {
       ctx.restore();
     }
 
-    // 5) Selection — thin pixel grid + light fill + slim outer frame
+    // 5) Selection — gold glass fill + crisp thin pixel borders
     if (selected.size) {
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
       const freeKeys = [];
@@ -3348,14 +3364,15 @@ function getImg(src) {
         const bh = (sMaxR - sMinR + 1) * drawCell;
 
         ctx.save();
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
+        // Soft gold glass — matches site palette, stays see-through
+        ctx.fillStyle = 'rgba(212, 160, 23, 0.22)';
         freeKeys.forEach(([c, r]) => {
           ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
         });
 
-        // Thin inner grid so every selected pixel is visible
-        if (visCell >= 3) {
-          ctx.strokeStyle = 'rgba(5, 120, 90, 0.55)';
+        // Every selected pixel outlined clearly
+        if (visCell >= 2.5) {
+          ctx.strokeStyle = 'rgba(139, 90, 43, 0.75)';
           ctx.lineWidth = hair;
           ctx.beginPath();
           for (let c = sMinC; c <= sMaxC + 1; c++) {
@@ -3371,26 +3388,30 @@ function getImg(src) {
           ctx.stroke();
         }
 
-        // Slim outer frame (~2 screen px)
-        ctx.strokeStyle = 'rgba(4, 120, 87, 0.95)';
-        ctx.lineWidth = Math.max(hair * 1.6, 1.5 / zNow);
+        // Outer frame — dark amber, easy to see
+        ctx.strokeStyle = 'rgba(92, 61, 30, 0.95)';
+        ctx.lineWidth = hairFrame;
         ctx.setLineDash([]);
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
+        // Inner highlight for depth
+        ctx.strokeStyle = 'rgba(240, 193, 75, 0.7)';
+        ctx.lineWidth = hair;
+        ctx.strokeRect(bx + hairFrame + 0.5, by + hairFrame + 0.5, Math.max(0, bw - hairFrame * 2 - 1), Math.max(0, bh - hairFrame * 2 - 1));
         ctx.restore();
       }
     }
 
-    // 6) Drag preview — same thin lines
+    // 6) Drag preview — same gold style while dragging
     if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
       const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
       const dx = minC * drawCell, dy = minR * drawCell;
       const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
       ctx.save();
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.10)';
+      ctx.fillStyle = 'rgba(212, 160, 23, 0.16)';
       ctx.fillRect(dx, dy, dw, dh);
-      if (visCell >= 3) {
-        ctx.strokeStyle = 'rgba(5, 120, 90, 0.5)';
+      if (visCell >= 2.5) {
+        ctx.strokeStyle = 'rgba(139, 90, 43, 0.65)';
         ctx.lineWidth = hair;
         ctx.beginPath();
         for (let c = minC; c <= maxC + 1; c++) {
@@ -3403,9 +3424,9 @@ function getImg(src) {
         }
         ctx.stroke();
       }
-      ctx.strokeStyle = 'rgba(4, 120, 87, 0.9)';
-      ctx.lineWidth = Math.max(hair * 1.5, 1.25 / zNow);
-      ctx.setLineDash([4 / zNow, 3 / zNow]);
+      ctx.strokeStyle = 'rgba(92, 61, 30, 0.9)';
+      ctx.lineWidth = hairFrame;
+      ctx.setLineDash([5 / zNow, 4 / zNow]);
       ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
       ctx.setLineDash([]);
       ctx.restore();

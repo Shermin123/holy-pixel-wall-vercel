@@ -1019,12 +1019,12 @@
   position: relative !important;
   isolation: isolate;
   display: grid !important;
-  grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) !important;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 1fr) !important;
   align-items: center !important;
-  column-gap: 20px !important;
-  min-height: 48px !important;
-  height: 48px !important;
-  padding: 0 14px !important;
+  column-gap: 16px !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  padding: 0 16px !important;
   overflow: hidden;
   background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
   border-bottom: 3px solid #2a2118 !important;
@@ -1366,210 +1366,6 @@
   .pixel-stat__foot { display: none; }
 }
 
-/* =========================================================
-   PHONE — compact top, full tools, footer visible
-   ========================================================= */
-@media (min-width: 701px) {
-  .viewport {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    background: #faf7f0 !important;
-  }
-}
-
-@media (max-width: 700px) {
-  html, body {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    background: #faf7f0 !important;
-  }
-
-  /* Phone header — classic compact */
-  .pixel-header {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    grid-template-columns: none !important;
-    gap: 8px !important;
-    height: 48px !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
-    padding: 0 10px !important;
-    border-bottom: 2px solid #2a2118 !important;
-    box-shadow: 0 2px 0 #c9a34e !important;
-    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
-  }
-  .pixel-header__grid { display: none !important; }
-  .pixel-brand {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-  }
-  .pixel-brand h1 {
-    font-size: 0.3rem !important;
-    letter-spacing: 0.2px !important;
-    text-shadow: 1px 1px 0 #e8d5b0 !important;
-  }
-  .pixel-brand p,
-  .pixel-brand__eyebrow { display: none !important; }
-
-  .pixel-center {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 5px !important;
-    flex-shrink: 0 !important;
-  }
-  .pixel-price-card {
-    display: none !important;
-  }
-  /* Tiny counter chip */
-  .pixel-stats {
-    display: flex !important;
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  .pixel-stat {
-    display: flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    padding: 2px 6px !important;
-    min-width: 0 !important;
-    width: auto !important;
-    border: 1px solid #2a2118 !important;
-    background: #fffdf8 !important;
-    box-shadow: none !important;
-  }
-  .pixel-stat__top,
-  .pixel-stat__foot,
-  .pixel-progress,
-  .pixel-stat__unit { display: none !important; }
-  .pixel-stat__main { margin: 0 !important; }
-  .pixel-stat .counter-num {
-    font-size: 0.24rem !important;
-    white-space: nowrap;
-  }
-
-  .pixel-buy {
-    min-height: 26px !important;
-    height: 26px !important;
-    padding: 0 8px !important;
-    box-shadow: 1px 1px 0 #2a2118 !important;
-    animation: none !important;
-  }
-  .pixel-buy__text { font-size: 0.26rem !important; }
-  .pixel-buy__icon,
-  .pixel-buy__arrow { display: none !important; }
-
-  /* Slim toolbar */
-  .toolbar {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    gap: 3px !important;
-    padding: 3px 5px !important;
-    justify-content: flex-start !important;
-    background: #f5efe4 !important;
-    border-bottom: 1px solid #e0d4c0 !important;
-    scrollbar-width: none;
-  }
-  .toolbar::-webkit-scrollbar { display: none; }
-  .toolbar .tool-gap {
-    width: 3px;
-    flex-shrink: 0;
-    display: block !important;
-  }
-  #toolClaims, #ownersBtn, #storyBtn, #contactBtn, #helpBtn,
-  #zoomOut, #zoomIn, #zoomFit {
-    display: inline-flex !important;
-  }
-  .toolbar .tool-btn {
-    flex: 0 0 auto;
-    min-height: 24px;
-    padding: 3px 6px !important;
-    font-size: 0.24rem !important;
-    white-space: nowrap;
-    background: #fff !important;
-  }
-  .toolbar .zoom-lvl {
-    flex: 0 0 auto;
-    min-width: 32px;
-    text-align: center;
-    font-size: 0.6rem;
-    line-height: 24px;
-    color: #5c4a32;
-  }
-
-  .viewport {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    background: #faf7f0 !important;
-  }
-
-  .stage {
-    box-shadow: 0 0 0 2px #2a2118 !important;
-  }
-
-  .site-copy {
-    display: flex !important;
-    justify-content: center;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.65rem !important;
-    padding: 3px 8px !important;
-    padding-bottom: calc(3px + env(safe-area-inset-bottom, 0px)) !important;
-    background: #f3ebe0 !important;
-    border-top: 1px solid #e0d4c0 !important;
-    color: #5c4a32;
-  }
-  #wallWrap {
-    background: transparent !important;
-  }
-
-  .float-bar {
-    bottom: calc(28px + env(safe-area-inset-bottom, 0px)) !important;
-    width: calc(100% - 16px) !important;
-    max-width: 400px !important;
-    padding: 8px 10px !important;
-  }
-  .float-bar .btn-claim,
-  .float-bar .btn-clear {
-    min-height: 36px;
-    padding: 6px 12px !important;
-    font-size: 0.36rem !important;
-  }
-  .sel-sum { font-size: 0.34rem !important; }
-
-  .overlay {
-    align-items: flex-end !important;
-    padding: 0 !important;
-  }
-  .overlay .modal {
-    max-width: 100% !important;
-    width: 100% !important;
-    max-height: 92dvh !important;
-    border-radius: 14px 14px 0 0;
-    margin: 0 !important;
-  }
-  .overlay .modal-body {
-    max-height: 60dvh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-@media (max-width: 380px) {
-  .pixel-brand h1 { font-size: 0.28rem !important; }
-  .pixel-buy__text { font-size: 0.26rem !important; }
-  .toolbar .tool-btn { font-size: 0.26rem !important; padding: 4px 6px !important; }
-}
-
-
-
 /* WALL ALIGN FIX — one paper color, wall centered, no outer box */
 .viewport, #wallWrap { background: #faf7f0 !important; }
 #wallWrap { background: transparent !important; }
@@ -1698,8 +1494,62 @@
 
 
 
-/* —— Classic top bars: desktop unchanged, mobile compact —— */
+
+/* ============================================================
+   TOP BARS — clean desktop + mobile (final)
+   ============================================================ */
+
+/* Desktop header already defined via .pixel-header */
+
+/* Toolbar desktop — centered, tidy */
+.toolbar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 8px 12px !important;
+  background: #f3e6c8 !important;
+  border-bottom: 2px solid #d4a017 !important;
+  flex-shrink: 0 !important;
+}
+.toolbar .tool-btn {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 0.34rem !important;
+  padding: 8px 10px !important;
+  line-height: 1.2 !important;
+  color: #5c3d0e !important;
+  background: #fffdf8 !important;
+  border: 2px solid #8b5a2b !important;
+  box-shadow: 2px 2px 0 #c9a66b !important;
+  cursor: pointer !important;
+  animation: none !important;
+  white-space: nowrap !important;
+}
+.toolbar .tool-btn:hover { background: #f0c14b !important; }
+.toolbar .tool-btn:active {
+  transform: translate(1px, 1px) !important;
+  box-shadow: 1px 1px 0 #c9a66b !important;
+}
+.toolbar .zoom-lvl {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 0.34rem !important;
+  min-width: 48px !important;
+  text-align: center !important;
+  padding: 6px 4px !important;
+  color: #8b5a2b !important;
+  background: #fff !important;
+  border: 2px solid #d2b48c !important;
+}
+.toolbar .tool-gap {
+  width: 8px !important;
+  height: 2px !important;
+  background: #d2b48c !important;
+  flex-shrink: 0 !important;
+}
+
 @media (max-width: 700px) {
+  /* Header: title | buy | counter — one clean row */
   .pixel-header {
     display: flex !important;
     flex-direction: row !important;
@@ -1707,52 +1557,80 @@
     align-items: center !important;
     justify-content: space-between !important;
     grid-template-columns: none !important;
-    height: 48px !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
-    padding: 0 10px !important;
+    grid-template-rows: none !important;
+    column-gap: 0 !important;
     gap: 8px !important;
+    height: 50px !important;
+    min-height: 50px !important;
+    max-height: 50px !important;
+    padding: 0 10px !important;
     overflow: hidden !important;
+    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
+    border-bottom: 2px solid #2a2118 !important;
+    box-shadow: 0 2px 0 #c9a34e !important;
   }
   .pixel-header__grid { display: none !important; }
-  .pixel-brand { flex: 1 1 auto; min-width: 0; }
+
+  .pixel-brand {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: 45% !important;
+  }
   .pixel-brand__eyebrow { display: none !important; }
   .pixel-brand p { display: none !important; }
   .pixel-brand h1 {
-    font-size: 0.38rem !important;
+    font-size: 0.36rem !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.3px !important;
     text-shadow: 1px 1px 0 #e8d5b0 !important;
   }
+
   .pixel-center {
     display: flex !important;
+    flex-direction: row !important;
     align-items: center !important;
     gap: 6px !important;
     flex: 0 0 auto !important;
   }
   .pixel-price-card { display: none !important; }
+
   .pixel-buy {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     height: 32px !important;
     min-height: 32px !important;
     padding: 0 12px !important;
     animation: none !important;
+    box-shadow: 2px 2px 0 #2a2118 !important;
   }
-  .pixel-buy__icon, .pixel-buy__arrow { display: none !important; }
-  .pixel-buy__text { font-size: 0.3rem !important; }
-  .pixel-stats { flex: 0 0 auto; }
-  .pixel-stat {
-    padding: 4px 8px !important;
-    box-shadow: none !important;
-  }
-  .pixel-stat__top, .pixel-stat__foot, .pixel-progress, .pixel-stat__unit {
-    display: none !important;
-  }
-  .pixel-stat .counter-num { font-size: 0.28rem !important; }
+  .pixel-buy__icon,
+  .pixel-buy__arrow { display: none !important; }
+  .pixel-buy__text { font-size: 0.3rem !important; line-height: 1 !important; }
 
+  .pixel-stats { flex: 0 0 auto !important; margin: 0 !important; }
+  .pixel-stat {
+    padding: 5px 8px !important;
+    box-shadow: none !important;
+    border: 1.5px solid #c9a34e !important;
+    background: #fff !important;
+  }
+  .pixel-stat__top,
+  .pixel-stat__foot,
+  .pixel-progress,
+  .pixel-stat__unit { display: none !important; }
+  .pixel-stat .counter-num {
+    font-size: 0.28rem !important;
+    line-height: 1 !important;
+  }
+
+  /* Second bar: scrollable row of same buttons as desktop */
   .toolbar {
     display: flex !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: flex-start !important;
-    gap: 4px !important;
+    gap: 5px !important;
     padding: 6px 8px !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
@@ -1763,22 +1641,23 @@
   .toolbar::-webkit-scrollbar { display: none; }
   .toolbar .tool-btn {
     flex: 0 0 auto !important;
-    padding: 6px 8px !important;
-    font-size: 0.28rem !important;
+    padding: 7px 9px !important;
+    font-size: 0.26rem !important;
+    line-height: 1.2 !important;
     box-shadow: 1px 1px 0 #c9a66b !important;
-    white-space: nowrap !important;
     animation: none !important;
   }
   .toolbar .zoom-lvl {
     flex: 0 0 auto !important;
-    min-width: 40px !important;
-    padding: 4px 2px !important;
+    min-width: 42px !important;
+    padding: 5px 3px !important;
     font-size: 0.28rem !important;
   }
   .toolbar .tool-gap {
-    width: 4px !important;
+    width: 6px !important;
     flex-shrink: 0 !important;
   }
+
   .site-copy {
     font-size: 0.65rem !important;
     padding: 4px 8px !important;

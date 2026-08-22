@@ -2048,15 +2048,32 @@ Min 10 blocks · no maximum
     }
   }
   const storeAPI = safeStorage();
+  function storeGet(key) {
+    try {
+      if (!storeAPI) return null;
+      return storeAPI.getItem(key);
+    } catch (e) { return null; }
+  }
+  function storeSet(key, val) {
+    try {
+      if (!storeAPI) return false;
+      storeAPI.setItem(key, val);
+      return true;
+    } catch (e) { return false; }
+  }
+  function storeDel(key) {
+    try {
+      if (!storeAPI) return;
+      storeAPI.removeItem(key);
+    } catch (e) {}
+  }
 
   // Fresh wall for Holy Pixel Wall — clear old data once
   try {
-    if (storeAPI && storeAPI.getItem('holy_pixel_wall_cleared') !== '1') {
-      storeAPI.removeItem(STORE);
-      ['pixelwall_pub_v1','pixelwall_v3','pixelwall_v2','10000pixels','pixel_wall'].forEach(k => {
-        try { storeAPI.removeItem(k); } catch (e) {}
-      });
-      storeAPI.setItem('holy_pixel_wall_cleared', '1');
+    if (storeGet('holy_pixel_wall_cleared') !== '1') {
+      storeDel(STORE);
+      ['pixelwall_pub_v1','pixelwall_v3','pixelwall_v2','10000pixels','pixel_wall'].forEach(k => storeDel(k));
+      storeSet('holy_pixel_wall_cleared', '1');
     }
   } catch (e) {}
 
@@ -2077,14 +2094,10 @@ Min 10 blocks · no maximum
       const el = document.getElementById('adminKeyInput');
       const typed = (el && el.value) ? String(el.value).trim().slice(0, 128) : '';
       if (typed) {
-        // Prefer session-only storage — less persistent XSS theft surface
-        try { sessionStorage.setItem('hpw_admin_key', typed); } catch (e) {}
-        try { localStorage.removeItem('hpw_admin_key'); } catch (e) {}
+        storeSet('hpw_admin_key', typed);
         return typed;
       }
-      return sessionStorage.getItem('hpw_admin_key')
-        || localStorage.getItem('hpw_admin_key') // legacy migration
-        || '';
+      return storeGet('hpw_admin_key') || '';
     } catch (e) {
       return '';
     }
@@ -2123,7 +2136,7 @@ Min 10 blocks · no maximum
   const CROP_CACHE_KEY = 'hpw_crop_cache_v1';
   function loadCropCache() {
     try {
-      const j = JSON.parse(localStorage.getItem(CROP_CACHE_KEY) || '{}');
+      const j = JSON.parse(storeGet(CROP_CACHE_KEY) || '{}');
       return j && typeof j === 'object' ? j : {};
     } catch (e) { return {}; }
   }
@@ -2136,7 +2149,7 @@ Min 10 blocks · no maximum
         cropX: cropObj.cropX != null ? Number(cropObj.cropX) : 0.5,
         cropY: cropObj.cropY != null ? Number(cropObj.cropY) : 0.5
       };
-      localStorage.setItem(CROP_CACHE_KEY, JSON.stringify(all));
+      storeSet(CROP_CACHE_KEY, JSON.stringify(all));
     } catch (e) {}
   }
   function applyCropCacheToRegions() {
@@ -2179,7 +2192,7 @@ Min 10 blocks · no maximum
   const MY_CLAIMS_STORE = 'hpw_my_claim_packages';
   function loadMyPackages() {
     try {
-      const raw = localStorage.getItem(MY_CLAIMS_STORE);
+      const raw = storeGet(MY_CLAIMS_STORE);
       const arr = raw ? JSON.parse(raw) : [];
       return Array.isArray(arr) ? arr : [];
     } catch (e) { return []; }
@@ -2188,7 +2201,7 @@ Min 10 blocks · no maximum
     const arr = loadMyPackages();
     arr.unshift(pkg);
     while (arr.length > 50) arr.pop();
-    try { localStorage.setItem(MY_CLAIMS_STORE, JSON.stringify(arr)); } catch (e) {}
+    try { storeSet(MY_CLAIMS_STORE, JSON.stringify(arr)); } catch (e) {}
   }
   function downloadText(filename, text) {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -2383,8 +2396,19 @@ Min 10 blocks · no maximum
 
   window.addEventListener('online', () => toast('Back online', 'ok'));
   window.addEventListener('offline', () => toast('You are offline', 'error'));
-  window.addEventListener('error', e => { console.warn('window error', e.message); });
-  window.addEventListener('unhandledrejection', e => { console.warn('promise reject', e.reason); });
+  window.addEventListener('error', e => {
+    const m = String((e && e.message) || '');
+    if (/securityerror|insecure|load failed/i.test(m)) return;
+  });
+  window.addEventListener('unhandledrejection', e => {
+    try {
+      const m = String((e && e.reason && (e.reason.message || e.reason)) || '');
+      if (/securityerror|insecure|load failed|failed to fetch/i.test(m)) {
+        e.preventDefault();
+        return;
+      }
+    } catch (err) {}
+ console.warn('promise reject', e.reason); });
 
 
   const PERM_PIXEL_CAP = 1000; // max permanent pixels on the whole wall
@@ -2502,7 +2526,7 @@ Min 10 blocks · no maximum
 
   function save() {
     try {
-      localStorage.setItem(STORE, JSON.stringify({
+      storeSet(STORE, JSON.stringify({
         regions: regions.map(r => {
           const copy = { ...r };
           if (copy.media && copy.media.startsWith('data:') && copy.media.length > 21000000) {
@@ -2512,14 +2536,13 @@ Min 10 blocks · no maximum
         })
       }));
     } catch (e) {
-      console.warn('save failed', e);
-      toast(friendlyError(e, 'Could not save locally — use a smaller image'), 'error');
+      // quota / SecurityError — ignore quietly
     }
   }
 
   function load() {
     try {
-      const raw = localStorage.getItem(STORE);
+      const raw = storeGet(STORE);
       if (!raw) return;
       const d = JSON.parse(raw);
       if (!d || typeof d !== 'object') return;
@@ -2540,9 +2563,8 @@ Min 10 blocks · no maximum
         } catch (err) { console.warn('skip region', err); }
       });
     } catch (e) {
-      console.warn('load failed', e);
-      try { localStorage.removeItem(STORE); } catch (e2) {}
-      toast('Saved data was corrupt — started fresh', 'error');
+      try { storeDel(STORE); } catch (e2) {}
+      // silent — avoid SecurityError noise in console
     }
   }
 
@@ -3925,7 +3947,7 @@ function getImg(src) {
     if (!modal) return;
     if (adminMode) { enterAdminMode(); return; }
     try {
-      const saved = localStorage.getItem('hpw_admin_key');
+      const saved = storeGet('hpw_admin_key');
       if (saved && $('adminKeyInput')) $('adminKeyInput').value = saved;
     } catch (e) {}
     modal.style.display = 'flex';
@@ -3935,7 +3957,7 @@ function getImg(src) {
     const input = document.getElementById('adminKeyInput');
     const key = (input && input.value ? String(input.value).trim() : '') || getAdminKey();
     if (!key) { toast('ENTER ADMIN KEY', 'error'); return; }
-    try { localStorage.setItem('hpw_admin_key', key); } catch (e) {}
+    try { storeSet('hpw_admin_key', key); } catch (e) {}
     try { if (typeof loadAdminMessages === 'function') loadAdminMessages(); } catch (e) {}
     adminMode = true;
     const b = $('adminBanner');
@@ -5377,18 +5399,18 @@ function clearPending() {
           console.warn('IndexedDB save failed', idbErr);
           // Fallback: sessionStorage without huge media if needed
           try {
-            sessionStorage.setItem('hpw_pending_claim', JSON.stringify(payload));
+            storeSet('hpw_pending_claim', JSON.stringify(payload));
           } catch (e2) {
             try {
               const slim = Object.assign({}, payload, { media: '' });
-              sessionStorage.setItem('hpw_pending_claim', JSON.stringify(slim));
+              storeSet('hpw_pending_claim', JSON.stringify(slim));
               toast('Image too large to cache — claim may miss image after pay', 'error');
             } catch (e3) {
               throw new Error('Could not save claim data before payment');
             }
           }
         }
-        try { sessionStorage.setItem('hpw_pending_flag', '1'); } catch (e) {}
+        try { storeSet('hpw_pending_flag', '1'); } catch (e) {}
         // Checkout only needs pricing fields (no huge media body)
         const checkoutBody = {
           cells: payload.cells,
@@ -5513,7 +5535,7 @@ function clearPending() {
   const CONTACT_STORE = 'hpw_contact_messages';
   function loadLocalMessages() {
     try {
-      const raw = localStorage.getItem(CONTACT_STORE);
+      const raw = storeGet(CONTACT_STORE);
       const arr = raw ? JSON.parse(raw) : [];
       return Array.isArray(arr) ? arr : [];
     } catch (e) { return []; }
@@ -5522,7 +5544,7 @@ function clearPending() {
     const arr = loadLocalMessages();
     arr.unshift(msg);
     while (arr.length > 100) arr.pop();
-    try { localStorage.setItem(CONTACT_STORE, JSON.stringify(arr)); } catch (e) {}
+    try { storeSet(CONTACT_STORE, JSON.stringify(arr)); } catch (e) {}
   }
 
   function openContact() {
@@ -5793,13 +5815,13 @@ function clearPending() {
 
   if ($('adminBtn')) $('adminBtn').onclick = () => {
     try {
-      const saved = localStorage.getItem('hpw_admin_key');
+      const saved = storeGet('hpw_admin_key');
       if (saved && $('adminKeyInput')) $('adminKeyInput').value = saved;
     } catch (e) {}
     $('adminModal').style.display = 'flex';
     // Auto-load if key already saved
     try {
-      const k = localStorage.getItem('hpw_admin_key');
+      const k = storeGet('hpw_admin_key');
       if (k) adminLoadClaims();
     } catch (e) {}
   };
@@ -6452,9 +6474,7 @@ let scrollDrawRaf = 0;
 
   function loadLocalGeomOverrides() {
     try {
-      const api = (typeof storeAPI !== 'undefined' && storeAPI) ? storeAPI : null;
-      if (!api) return;
-      const raw = api.getItem(GEOM_OVERRIDE_KEY);
+      const raw = storeGet(GEOM_OVERRIDE_KEY);
       if (!raw) return;
       const obj = JSON.parse(raw);
       if (!obj || typeof obj !== 'object') return;
@@ -6470,8 +6490,6 @@ let scrollDrawRaf = 0;
 
   function persistLocalGeomOverrides() {
     try {
-      const api = (typeof storeAPI !== 'undefined' && storeAPI) ? storeAPI : null;
-      if (!api) return;
       const obj = {};
       localGeomOverride.forEach((g, id) => {
         obj[id] = {
@@ -6482,7 +6500,7 @@ let scrollDrawRaf = 0;
           at: g.at || Date.now()
         };
       });
-      api.setItem(GEOM_OVERRIDE_KEY, JSON.stringify(obj));
+      storeSet(GEOM_OVERRIDE_KEY, JSON.stringify(obj));
     } catch (e) {
       // ignore SecurityError / quota
     }
@@ -6614,7 +6632,7 @@ let scrollDrawRaf = 0;
         try { payload = await idbGet('pending'); } catch (e) { console.warn('idbGet', e); }
         if (!payload) {
           try {
-            const raw = sessionStorage.getItem('hpw_pending_claim');
+            const raw = storeGet('hpw_pending_claim');
             if (raw) payload = JSON.parse(raw);
           } catch (e) {}
         }
@@ -6645,8 +6663,8 @@ let scrollDrawRaf = 0;
           }
           try { await idbDel('pending'); } catch (e) {}
           try {
-            sessionStorage.removeItem('hpw_pending_claim');
-            sessionStorage.removeItem('hpw_pending_flag');
+            storeDel('hpw_pending_claim');
+            storeDel('hpw_pending_flag');
           } catch (e) {}
           history.replaceState({}, '', '/');
           await pullWall();
@@ -6679,7 +6697,7 @@ let scrollDrawRaf = 0;
       history.replaceState({}, '', '/');
       toast('PAYMENT CANCELED');
       try { await idbDel('pending'); } catch (e) {}
-      try { sessionStorage.removeItem('hpw_pending_claim'); sessionStorage.removeItem('hpw_pending_flag'); } catch (e) {}
+      try { storeDel('hpw_pending_claim'); storeDel('hpw_pending_flag'); } catch (e) {}
     }
   })();
 
@@ -6690,10 +6708,10 @@ let scrollDrawRaf = 0;
   function setAdminKey(k) {
     try {
       if (k) {
-        localStorage.setItem('hpw_admin_key', k);
+        storeSet('hpw_admin_key', k);
         sessionStorage.setItem('hpw_admin_key', k);
       } else {
-        localStorage.removeItem('hpw_admin_key');
+        storeDel('hpw_admin_key');
         sessionStorage.removeItem('hpw_admin_key');
       }
     } catch (e) {}
@@ -6898,8 +6916,8 @@ let scrollDrawRaf = 0;
         return;
       }
       try {
-        localStorage.setItem('hpw_admin_key', key);
-        sessionStorage.setItem('hpw_admin_key', key);
+        storeSet('hpw_admin_key', key);
+        storeSet('hpw_admin_key', key);
       } catch (e) {}
       try {
         await apiFetch('/api/admin/list?key=' + encodeURIComponent(key), { timeout: 15000 }, 'Admin');

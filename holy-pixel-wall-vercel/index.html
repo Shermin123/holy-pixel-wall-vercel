@@ -2506,13 +2506,24 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Maximize wall on desktop AND phone — full FIT, no forced scroll.
-    // Wall uses nearly the entire viewport so it is large and fully visible.
-    const margin = 2;
+    // Phone: FIT full wall in view.
+    // Desktop: stretch horizontally — wall fills the WIDTH (bigger cells),
+    // height can overflow so you scroll to see the rest.
+    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
+    const margin = phone ? 4 : 2;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s = Math.min(vw / COLS, vh / ROWS);
+    let s;
+    if (phone) {
+      s = Math.min(vw / COLS, vh / ROWS);
+    } else {
+      // Fill full desktop width → much larger wall; scroll vertically
+      s = vw / COLS;
+      // Never smaller than height-fit either (ultra-wide safety)
+      const minH = vh / ROWS;
+      if (s < minH) s = minH;
+    }
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;
@@ -2534,8 +2545,14 @@ Min 10 blocks · no maximum
       requestAnimationFrame(() => {
         const wrap = $('wallWrap');
         if (wrap && viewport) {
+          // Center horizontally; start near top so the big wall is obvious and scrollable down
           viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
-          viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
+          const overflowY = wrap.offsetHeight - viewport.clientHeight;
+          if (overflowY > 8) {
+            viewport.scrollTop = 0; // top of wall first — scroll down to explore
+          } else {
+            viewport.scrollTop = Math.max(0, overflowY / 2);
+          }
         } else if (viewport) {
           viewport.scrollLeft = 0;
           viewport.scrollTop = 0;
@@ -2563,12 +2580,13 @@ Min 10 blocks · no maximum
   const Z_MIN = 1, Z_MAX = 14;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
-    // At fit (zoom≈1): no outer margin so the wall sits flush — no colored box.
-    // When zoomed in: padding so corners stay reachable by scrolling.
+    // Small edge pad so you can scroll past the wall border on desktop.
+    // Extra pad when zoomed in so corners stay reachable.
     try {
-      if ((zoom || 1) <= 1.05) return 0;
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      return w < 700 ? 36 : 48;
+      const phone = w < 700;
+      if ((zoom || 1) <= 1.05) return phone ? 0 : 12;
+      return phone ? 36 : 48;
     } catch (e) { return 0; }
   }
   function isPhoneLayout() {

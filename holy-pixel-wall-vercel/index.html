@@ -2506,11 +2506,11 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Phone: FIT full wall in view.
-    // Desktop: stretch horizontally — wall fills the WIDTH (bigger cells),
-    // height can overflow so you scroll to see the rest.
+    // Phone: full wall fits in view.
+    // Desktop: clean vertical wall — mostly height-fit, only a slight
+    // bump in size so it reads taller/clearer without extreme stretch.
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const margin = phone ? 4 : 2;
+    const margin = phone ? 6 : 16;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
@@ -2518,11 +2518,11 @@ Min 10 blocks · no maximum
     if (phone) {
       s = Math.min(vw / COLS, vh / ROWS);
     } else {
-      // Fill full desktop width → much larger wall; scroll vertically
-      s = vw / COLS;
-      // Never smaller than height-fit either (ultra-wide safety)
-      const minH = vh / ROWS;
-      if (s < minH) s = minH;
+      const fit = Math.min(vw / COLS, vh / ROWS);
+      const wide = vw / COLS;
+      // ~25% toward full-width — mild size boost, still vertical/centered
+      s = fit + (wide - fit) * 0.25;
+      if (s < fit) s = fit;
     }
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
@@ -2545,14 +2545,9 @@ Min 10 blocks · no maximum
       requestAnimationFrame(() => {
         const wrap = $('wallWrap');
         if (wrap && viewport) {
-          // Center horizontally; start near top so the big wall is obvious and scrollable down
+          // Center the wall — clean vertical panel in the middle
           viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
-          const overflowY = wrap.offsetHeight - viewport.clientHeight;
-          if (overflowY > 8) {
-            viewport.scrollTop = 0; // top of wall first — scroll down to explore
-          } else {
-            viewport.scrollTop = Math.max(0, overflowY / 2);
-          }
+          viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
         } else if (viewport) {
           viewport.scrollLeft = 0;
           viewport.scrollTop = 0;
@@ -2580,13 +2575,12 @@ Min 10 blocks · no maximum
   const Z_MIN = 1, Z_MAX = 14;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
-    // Small edge pad so you can scroll past the wall border on desktop.
-    // Extra pad when zoomed in so corners stay reachable.
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
       const phone = w < 700;
-      if ((zoom || 1) <= 1.05) return phone ? 0 : 12;
-      return phone ? 36 : 48;
+      // Fit: tiny pad so the wall reads as a clean centered panel
+      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
+      return phone ? 36 : 40;
     } catch (e) { return 0; }
   }
   function isPhoneLayout() {

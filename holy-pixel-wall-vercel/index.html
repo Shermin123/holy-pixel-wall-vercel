@@ -2108,7 +2108,7 @@
 
 
 /* ============================================================
-   SECOND BAR (toolbar) — mobile: neat equal chips (final override)
+   SECOND BAR (toolbar) — pixel theme, clean & visible
    ============================================================ */
 @media (max-width: 700px) {
   .toolbar {
@@ -2117,46 +2117,44 @@
     flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: flex-start !important;
-    gap: 8px !important;
-    padding: 8px 10px !important;
+    gap: 6px !important;
+    padding: 6px 8px !important;
     margin: 0 !important;
-    background: #f3ebe0 !important;
-    border-bottom: 2px solid #2a2118 !important;
+    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
+    border-bottom: 3px solid #2a2118 !important;
+    box-shadow: 0 2px 0 #c9a34e !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none !important;
     height: auto !important;
-    min-height: 44px !important;
+    min-height: 40px !important;
     max-height: none !important;
     box-sizing: border-box !important;
   }
   .toolbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
   .toolbar .tool-gap { display: none !important; }
 
-  /* Each group = one clean white box */
+  /* Flat pixel chips — no nested boxes, just buttons in a row group */
   .toolbar .tool-group {
     display: inline-flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 4px !important;
+    gap: 0 !important;
     flex: 0 0 auto !important;
     width: auto !important;
-    height: 32px !important;
-    min-height: 32px !important;
-    max-height: 32px !important;
-    padding: 2px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 0 !important;
     margin: 0 !important;
-    background: #fffdf8 !important;
-    border: 2px solid #2a2118 !important;
-    border-radius: 3px !important;
-    box-shadow: 2px 2px 0 #c9a34e !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     box-sizing: border-box !important;
-  }
-  .toolbar .tool-group--zoom {
-    padding: 2px 3px !important;
   }
 
   .toolbar .tool-btn {
@@ -2165,54 +2163,90 @@
     justify-content: center !important;
     flex: 0 0 auto !important;
     width: auto !important;
-    height: 26px !important;
-    min-height: 26px !important;
-    max-height: 26px !important;
-    padding: 0 9px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
     margin: 0 !important;
     font-family: 'Press Start 2P', monospace !important;
-    font-size: 0.28rem !important;
+    font-size: 0.3rem !important;
     line-height: 1 !important;
-    letter-spacing: 0.3px !important;
+    letter-spacing: 0.4px !important;
     color: #2a2118 !important;
-    background: #fffef9 !important;
-    border: 1.5px solid #c9b896 !important;
-    border-radius: 2px !important;
-    box-shadow: none !important;
+    background: #fffdf8 !important;
+    border: 2px solid #2a2118 !important;
+    border-radius: 0 !important;
+    box-shadow: 2px 2px 0 #c9a34e !important;
     animation: none !important;
     white-space: nowrap !important;
     box-sizing: border-box !important;
   }
+  /* Join buttons in a group: shared border, single outer shadow */
+  .toolbar .tool-group .tool-btn + .tool-btn {
+    margin-left: -2px !important;
+  }
+  .toolbar .tool-group .tool-btn:not(:last-child) {
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group .tool-btn:last-child {
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
+  .toolbar .tool-group .tool-btn:only-child {
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
+
   .toolbar .tool-btn:active,
   .toolbar .tool-btn.tool-active {
     background: #f0c14b !important;
+    color: #2a2118 !important;
     border-color: #2a2118 !important;
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0 #c9a34e !important;
   }
 
+  /* Zoom cluster: − 100% + FIT as one joined strip */
+  .toolbar .tool-group--zoom {
+    gap: 0 !important;
+  }
   .toolbar .zoom-lvl {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    height: 26px !important;
-    min-width: 36px !important;
+    height: 28px !important;
+    min-width: 42px !important;
     padding: 0 4px !important;
-    margin: 0 !important;
+    margin: 0 0 0 -2px !important;
     font-family: 'Press Start 2P', monospace !important;
-    font-size: 0.26rem !important;
+    font-size: 0.28rem !important;
     line-height: 1 !important;
-    color: #5c4a32 !important;
-    background: transparent !important;
-    border: none !important;
+    color: #2a2118 !important;
+    background: #fff8e0 !important;
+    border: 2px solid #2a2118 !important;
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+  }
+  .toolbar .tool-group--zoom #zoomOut {
+    border-right-width: 0 !important;
     box-shadow: none !important;
   }
+  .toolbar .tool-group--zoom #zoomIn {
+    margin-left: 0 !important;
+    border-left-width: 0 !important;
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group--zoom #zoomFit {
+    margin-left: -2px !important;
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
 
-  /* Hide unused select/drag/dev/export on mobile chrome */
   #toolSelect, #toolDrag, #toolDev, #exportBtn {
     display: none !important;
   }
 }
 
-/* Desktop second bar stays grouped but not oversized */
+/* Desktop second bar — pixel chips, same language */
 @media (min-width: 701px) {
   .toolbar {
     display: flex !important;
@@ -2220,17 +2254,69 @@
     justify-content: center !important;
     gap: 10px !important;
     flex-wrap: wrap !important;
+    padding: 6px 10px !important;
+    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
+    border-bottom: 3px solid #2a2118 !important;
+    box-shadow: 0 2px 0 #c9a34e !important;
   }
   .toolbar .tool-group {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    padding: 3px 4px !important;
-    background: #fff !important;
-    border: 1.5px solid #c9b896 !important;
-    border-radius: 3px !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
   .toolbar .tool-gap { display: none !important; }
+  .toolbar .tool-btn {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.32rem !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 12px !important;
+    color: #2a2118 !important;
+    background: #fffdf8 !important;
+    border: 2px solid #2a2118 !important;
+    border-radius: 0 !important;
+    box-shadow: 2px 2px 0 #c9a34e !important;
+    animation: none !important;
+  }
+  .toolbar .tool-group .tool-btn + .tool-btn {
+    margin-left: -2px !important;
+  }
+  .toolbar .tool-group .tool-btn:not(:last-child) {
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group .tool-btn:last-child {
+    box-shadow: 2px 2px 0 #c9a34e !important;
+  }
+  .toolbar .tool-btn:hover {
+    background: #fff8e0 !important;
+  }
+  .toolbar .tool-btn:active,
+  .toolbar .tool-btn.tool-active {
+    background: #f0c14b !important;
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0 #c9a34e !important;
+  }
+  .toolbar .zoom-lvl {
+    height: 30px !important;
+    min-width: 48px !important;
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 0.3rem !important;
+    color: #2a2118 !important;
+    background: #fff8e0 !important;
+    border: 2px solid #2a2118 !important;
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  .toolbar .tool-group--zoom #zoomOut { border-right-width: 0 !important; box-shadow: none !important; }
+  .toolbar .tool-group--zoom #zoomIn { margin-left: 0 !important; border-left-width: 0 !important; box-shadow: none !important; }
+  .toolbar .tool-group--zoom #zoomFit { margin-left: -2px !important; box-shadow: 2px 2px 0 #c9a34e !important; }
 }
 
 </style>

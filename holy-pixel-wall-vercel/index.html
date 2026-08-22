@@ -2091,12 +2091,34 @@ Min 10 blocks · no maximum
 (() => {
   const MS_DAY = 86400000;
   const STORE = 'holy_pixel_wall_v1';
+  // Safe storage — avoids SecurityError on file:// / restricted iframes
+  function safeStorage() {
+    try {
+      const t = '__hpw_t';
+      localStorage.setItem(t, '1');
+      localStorage.removeItem(t);
+      return localStorage;
+    } catch (e) {
+      try {
+        const t = '__hpw_t';
+        sessionStorage.setItem(t, '1');
+        sessionStorage.removeItem(t);
+        return sessionStorage;
+      } catch (e2) {
+        return null;
+      }
+    }
+  }
+  const storeAPI = safeStorage();
+
   // Fresh wall for Holy Pixel Wall — clear old data once
   try {
-    if (localStorage.getItem('holy_pixel_wall_cleared') !== '1') {
-      localStorage.removeItem(STORE);
-      ['pixelwall_pub_v1','pixelwall_v3','pixelwall_v2','10000pixels','pixel_wall'].forEach(k => localStorage.removeItem(k));
-      localStorage.setItem('holy_pixel_wall_cleared', '1');
+    if (storeAPI && storeAPI.getItem('holy_pixel_wall_cleared') !== '1') {
+      storeAPI.removeItem(STORE);
+      ['pixelwall_pub_v1','pixelwall_v3','pixelwall_v2','10000pixels','pixel_wall'].forEach(k => {
+        try { storeAPI.removeItem(k); } catch (e) {}
+      });
+      storeAPI.setItem('holy_pixel_wall_cleared', '1');
     }
   } catch (e) {}
 
@@ -2361,8 +2383,16 @@ Min 10 blocks · no maximum
   function friendlyError(err, fallback) {
     const raw = err && (err.message || err.error) ? String(err.message || err.error) : String(err || '');
     const low = raw.toLowerCase();
-    if (!navigator.onLine || low.includes('failed to fetch') || low.includes('networkerror')) {
-      return 'No internet — check your connection';
+    // Safari: "Load failed" · Chrome: "Failed to fetch" · Firefox: "NetworkError"
+    if (
+      !navigator.onLine ||
+      low.includes('failed to fetch') ||
+      low.includes('networkerror') ||
+      low.includes('load failed') ||
+      low.includes('network request failed') ||
+      low.includes('fetch')
+    ) {
+      return 'Server unreachable — showing local wall';
     }
     if (err && err.name === 'AbortError') return 'Request timed out — try again';
     if (low.includes('not configured') || low.includes('stripe')) return raw.slice(0, 140);
@@ -6455,7 +6485,9 @@ let scrollDrawRaf = 0;
 
   function loadLocalGeomOverrides() {
     try {
-      const raw = localStorage.getItem(GEOM_OVERRIDE_KEY);
+      const api = (typeof storeAPI !== 'undefined' && storeAPI) ? storeAPI : null;
+      if (!api) return;
+      const raw = api.getItem(GEOM_OVERRIDE_KEY);
       if (!raw) return;
       const obj = JSON.parse(raw);
       if (!obj || typeof obj !== 'object') return;
@@ -6464,11 +6496,15 @@ let scrollDrawRaf = 0;
         if (!g || !Array.isArray(g.cells) || !g.cells.length) return;
         localGeomOverride.set(String(id), g);
       });
-    } catch (e) { console.warn('load geom overrides', e); }
+    } catch (e) {
+      // SecurityError / quota — stay silent; in-memory map still works this session
+    }
   }
 
   function persistLocalGeomOverrides() {
     try {
+      const api = (typeof storeAPI !== 'undefined' && storeAPI) ? storeAPI : null;
+      if (!api) return;
       const obj = {};
       localGeomOverride.forEach((g, id) => {
         obj[id] = {
@@ -6479,8 +6515,10 @@ let scrollDrawRaf = 0;
           at: g.at || Date.now()
         };
       });
-      localStorage.setItem(GEOM_OVERRIDE_KEY, JSON.stringify(obj));
-    } catch (e) { console.warn('persist geom overrides', e); }
+      api.setItem(GEOM_OVERRIDE_KEY, JSON.stringify(obj));
+    } catch (e) {
+      // ignore SecurityError / quota
+    }
   }
 
   function setLocalGeomOverride(id, geom) {
@@ -6540,7 +6578,6 @@ let scrollDrawRaf = 0;
       (data.regions || []).forEach(r => {
         try {
           if (!r || expired(r)) return;
-          // Normalize bounds from cells if missing
           if ((r.minC == null || r.maxC == null) && r.cells && r.cells.length) {
             let minC = COLS, maxC = 0, minR = ROWS, maxR = 0;
             r.cells.forEach(k => {
@@ -6558,9 +6595,8 @@ let scrollDrawRaf = 0;
           if (r.maxR != null && r.maxR > maxRSeen) maxRSeen = r.maxR;
           regions.push(r);
           (r.cells || []).forEach(k => sold.set(k, r));
-        } catch (err) { console.warn(err); }
+        } catch (err) { /* skip bad region */ }
       });
-      // Expand fixed grid if server has claims beyond defaults (legacy adaptive grids)
       let expanded = false;
       if (maxCSeen >= COLS || maxRSeen >= ROWS) {
         COLS = Math.max(COLS, Math.ceil((maxCSeen + 1) / 10) * 10);
@@ -6579,7 +6615,7 @@ let scrollDrawRaf = 0;
       try { syncMediaOverlays(); } catch (e) {}
       return true;
     } catch (e) {
-      console.warn('pullWall', e);
+      // Expected when API is offline / static host — use local data quietly
       return false;
     }
   }
@@ -6588,9 +6624,12 @@ let scrollDrawRaf = 0;
     try { loadLocalGeomOverrides(); } catch (e) {}
     const ok = await pullWall();
     if (!ok) {
-      load();
+      try { load(); } catch (e) {}
       try { applyLocalGeomOverrides(); } catch (e) {}
-      if (!navigator.onLine) toast('Offline — showing saved wall', 'error');
+      // Quiet fallback — only hint once if clearly offline
+      if (!navigator.onLine) {
+        try { toast('Offline — showing saved wall', 'error'); } catch (e) {}
+      }
     }
     try { resize(true); } catch (e) { console.warn(e); }
     requestAnimationFrame(() => { try { resize(true); } catch (e) {} });

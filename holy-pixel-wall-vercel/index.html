@@ -3224,32 +3224,31 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // 4) Buy-mode pixel grid — clear at full zoom, ~1.5 screen-px lines
+    // 4) Buy-mode: every free pixel drawn as a clear square when zoomed
     const visCell = (baseCell || drawCell) * (zoom || 1);
     const zNow = Math.max(zoom || 1, 1);
-    // Keep lines readable on retina without swallowing the cell
-    const hair = Math.max(0.06, 1.35 / zNow);
-    const hairBold = Math.max(0.1, 2.2 / zNow);
-    const hairFrame = Math.max(0.12, 2.5 / zNow);
+    // ~1.5–2 CSS pixels on screen after zoom scale
+    const hair = Math.max(0.05, 1.5 / zNow);
+    const hairBold = Math.max(0.08, 2.4 / zNow);
+    const hairFrame = Math.max(0.1, 2.8 / zNow);
 
-    if (buyMode && visCell >= 2.5) {
+    if (buyMode && visCell >= 2) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      // Subtle free-cell tint when zoomed so empty pixels read as squares
-      if (visCell >= 8) {
-        for (let c = gc0; c <= gc1; c++) {
-          for (let r = gr0; r <= gr1; r++) {
-            if (sold.has(c + ',' + r)) continue;
-            if ((c + r) % 2 === 0) {
-              ctx.fillStyle = 'rgba(212, 160, 23, 0.06)';
-              ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
-            }
+      // Checker + outline each free pixel so you can aim at single cells
+      for (let c = gc0; c <= gc1; c++) {
+        for (let r = gr0; r <= gr1; r++) {
+          if (sold.has(c + ',' + r)) continue;
+          const x = c * drawCell, y = r * drawCell;
+          if (visCell >= 6) {
+            ctx.fillStyle = ((c + r) & 1) ? 'rgba(255,253,248,0.35)' : 'rgba(212,160,23,0.10)';
+            ctx.fillRect(x, y, drawCell, drawCell);
           }
         }
       }
-      // Per-pixel lines — warm brown, stronger when zoomed in
-      const gridAlpha = visCell >= 14 ? 0.45 : (visCell >= 8 ? 0.32 : 0.2);
-      ctx.strokeStyle = 'rgba(58, 42, 26, ' + gridAlpha + ')';
+      // Per-pixel grid lines — stronger at higher zoom
+      const gridAlpha = visCell >= 16 ? 0.65 : (visCell >= 10 ? 0.5 : (visCell >= 5 ? 0.35 : 0.22));
+      ctx.strokeStyle = 'rgba(42, 33, 24, ' + gridAlpha + ')';
       ctx.lineWidth = hair;
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
@@ -3263,8 +3262,8 @@ function getImg(src) {
         ctx.lineTo((gc1 + 1) * drawCell, y);
       }
       ctx.stroke();
-      // 10×10 blocks
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.5)';
+      // 10×10 section guides
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.55)';
       ctx.lineWidth = hairBold;
       ctx.beginPath();
       const sec = SECTION || 10;
@@ -3302,15 +3301,25 @@ function getImg(src) {
         const bh = (sMaxR - sMinR + 1) * drawCell;
 
         ctx.save();
-        // Soft gold glass — matches site palette, stays see-through
-        ctx.fillStyle = 'rgba(212, 160, 23, 0.22)';
+        // Gold fill on each selected pixel
         freeKeys.forEach(([c, r]) => {
+          ctx.fillStyle = 'rgba(212, 160, 23, 0.28)';
           ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
+          // Individual pixel border when large enough to see
+          if (visCell >= 4) {
+            ctx.strokeStyle = 'rgba(92, 61, 30, 0.85)';
+            ctx.lineWidth = hair;
+            ctx.strokeRect(
+              Math.floor(c * drawCell) + 0.5,
+              Math.floor(r * drawCell) + 0.5,
+              Math.max(0, drawCell - 1),
+              Math.max(0, drawCell - 1)
+            );
+          }
         });
-
-        // Every selected pixel outlined clearly
-        if (visCell >= 2.5) {
-          ctx.strokeStyle = 'rgba(139, 90, 43, 0.75)';
+        // Grid through selection region
+        if (visCell >= 2.5 && freeKeys.length > 1) {
+          ctx.strokeStyle = 'rgba(139, 90, 43, 0.7)';
           ctx.lineWidth = hair;
           ctx.beginPath();
           for (let c = sMinC; c <= sMaxC + 1; c++) {
@@ -3325,14 +3334,12 @@ function getImg(src) {
           }
           ctx.stroke();
         }
-
-        // Outer frame — dark amber, easy to see
+        // Outer frame
         ctx.strokeStyle = 'rgba(92, 61, 30, 0.95)';
         ctx.lineWidth = hairFrame;
         ctx.setLineDash([]);
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
-        // Inner highlight for depth
-        ctx.strokeStyle = 'rgba(240, 193, 75, 0.7)';
+        ctx.strokeStyle = 'rgba(240, 193, 75, 0.75)';
         ctx.lineWidth = hair;
         ctx.strokeRect(bx + hairFrame + 0.5, by + hairFrame + 0.5, Math.max(0, bw - hairFrame * 2 - 1), Math.max(0, bh - hairFrame * 2 - 1));
         ctx.restore();

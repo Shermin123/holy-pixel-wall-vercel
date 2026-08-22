@@ -224,10 +224,10 @@
     align-items: center !important;
     justify-content: center !important;
     gap: 6px !important;
-    padding: 4px 8px !important;
+    padding: 8px 12px !important;
     flex-wrap: wrap !important;
     background: #f3e6c8 !important;
-    border-bottom: 2px solid #d4a017 !important;
+    border-bottom: 3px solid #d4a017 !important;
     flex-shrink: 0;
     z-index: 40;
   }
@@ -961,14 +961,14 @@
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 6px;
-    padding: 4px 10px;
+    gap: 8px;
+    padding: 10px 12px;
     background: #fffdf8;
-    border-top: 1px solid #e0d4c0;
-    font-family: 'VT323', monospace;
-    font-size: 0.7rem;
+    border-top: 2px solid var(--gold);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.32rem;
     color: var(--muted);
-    letter-spacing: 0.3px;
+    letter-spacing: 0.5px;
     z-index: 70;
     text-align: center;
   }
@@ -1022,9 +1022,9 @@
   grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) !important;
   align-items: center !important;
   column-gap: 20px !important;
-  min-height: 48px !important;
-  height: 48px !important;
-  padding: 0 14px !important;
+  min-height: 64px !important;
+  height: 64px !important;
+  padding: 0 18px !important;
   overflow: hidden;
   background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
   border-bottom: 3px solid #2a2118 !important;
@@ -1517,10 +1517,10 @@
     display: flex !important;
     justify-content: center;
     align-items: center;
-    gap: 4px;
-    font-size: 0.65rem !important;
-    padding: 3px 8px !important;
-    padding-bottom: calc(3px + env(safe-area-inset-bottom, 0px)) !important;
+    gap: 6px;
+    font-size: 0.75rem !important;
+    padding: 5px 8px !important;
+    padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px)) !important;
     background: #f3ebe0 !important;
     border-top: 1px solid #e0d4c0 !important;
     color: #5c4a32;
@@ -1576,286 +1576,132 @@
 .stage { box-shadow: 0 0 0 2px #2a2118 !important; }
 
 
-/* DESKTOP WALL MAX — free vertical space for a larger wall */
-@media (min-width: 701px) {
-  .pixel-header {
-    min-height: 48px !important;
-    height: 48px !important;
-    max-height: 48px !important;
-  }
-  .toolbar {
-    padding: 4px 8px !important;
-  }
-  .toolbar .tool-btn {
-    padding: 5px 8px !important;
-    font-size: 0.28rem !important;
-  }
-  .site-copy {
-    padding: 3px 10px !important;
-    font-size: 0.65rem !important;
-  }
-  .viewport {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-  }
-}
-
-
-/* Toolbar groups — clean layout desktop + mobile */
-.toolbar {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-wrap: wrap !important;
-  gap: 8px !important;
-}
+/* —— Clean toolbar groups (desktop + mobile) —— */
 .tool-group {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
+  gap: 3px;
+  padding: 3px;
+  background: #fff;
+  border: 1.5px solid #c9b896;
+  border-radius: 3px;
+  box-sizing: border-box;
 }
-.tool-group--zoom {
-  background: rgba(255,255,255,0.55);
-  border: 1px solid #e0d4c0;
-  padding: 2px 4px;
-  border-radius: 2px;
+.tool-group .tool-btn {
+  margin: 0;
+  line-height: 1;
 }
-.tb-short { display: none; }
-.tb-full { display: inline; }
+.tool-group .zoom-lvl {
+  line-height: 1;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  min-width: 40px;
+  text-align: center;
+}
 
 @media (max-width: 700px) {
-  .toolbar {
-    justify-content: flex-start !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    gap: 6px !important;
-    padding: 6px 8px !important;
-    scrollbar-width: none;
-  }
-  .toolbar::-webkit-scrollbar { display: none; }
-  .tool-group {
-    gap: 4px;
-  }
-  .tool-group--zoom {
-    padding: 2px 3px;
-  }
-  .toolbar .tool-gap {
-    width: 1px !important;
-    height: 18px !important;
-    background: #d2b48c !important;
-    align-self: center;
-  }
-  .tb-full { display: none !important; }
-  .tb-short { display: inline !important; }
-  .toolbar .tool-btn {
-    min-height: 22px !important;
-    padding: 2px 5px !important;
-    font-size: 0.2rem !important;
-    border-radius: 2px;
-  }
-  .toolbar .zoom-lvl {
-    min-width: 28px !important;
-    font-size: 0.55rem !important;
-    line-height: 22px !important;
-  }
-}
-
-
-.hpw-chip {
-  display: inline-block;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 0.32rem;
-  letter-spacing: 1px;
-  padding: 6px 10px;
-  margin-top: 4px;
-  border: 2px solid #2a2118;
-  background: linear-gradient(180deg, #fff8e8 0%, #f0c14b 100%);
-  color: #2a2118;
-  box-shadow: 2px 2px 0 #2a2118;
-  cursor: pointer;
-  border-radius: 2px;
-}
-.hpw-chip:hover { filter: brightness(1.05); }
-.hpw-chip[aria-expanded="true"] {
-  background: #2a2118;
-  color: #f0c14b;
-}
-.hpw-seo-box {
-  margin-top: 10px;
-  padding: 12px 14px;
-  border: 2px solid #c9a34e;
-  background: #fffdf8;
-  color: #5c4a32;
-  font-size: 0.95rem;
-  line-height: 1.45;
-}
-.hpw-seo-box[hidden] { display: none !important; }
-.hpw-seo-box strong { color: #2a2118; }
-
-
-
-/* =========================================================
-   MOBILE CHROME — desktop-like small boxes, clean layout
-   ========================================================= */
-@media (max-width: 700px) {
-  html, body {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-  }
-
-  /* Header: title left · counter + buy right (like desktop) */
+  /* Header like desktop: title | buy + counter chips */
   .pixel-header {
     display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 8px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
+    gap: 6px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
     padding: 0 8px !important;
     background: #fffef9 !important;
     border-bottom: 2px solid #2a2118 !important;
-    box-shadow: 0 1px 0 #e8d9b8 !important;
+    box-shadow: none !important;
   }
   .pixel-header__grid { display: none !important; }
-
-  .pixel-brand {
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    overflow: hidden !important;
-  }
   .pixel-brand h1 {
     font-size: 0.34rem !important;
-    letter-spacing: 0.3px !important;
     text-shadow: none !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
   }
   .pixel-brand p,
   .pixel-brand__eyebrow { display: none !important; }
-
+  .pixel-price-card { display: none !important; }
   .pixel-center {
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    gap: 6px !important;
-    flex: 0 0 auto !important;
+    gap: 5px !important;
   }
-  .pixel-price-card { display: none !important; }
-
-  /* Small counter box (desktop style) */
-  .pixel-stats {
-    display: flex !important;
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-  }
+  .pixel-stats { display: flex !important; margin: 0 !important; }
   .pixel-stat {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 4px 8px !important;
-    min-width: 0 !important;
-    width: auto !important;
+    padding: 4px 7px !important;
     border: 1.5px solid #c9b896 !important;
     background: #fff !important;
-    box-shadow: 1px 1px 0 rgba(42,33,24,0.1) !important;
+    box-shadow: none !important;
     border-radius: 2px !important;
   }
-  .pixel-stat__top,
-  .pixel-stat__foot,
-  .pixel-progress,
-  .pixel-stat__unit { display: none !important; }
-  .pixel-stat__main { margin: 0 !important; }
-  .pixel-stat .counter-num {
-    font-size: 0.26rem !important;
-    white-space: nowrap !important;
-  }
-
-  /* Small buy box */
+  .pixel-stat__top, .pixel-stat__foot, .pixel-progress, .pixel-stat__unit { display: none !important; }
+  .pixel-stat .counter-num { font-size: 0.24rem !important; line-height: 1 !important; }
   .pixel-buy {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 28px !important;
     height: 28px !important;
+    min-height: 28px !important;
     padding: 0 10px !important;
-    border: 1.5px solid #2a2118 !important;
-    background: linear-gradient(180deg, #e86a3c 0%, #c24e2e 100%) !important;
-    box-shadow: 1px 1px 0 #2a2118 !important;
     animation: none !important;
-    border-radius: 2px !important;
+    box-shadow: 1px 1px 0 #2a2118 !important;
   }
-  .pixel-buy__text {
-    font-size: 0.26rem !important;
-    letter-spacing: 0.3px !important;
-  }
-  .pixel-buy__icon,
-  .pixel-buy__arrow { display: none !important; }
+  .pixel-buy__text { font-size: 0.26rem !important; line-height: 1 !important; }
+  .pixel-buy__icon, .pixel-buy__arrow { display: none !important; }
 
-  /* Toolbar: three neat boxes */
+  /* Toolbar: compact chips in a row — NO tall empty boxes */
   .toolbar {
     display: flex !important;
-    flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
-    justify-content: space-between !important;
-    gap: 6px !important;
-    padding: 6px 8px !important;
-    background: #f7f2e8 !important;
-    border-bottom: 1px solid #e5d9c4 !important;
+    justify-content: flex-start !important;
+    gap: 5px !important;
+    padding: 5px 6px !important;
+    background: #f5efe4 !important;
+    border-bottom: 1px solid #e0d4c0 !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    min-height: 0 !important;
   }
   .toolbar::-webkit-scrollbar { display: none; }
-
   .toolbar .tool-gap { display: none !important; }
 
   .tool-group {
     display: inline-flex !important;
+    flex-direction: row !important;
     align-items: center !important;
-    justify-content: center !important;
-    gap: 3px !important;
-    flex: 0 0 auto !important;
-    padding: 3px 4px !important;
+    gap: 2px !important;
+    padding: 2px !important;
+    height: auto !important;
+    min-height: 0 !important;
     background: #fff !important;
     border: 1.5px solid #c9b896 !important;
     border-radius: 3px !important;
-    box-shadow: 1px 1px 0 rgba(42,33,24,0.08) !important;
   }
-  .tool-group--zoom {
-    background: #fff !important;
-    border: 1.5px solid #c9b896 !important;
-    padding: 3px 4px !important;
-  }
-
-  .tb-full { display: none !important; }
-  .tb-short { display: inline !important; }
 
   .toolbar .tool-btn {
-    min-height: 26px !important;
-    height: 26px !important;
-    padding: 0 7px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 6px 7px !important;
     font-size: 0.22rem !important;
-    border: 1px solid #e0d4c0 !important;
+    line-height: 1 !important;
+    border: 1px solid #e8dcc8 !important;
     background: #fffef9 !important;
     box-shadow: none !important;
-    border-radius: 2px !important;
     animation: none !important;
-  }
-  .toolbar .tool-btn:active {
-    background: #f0c14b !important;
+    white-space: nowrap !important;
   }
   .toolbar .zoom-lvl {
-    min-width: 34px !important;
     font-size: 0.7rem !important;
-    line-height: 26px !important;
-    padding: 0 3px !important;
+    line-height: 1 !important;
+    padding: 4px 3px !important;
+    min-width: 34px !important;
     border: none !important;
     background: transparent !important;
   }
@@ -1864,13 +1710,6 @@
     font-size: 0.6rem !important;
     padding: 3px 8px !important;
   }
-}
-
-@media (max-width: 360px) {
-  .pixel-brand h1 { font-size: 0.28rem !important; }
-  .pixel-buy { padding: 0 7px !important; }
-  .pixel-buy__text { font-size: 0.22rem !important; }
-  .toolbar .tool-btn { padding: 0 5px !important; font-size: 0.2rem !important; }
 }
 
 </style>
@@ -1927,22 +1766,20 @@
   <button class="tool-btn" id="toolSelect" type="button" style="display:none">SELECT</button>
   <button class="tool-btn" id="toolDrag" type="button" style="display:none">DRAG</button>
   <button class="tool-btn" id="toolDev" type="button" style="display:none">DEV</button>
-  <div class="tool-group tool-group--nav">
-    <button class="tool-btn" id="toolClaims" type="button" title="My claims"><span class="tb-full">MY CLAIMS</span><span class="tb-short">CLAIMS</span></button>
-    <button class="tool-btn" id="ownersBtn" type="button" title="All owners"><span class="tb-full">OWNERS</span><span class="tb-short">OWNERS</span></button>
+  <div class="tool-group">
+    <button class="tool-btn" id="toolClaims" type="button" title="My claims">CLAIMS</button>
+    <button class="tool-btn" id="ownersBtn" type="button" title="Owners">OWNERS</button>
   </div>
-  <span class="tool-gap" aria-hidden="true"></span>
   <div class="tool-group tool-group--zoom">
     <button class="tool-btn" id="zoomOut" type="button" title="Zoom out">−</button>
     <span id="zoomLvl" class="zoom-lvl">100%</span>
     <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
-    <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
+    <button class="tool-btn" id="zoomFit" type="button" title="Fit">FIT</button>
   </div>
-  <span class="tool-gap" aria-hidden="true"></span>
-  <div class="tool-group tool-group--info">
-    <button class="tool-btn" id="storyBtn" type="button"><span class="tb-full">STORY</span><span class="tb-short">STORY</span></button>
-    <button class="tool-btn" id="contactBtn" type="button"><span class="tb-full">CONTACT</span><span class="tb-short">MAIL</span></button>
-    <button class="tool-btn" id="helpBtn" type="button"><span class="tb-full">HOW IT WORKS</span><span class="tb-short">HELP</span></button>
+  <div class="tool-group">
+    <button class="tool-btn" id="storyBtn" type="button">STORY</button>
+    <button class="tool-btn" id="contactBtn" type="button">MAIL</button>
+    <button class="tool-btn" id="helpBtn" type="button">HELP</button>
   </div>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
 </div>
@@ -2210,20 +2047,9 @@ Min 10 blocks · no maximum
       <p style="margin-bottom:12px">
         Every pixel you claim helps cover education costs. You’re not just buying space on a grid — you’re helping someone stay in school.
       </p>
-      <p style="margin-bottom:14px;color:var(--dark)">
+      <p style="color:var(--dark)">
         Thank you for being here. It means more than you know.
       </p>
-      <button type="button" id="hpwSeoBtn" class="hpw-chip" aria-expanded="false" aria-controls="hpwSeoBox">HPW</button>
-      <div id="hpwSeoBox" class="hpw-seo-box" hidden>
-        <p>
-          <strong>Holy Pixel Wall (HPW)</strong> is an online pixel wall and digital fundraising page where anyone can
-          <strong>buy pixels</strong>, claim a block on a public grid, and display a photo, logo, or message.
-          Inspired by the classic million-dollar homepage idea, HPW is a modern
-          <strong>pixel art billboard</strong> built to help raise money for
-          <strong>university education</strong>, tuition fees, and student costs.
-          Own a piece of the wall, support education, and join a growing community of pixel owners worldwide.
-        </p>
-      </div>
     </div>
     <div class="modal-foot">
       <button type="button" class="btn btn-sec" id="storyClose">CLOSE</button>
@@ -2795,24 +2621,13 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Phone: full wall fits in view.
-    // Desktop: clean vertical wall — mostly height-fit, only a slight
-    // bump in size so it reads taller/clearer without extreme stretch.
-    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const margin = phone ? 6 : 16;
+    // Fit full wall in viewport — same on phone and desktop.
+    // 4px inset so the 2px wall frame is fully visible, no outer box.
+    const margin = 4;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s;
-    if (phone) {
-      s = Math.min(vw / COLS, vh / ROWS);
-    } else {
-      const fit = Math.min(vw / COLS, vh / ROWS);
-      const wide = vw / COLS;
-      // ~25% toward full-width — mild size boost, still vertical/centered
-      s = fit + (wide - fit) * 0.25;
-      if (s < fit) s = fit;
-    }
+    let s = Math.min(vw / COLS, vh / ROWS);
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;
@@ -2834,7 +2649,6 @@ Min 10 blocks · no maximum
       requestAnimationFrame(() => {
         const wrap = $('wallWrap');
         if (wrap && viewport) {
-          // Center the wall — clean vertical panel in the middle
           viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
           viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
         } else if (viewport) {
@@ -2861,15 +2675,15 @@ Min 10 blocks · no maximum
   // ===== Smooth zoom (layout-sized, no transform glitch) =====
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 1, Z_MAX = 24;
+  const Z_MIN = 1, Z_MAX = 14;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
+    // At fit (zoom≈1): no outer margin so the wall sits flush — no colored box.
+    // When zoomed in: padding so corners stay reachable by scrolling.
     try {
+      if ((zoom || 1) <= 1.05) return 0;
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      const phone = w < 700;
-      // Fit: tiny pad so the wall reads as a clean centered panel
-      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
-      return phone ? 36 : 40;
+      return w < 700 ? 36 : 48;
     } catch (e) { return 0; }
   }
   function isPhoneLayout() {
@@ -2884,8 +2698,7 @@ Min 10 blocks · no maximum
 
   function zClamp(z) {
     z = Number(z);
-    if (!isFinite(z) || z <= 0) return Z_MIN;
-    if (z < Z_MIN) return Z_MIN;
+    if (!isFinite(z) || z < Z_MIN) return Z_MIN;
     if (z > Z_MAX) return Z_MAX;
     return z;
   }
@@ -2935,7 +2748,7 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    canvas.style.imageRendering = 'auto';
+    canvas.style.imageRendering = 'pixelated';
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -2950,23 +2763,16 @@ Min 10 blocks · no maximum
 
     if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
     try { positionMediaOverlays(); } catch (e) {}
-    // Keep GIF/video clips locked to the same cells as the canvas while zooming
-    try {
-      if (mediaLayer) {
-        mediaLayer.style.width = w + 'px';
-        mediaLayer.style.height = h + 'px';
-      }
-    } catch (e) {}
   }
 
   function paintBase() {
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
     // High internal resolution so claim photos stay sharp (esp. phone zoom)
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const minLong = isPhoneLayout() ? 3600 : 4200;
+    const minLong = isPhoneLayout() ? 3200 : 2800;
     const long = Math.max(baseW, baseH);
     const boost = long < minLong ? (minLong / long) : 1;
-    const scale = dpr * Math.min(boost, 4);
+    const scale = dpr * Math.min(boost, 3.5);
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -3031,28 +2837,18 @@ Min 10 blocks · no maximum
   function zoomFrame() {
     zoomRaf = 0;
     const target = zClamp(zoomTarget);
-    if (!isFinite(target) || !isFinite(zoom)) {
-      zoom = Z_MIN;
-      zoomTarget = Z_MIN;
-      layoutAtZoom(zoom);
-      clampScroll();
-      return;
-    }
     const diff = target - zoom;
-    if (Math.abs(diff) < 0.0015) {
+    if (Math.abs(diff) < 0.002) {
       zoom = target;
-      zoomTarget = target;
       layoutAtZoom(zoom);
       keepAnchor();
       zoomAnchor = null;
       clampScroll();
-      try { positionMediaOverlays(); } catch (e) {}
+      // Redraw so buy-mode pixel grid matches the new zoom
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;
     }
-    // Ease toward target; larger steps when far for responsive zoom
-    const step = Math.abs(diff) > 0.5 ? 0.4 : 0.28;
-    zoom = zClamp(zoom + diff * step);
+    zoom += diff * 0.32;
     layoutAtZoom(zoom);
     keepAnchor();
     zoomRaf = requestAnimationFrame(zoomFrame);
@@ -3061,25 +2857,21 @@ Min 10 blocks · no maximum
   function bumpZoom(d, clientX, clientY, continuous) {
     let factor;
     if (continuous) {
-      const clamped = Math.max(-0.35, Math.min(0.35, d));
+      const clamped = Math.max(-0.25, Math.min(0.25, d));
       factor = Math.exp(clamped);
     } else {
-      // Button / key: ~25% steps, stable
-      factor = d > 0 ? 1.25 : 0.8;
+      factor = d > 0 ? 1.2 : 1 / 1.2;
     }
     if (!isFinite(factor) || factor <= 0) return;
 
-    try {
-      if (!zoomAnchor) anchorAt(clientX, clientY);
-      else if (clientX != null && isFinite(clientX)) {
-        const vr = viewport.getBoundingClientRect();
-        zoomAnchor.mx = clientX - vr.left;
-        zoomAnchor.my = clientY - vr.top;
-      }
-    } catch (e) {}
+    if (!zoomAnchor) anchorAt(clientX, clientY);
+    else if (clientX != null && isFinite(clientX)) {
+      const vr = viewport.getBoundingClientRect();
+      zoomAnchor.mx = clientX - vr.left;
+      zoomAnchor.my = clientY - vr.top;
+    }
 
-    const base = isFinite(zoomTarget) ? zoomTarget : (zoom || 1);
-    zoomTarget = zClamp(base * factor);
+    zoomTarget = zClamp(zoomTarget * factor);
     if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
   }
 
@@ -3100,8 +2892,7 @@ Min 10 blocks · no maximum
     if (!mediaLayer) return;
     const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
     if (!clips.length) return;
-    // Use current layout cell (baseCell * zoom) so overlays track canvas exactly
-    const c = (typeof cell === 'number' && cell > 0) ? cell : ((baseCell || 1) * (zoom || 1));
+    const c = cell;
     clips.forEach(clip => {
       const minC = +clip.getAttribute('data-min-c');
       const maxC = +clip.getAttribute('data-max-c');
@@ -3111,28 +2902,23 @@ Min 10 blocks · no maximum
       const fx = clip.getAttribute('data-crop-x') != null ? +clip.getAttribute('data-crop-x') : 0.5;
       const fy = clip.getAttribute('data-crop-y') != null ? +clip.getAttribute('data-crop-y') : 0.5;
       if (!Number.isFinite(minC) || !Number.isFinite(maxC)) return;
-      // Floor positions so GIF/video never drift off the painted claim box
-      const x = Math.round(minC * c);
-      const y = Math.round(minR * c);
-      const w = Math.max(1, Math.round((maxC - minC + 1) * c));
-      const h = Math.max(1, Math.round((maxR - minR + 1) * c));
+      const x = minC * c;
+      const y = minR * c;
+      const w = (maxC - minC + 1) * c;
+      const h = (maxR - minR + 1) * c;
       clip.style.left = x + 'px';
       clip.style.top = y + 'px';
       clip.style.width = w + 'px';
       clip.style.height = h + 'px';
-      clip.style.overflow = 'hidden';
       const el = clip.firstElementChild;
       if (el) {
-        const mw = Math.round(w * scale);
-        const mh = Math.round(h * scale);
+        const mw = w * scale;
+        const mh = h * scale;
         el.style.width = mw + 'px';
         el.style.height = mh + 'px';
-        el.style.left = Math.round((w - mw) * fx) + 'px';
-        el.style.top = Math.round((h - mh) * fy) + 'px';
-        el.style.objectFit = 'cover';
+        el.style.left = ((w - mw) * fx) + 'px';
+        el.style.top = ((h - mh) * fy) + 'px';
         el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
-        el.style.maxWidth = 'none';
-        el.style.maxHeight = 'none';
       }
     });
   }
@@ -3471,15 +3257,13 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // 4) Buy-mode grid — soft lines when zoomed so each pixel is clear
+    // 4) Buy-mode pixel grid — each square is one buyable pixel (shows when zoomed)
     const visCell = (baseCell || drawCell) * (zoom || 1);
-    if (buyMode && visCell >= 3) {
+    if (buyMode && visCell >= 3.5) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      // Stronger lines when zoomed in so each pixel is obvious
-      const lineA = visCell >= 12 ? 0.28 : 0.14;
-      ctx.strokeStyle = 'rgba(42, 33, 24, ' + lineA + ')';
-      ctx.lineWidth = Math.max(0.4, drawCell * (visCell >= 12 ? 0.05 : 0.03));
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.10)';
+      ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
         const x = Math.floor(c * drawCell) + 0.5;
@@ -3492,9 +3276,8 @@ function getImg(src) {
         ctx.lineTo((gc1 + 1) * drawCell, y);
       }
       ctx.stroke();
-      // Stronger 10×10 blocks
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.22)';
-      ctx.lineWidth = Math.max(0.7, drawCell * 0.06);
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.18)';
+      ctx.lineWidth = Math.max(1, drawCell * 0.09);
       ctx.beginPath();
       const sec = SECTION || 10;
       for (let c = Math.floor(gc0 / sec) * sec; c <= gc1 + 1; c += sec) {
@@ -3511,88 +3294,50 @@ function getImg(src) {
       ctx.restore();
     }
 
-    // 5) CLEAN SEE-THROUGH SELECTION — one glass layer + pixel grid + outer frame
-    if (selected.size) {
-      let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
-      const freeKeys = [];
-      selected.forEach(k => {
-        if (sold.has(k) && !(adminMode && editingRegion && typeof cellOwnedByEditing === 'function' && cellOwnedByEditing(k))) return;
-        const parts = k.split(',');
-        const c = +parts[0], r = +parts[1];
-        if (!Number.isFinite(c) || !Number.isFinite(r)) return;
-        freeKeys.push([c, r]);
-        if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
-        if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
-      });
-      if (freeKeys.length && sMaxC >= sMinC) {
-        const bx = sMinC * drawCell;
-        const by = sMinR * drawCell;
-        const bw = (sMaxC - sMinC + 1) * drawCell;
-        const bh = (sMaxR - sMinR + 1) * drawCell;
+    // 5) SEE-THROUGH SELECTION
+if (selected.size) {
+  selected.forEach(k => {
+    const [c, r] = k.split(',').map(Number);
 
-        ctx.save();
-        // Soft see-through fill (wall stays visible underneath)
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
-        freeKeys.forEach(([c, r]) => {
-          ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
-        });
+    if (!Number.isFinite(c) || !Number.isFinite(r)) return;
 
-        // Inner pixel lines only when cells are large enough (zoomed in)
-        if (visCell >= 3) {
-          ctx.strokeStyle = 'rgba(5, 120, 90, 0.45)';
-          ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
-          ctx.beginPath();
-          for (let c = sMinC; c <= sMaxC + 1; c++) {
-            const x = Math.floor(c * drawCell) + 0.5;
-            ctx.moveTo(x, by);
-            ctx.lineTo(x, by + bh);
-          }
-          for (let r = sMinR; r <= sMaxR + 1; r++) {
-            const y = Math.floor(r * drawCell) + 0.5;
-            ctx.moveTo(bx, y);
-            ctx.lineTo(bx + bw, y);
-          }
-          ctx.stroke();
-        }
+    const x = c * drawCell;
+    const y = r * drawCell;
 
-        // Single clean outer frame
-        ctx.strokeStyle = 'rgba(4, 120, 87, 0.95)';
-        ctx.lineWidth = Math.max(1.5, Math.min(3, drawCell * 0.2));
-        ctx.setLineDash([]);
-        ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
-        ctx.restore();
-      }
-    }
+    // VERY LIGHT transparent overlay
+    // Image underneath remains clearly visible
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.fillRect(
+      x,
+      y,
+      drawCell,
+      drawCell
+    );
 
-    // 6) Drag preview — same see-through style while dragging
-    if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
+    // Clean thin border around each pixel
+    ctx.strokeStyle = 'rgba(255, 80, 40, 0.85)';
+    ctx.lineWidth = Math.max(0.5, 1 / (zoom || 1));
+
+    ctx.strokeRect(
+      x + 0.5,
+      y + 0.5,
+      drawCell - 1,
+      drawCell - 1
+    );
+  });
+}
+
+    // 6) Dragging preview when selection not yet committed
+    if (dragging && Number.isFinite(startC) && Number.isFinite(curC) && !selected.size) {
       const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
       const dx = minC * drawCell, dy = minR * drawCell;
       const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
-      ctx.save();
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
-      ctx.fillRect(dx, dy, dw, dh);
-      if (visCell >= 3) {
-        ctx.strokeStyle = 'rgba(5, 120, 90, 0.4)';
-        ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
-        ctx.beginPath();
-        for (let c = minC; c <= maxC + 1; c++) {
-          const x = Math.floor(c * drawCell) + 0.5;
-          ctx.moveTo(x, dy); ctx.lineTo(x, dy + dh);
-        }
-        for (let r = minR; r <= maxR + 1; r++) {
-          const y = Math.floor(r * drawCell) + 0.5;
-          ctx.moveTo(dx, y); ctx.lineTo(dx + dw, y);
-        }
-        ctx.stroke();
-      }
-      ctx.strokeStyle = 'rgba(4, 120, 87, 0.9)';
-      ctx.lineWidth = Math.max(1.25, Math.min(2.5, drawCell * 0.16));
-      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#059669';
+      ctx.lineWidth = Math.max(1.5, Math.min(2.5, drawCell * 0.18));
+      ctx.setLineDash([4, 3]);
       ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
       ctx.setLineDash([]);
-      ctx.restore();
     }
 
     // Live preview: show how image will look on selection before claim
@@ -5704,21 +5449,6 @@ function clearPending() {
   if ($('helpClose')) $('helpClose').onclick = () => { $('helpModal').style.display = 'none'; };
   if ($('storyBtn')) $('storyBtn').onclick = () => { $('storyModal').style.display = 'flex'; };
   if ($('storyClose')) $('storyClose').onclick = () => { $('storyModal').style.display = 'none'; };
-  (function wireHpwSeo() {
-    const btn = $('hpwSeoBtn');
-    const box = $('hpwSeoBox');
-    if (!btn || !box) return;
-    btn.onclick = () => {
-      const open = box.hasAttribute('hidden');
-      if (open) {
-        box.removeAttribute('hidden');
-        btn.setAttribute('aria-expanded', 'true');
-      } else {
-        box.setAttribute('hidden', '');
-        btn.setAttribute('aria-expanded', 'false');
-      }
-    };
-  })();
   if ($('storyBuy')) $('storyBuy').onclick = () => {
     $('storyModal').style.display = 'none';
     if (typeof setBuyMode === 'function') setBuyMode(true);
@@ -6565,7 +6295,7 @@ function clearPending() {
   }, { passive: false });
   viewport.addEventListener('gesturechange', e => {
     e.preventDefault();
-    const target = Math.max(Z_MIN, Math.min(Z_MAX, gestureStartZoom * e.scale));
+    const target = Math.max(1, Math.min(12, gestureStartZoom * e.scale));
     const delta = target - zoom;
     if (Math.abs(delta) > 0.001) {
       bumpZoom(delta, e.clientX || lastMouseX, e.clientY || lastMouseY, true);

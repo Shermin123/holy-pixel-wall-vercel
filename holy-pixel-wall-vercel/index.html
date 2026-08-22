@@ -224,7 +224,7 @@
     align-items: center !important;
     justify-content: center !important;
     gap: 6px !important;
-    padding: 6px 10px !important;
+    padding: 4px 8px !important;
     flex-wrap: wrap !important;
     background: #f3e6c8 !important;
     border-bottom: 2px solid #d4a017 !important;
@@ -1022,9 +1022,9 @@
   grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) !important;
   align-items: center !important;
   column-gap: 20px !important;
-  min-height: 52px !important;
-  height: 52px !important;
-  padding: 0 16px !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  padding: 0 14px !important;
   overflow: hidden;
   background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
   border-bottom: 3px solid #2a2118 !important;
@@ -1574,6 +1574,31 @@
 #wallWrap { background: transparent !important; }
 .stage, canvas { background: #faf7f0 !important; }
 .stage { box-shadow: 0 0 0 2px #2a2118 !important; }
+
+
+/* DESKTOP WALL MAX — free vertical space for a larger wall */
+@media (min-width: 701px) {
+  .pixel-header {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+  .toolbar {
+    padding: 4px 8px !important;
+  }
+  .toolbar .tool-btn {
+    padding: 5px 8px !important;
+    font-size: 0.28rem !important;
+  }
+  .site-copy {
+    padding: 4px 10px !important;
+    font-size: 0.75rem !important;
+  }
+  .viewport {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+}
 
 </style>
 </head>
@@ -2481,22 +2506,13 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Desktop: maximize wall size; allow a little vertical scroll for balance.
-    // Phone: still fit fully in view.
-    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const margin = phone ? 4 : 8;
+    // Maximize wall on desktop AND phone — full FIT, no forced scroll.
+    // Wall uses nearly the entire viewport so it is large and fully visible.
+    const margin = 2;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s;
-    if (phone) {
-      s = Math.min(vw / COLS, vh / ROWS);
-    } else {
-      // Prefer large wall: fill width when possible, allow ~8% extra height to scroll
-      const byW = vw / COLS;
-      const byH = (vh * 1.08) / ROWS;
-      s = Math.min(byW, byH);
-    }
+    let s = Math.min(vw / COLS, vh / ROWS);
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;

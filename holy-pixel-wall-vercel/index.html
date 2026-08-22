@@ -1600,6 +1600,100 @@
   }
 }
 
+
+/* Toolbar groups — clean layout desktop + mobile */
+.toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+.tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.tool-group--zoom {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid #e0d4c0;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+.tb-short { display: none; }
+.tb-full { display: inline; }
+
+@media (max-width: 700px) {
+  .toolbar {
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .tool-group {
+    gap: 4px;
+  }
+  .tool-group--zoom {
+    padding: 2px 3px;
+  }
+  .toolbar .tool-gap {
+    width: 1px !important;
+    height: 18px !important;
+    background: #d2b48c !important;
+    align-self: center;
+  }
+  .tb-full { display: none !important; }
+  .tb-short { display: inline !important; }
+  .toolbar .tool-btn {
+    min-height: 30px !important;
+    padding: 5px 9px !important;
+    font-size: 0.28rem !important;
+    border-radius: 2px;
+  }
+  .toolbar .zoom-lvl {
+    min-width: 40px !important;
+    font-size: 0.75rem !important;
+    line-height: 30px !important;
+  }
+}
+
+
+.hpw-chip {
+  display: inline-block;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.32rem;
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  border: 2px solid #2a2118;
+  background: linear-gradient(180deg, #fff8e8 0%, #f0c14b 100%);
+  color: #2a2118;
+  box-shadow: 2px 2px 0 #2a2118;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.hpw-chip:hover { filter: brightness(1.05); }
+.hpw-chip[aria-expanded="true"] {
+  background: #2a2118;
+  color: #f0c14b;
+}
+.hpw-seo-box {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 2px solid #c9a34e;
+  background: #fffdf8;
+  color: #5c4a32;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.hpw-seo-box[hidden] { display: none !important; }
+.hpw-seo-box strong { color: #2a2118; }
+
 </style>
 </head>
 <body>
@@ -1650,23 +1744,28 @@
   <div id="willow" style="display:none"></div>
 </header>
 
-<div class="toolbar">
+<div class="toolbar" role="toolbar" aria-label="Wall tools">
   <button class="tool-btn" id="toolSelect" type="button" style="display:none">SELECT</button>
   <button class="tool-btn" id="toolDrag" type="button" style="display:none">DRAG</button>
   <button class="tool-btn" id="toolDev" type="button" style="display:none">DEV</button>
-  <button class="tool-btn" id="toolClaims" type="button" title="My claims">MY CLAIMS</button>
-  <button class="tool-btn" id="ownersBtn" type="button" title="All owners">OWNERS</button>
-  <span class="tool-gap"></span>
-  <button class="tool-btn" id="zoomOut" type="button" title="Zoom out">−</button>
-  <span id="zoomLvl" class="zoom-lvl">100%</span>
-  <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
-  <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
-  <span class="tool-gap"></span>
-  <button class="tool-btn" id="storyBtn" type="button">STORY</button>
-  <button class="tool-btn" id="contactBtn" type="button">CONTACT</button>
-  <button class="tool-btn" id="helpBtn" type="button">HOW IT WORKS</button>
+  <div class="tool-group tool-group--nav">
+    <button class="tool-btn" id="toolClaims" type="button" title="My claims"><span class="tb-full">MY CLAIMS</span><span class="tb-short">CLAIMS</span></button>
+    <button class="tool-btn" id="ownersBtn" type="button" title="All owners"><span class="tb-full">OWNERS</span><span class="tb-short">OWNERS</span></button>
+  </div>
+  <span class="tool-gap" aria-hidden="true"></span>
+  <div class="tool-group tool-group--zoom">
+    <button class="tool-btn" id="zoomOut" type="button" title="Zoom out">−</button>
+    <span id="zoomLvl" class="zoom-lvl">100%</span>
+    <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
+    <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
+  </div>
+  <span class="tool-gap" aria-hidden="true"></span>
+  <div class="tool-group tool-group--info">
+    <button class="tool-btn" id="storyBtn" type="button"><span class="tb-full">STORY</span><span class="tb-short">STORY</span></button>
+    <button class="tool-btn" id="contactBtn" type="button"><span class="tb-full">CONTACT</span><span class="tb-short">MAIL</span></button>
+    <button class="tool-btn" id="helpBtn" type="button"><span class="tb-full">HOW IT WORKS</span><span class="tb-short">HELP</span></button>
+  </div>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
-  <!-- admin: Ctrl+Shift+A only -->
 </div>
 <div class="viewport" id="viewport">
   <div id="wallWrap">
@@ -1932,9 +2031,20 @@ Min 10 blocks · no maximum
       <p style="margin-bottom:12px">
         Every pixel you claim helps cover education costs. You’re not just buying space on a grid — you’re helping someone stay in school.
       </p>
-      <p style="color:var(--dark)">
+      <p style="margin-bottom:14px;color:var(--dark)">
         Thank you for being here. It means more than you know.
       </p>
+      <button type="button" id="hpwSeoBtn" class="hpw-chip" aria-expanded="false" aria-controls="hpwSeoBox">HPW</button>
+      <div id="hpwSeoBox" class="hpw-seo-box" hidden>
+        <p>
+          <strong>Holy Pixel Wall (HPW)</strong> is an online pixel wall and digital fundraising page where anyone can
+          <strong>buy pixels</strong>, claim a block on a public grid, and display a photo, logo, or message.
+          Inspired by the classic million-dollar homepage idea, HPW is a modern
+          <strong>pixel art billboard</strong> built to help raise money for
+          <strong>university education</strong>, tuition fees, and student costs.
+          Own a piece of the wall, support education, and join a growing community of pixel owners worldwide.
+        </p>
+      </div>
     </div>
     <div class="modal-foot">
       <button type="button" class="btn btn-sec" id="storyClose">CLOSE</button>
@@ -5415,6 +5525,21 @@ function clearPending() {
   if ($('helpClose')) $('helpClose').onclick = () => { $('helpModal').style.display = 'none'; };
   if ($('storyBtn')) $('storyBtn').onclick = () => { $('storyModal').style.display = 'flex'; };
   if ($('storyClose')) $('storyClose').onclick = () => { $('storyModal').style.display = 'none'; };
+  (function wireHpwSeo() {
+    const btn = $('hpwSeoBtn');
+    const box = $('hpwSeoBox');
+    if (!btn || !box) return;
+    btn.onclick = () => {
+      const open = box.hasAttribute('hidden');
+      if (open) {
+        box.removeAttribute('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+      } else {
+        box.setAttribute('hidden', '');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    };
+  })();
   if ($('storyBuy')) $('storyBuy').onclick = () => {
     $('storyModal').style.display = 'none';
     if (typeof setBuyMode === 'function') setBuyMode(true);

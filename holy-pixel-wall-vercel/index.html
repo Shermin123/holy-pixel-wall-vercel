@@ -3139,13 +3139,13 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // 4) Buy-mode pixel grid — each square is one buyable pixel (shows when zoomed)
+    // 4) Buy-mode grid — soft lines when zoomed so each pixel is clear
     const visCell = (baseCell || drawCell) * (zoom || 1);
-    if (buyMode && visCell >= 3.5) {
+    if (buyMode && visCell >= 4) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.10)';
-      ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.12)';
+      ctx.lineWidth = Math.max(0.4, drawCell * 0.03);
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
         const x = Math.floor(c * drawCell) + 0.5;
@@ -3158,8 +3158,9 @@ function getImg(src) {
         ctx.lineTo((gc1 + 1) * drawCell, y);
       }
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.18)';
-      ctx.lineWidth = Math.max(1, drawCell * 0.09);
+      // Stronger 10×10 blocks
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.22)';
+      ctx.lineWidth = Math.max(0.7, drawCell * 0.06);
       ctx.beginPath();
       const sec = SECTION || 10;
       for (let c = Math.floor(gc0 / sec) * sec; c <= gc1 + 1; c += sec) {
@@ -3176,50 +3177,88 @@ function getImg(src) {
       ctx.restore();
     }
 
-    // 5) SEE-THROUGH SELECTION
-if (selected.size) {
-  selected.forEach(k => {
-    const [c, r] = k.split(',').map(Number);
+    // 5) CLEAN SEE-THROUGH SELECTION — one glass layer + pixel grid + outer frame
+    if (selected.size) {
+      let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
+      const freeKeys = [];
+      selected.forEach(k => {
+        if (sold.has(k) && !(adminMode && editingRegion && typeof cellOwnedByEditing === 'function' && cellOwnedByEditing(k))) return;
+        const parts = k.split(',');
+        const c = +parts[0], r = +parts[1];
+        if (!Number.isFinite(c) || !Number.isFinite(r)) return;
+        freeKeys.push([c, r]);
+        if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
+        if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
+      });
+      if (freeKeys.length && sMaxC >= sMinC) {
+        const bx = sMinC * drawCell;
+        const by = sMinR * drawCell;
+        const bw = (sMaxC - sMinC + 1) * drawCell;
+        const bh = (sMaxR - sMinR + 1) * drawCell;
 
-    if (!Number.isFinite(c) || !Number.isFinite(r)) return;
+        ctx.save();
+        // Soft see-through fill (wall stays visible underneath)
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+        freeKeys.forEach(([c, r]) => {
+          ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
+        });
 
-    const x = c * drawCell;
-    const y = r * drawCell;
+        // Inner pixel lines only when cells are large enough (zoomed in)
+        if (visCell >= 5) {
+          ctx.strokeStyle = 'rgba(5, 120, 90, 0.35)';
+          ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
+          ctx.beginPath();
+          for (let c = sMinC; c <= sMaxC + 1; c++) {
+            const x = Math.floor(c * drawCell) + 0.5;
+            ctx.moveTo(x, by);
+            ctx.lineTo(x, by + bh);
+          }
+          for (let r = sMinR; r <= sMaxR + 1; r++) {
+            const y = Math.floor(r * drawCell) + 0.5;
+            ctx.moveTo(bx, y);
+            ctx.lineTo(bx + bw, y);
+          }
+          ctx.stroke();
+        }
 
-    // VERY LIGHT transparent overlay
-    // Image underneath remains clearly visible
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.fillRect(
-      x,
-      y,
-      drawCell,
-      drawCell
-    );
+        // Single clean outer frame
+        ctx.strokeStyle = 'rgba(4, 120, 87, 0.95)';
+        ctx.lineWidth = Math.max(1.5, Math.min(3, drawCell * 0.2));
+        ctx.setLineDash([]);
+        ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
+        ctx.restore();
+      }
+    }
 
-    // Clean thin border around each pixel
-    ctx.strokeStyle = 'rgba(255, 80, 40, 0.85)';
-    ctx.lineWidth = Math.max(0.5, 1 / (zoom || 1));
-
-    ctx.strokeRect(
-      x + 0.5,
-      y + 0.5,
-      drawCell - 1,
-      drawCell - 1
-    );
-  });
-}
-
-    // 6) Dragging preview when selection not yet committed
-    if (dragging && Number.isFinite(startC) && Number.isFinite(curC) && !selected.size) {
+    // 6) Drag preview — same see-through style while dragging
+    if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
       const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
       const dx = minC * drawCell, dy = minR * drawCell;
       const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
-      ctx.strokeStyle = '#059669';
-      ctx.lineWidth = Math.max(1.5, Math.min(2.5, drawCell * 0.18));
-      ctx.setLineDash([4, 3]);
+      ctx.save();
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+      ctx.fillRect(dx, dy, dw, dh);
+      if (visCell >= 5) {
+        ctx.strokeStyle = 'rgba(5, 120, 90, 0.3)';
+        ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
+        ctx.beginPath();
+        for (let c = minC; c <= maxC + 1; c++) {
+          const x = Math.floor(c * drawCell) + 0.5;
+          ctx.moveTo(x, dy); ctx.lineTo(x, dy + dh);
+        }
+        for (let r = minR; r <= maxR + 1; r++) {
+          const y = Math.floor(r * drawCell) + 0.5;
+          ctx.moveTo(dx, y); ctx.lineTo(dx + dw, y);
+        }
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(4, 120, 87, 0.9)';
+      ctx.lineWidth = Math.max(1.25, Math.min(2.5, drawCell * 0.16));
+      ctx.setLineDash([6, 4]);
       ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
       ctx.setLineDash([]);
+      ctx.restore();
     }
 
     // Live preview: show how image will look on selection before claim

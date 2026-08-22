@@ -1384,18 +1384,19 @@
     background: #faf7f0 !important;
   }
 
-  /* Ultra-slim header row */
+  /* Phone header — classic compact */
   .pixel-header {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 4px !important;
-    height: 36px !important;
-    min-height: 36px !important;
-    max-height: 36px !important;
-    padding: 0 6px !important;
+    grid-template-columns: none !important;
+    gap: 8px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    padding: 0 10px !important;
     border-bottom: 2px solid #2a2118 !important;
     box-shadow: 0 2px 0 #c9a34e !important;
     background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
@@ -1696,212 +1697,8 @@
 
 
 
-/* =========================================================
-   MOBILE CHROME — desktop-like small boxes, clean layout
-   ========================================================= */
-@media (max-width: 700px) {
-  html, body {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-  }
 
-  /* Header: title left · counter + buy right (like desktop) */
-  .pixel-header {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 8px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    padding: 0 8px !important;
-    background: #fffef9 !important;
-    border-bottom: 2px solid #2a2118 !important;
-    box-shadow: 0 1px 0 #e8d9b8 !important;
-  }
-  .pixel-header__grid { display: none !important; }
-
-  .pixel-brand {
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    overflow: hidden !important;
-  }
-  .pixel-brand h1 {
-    font-size: 0.34rem !important;
-    letter-spacing: 0.3px !important;
-    text-shadow: none !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-  .pixel-brand p,
-  .pixel-brand__eyebrow { display: none !important; }
-
-  .pixel-center {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex: 0 0 auto !important;
-  }
-  .pixel-price-card { display: none !important; }
-
-  /* Small counter box (desktop style) */
-  .pixel-stats {
-    display: flex !important;
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-  }
-  .pixel-stat {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 4px 8px !important;
-    min-width: 0 !important;
-    width: auto !important;
-    border: 1.5px solid #c9b896 !important;
-    background: #fff !important;
-    box-shadow: 1px 1px 0 rgba(42,33,24,0.1) !important;
-    border-radius: 2px !important;
-  }
-  .pixel-stat__top,
-  .pixel-stat__foot,
-  .pixel-progress,
-  .pixel-stat__unit { display: none !important; }
-  .pixel-stat__main { margin: 0 !important; }
-  .pixel-stat .counter-num {
-    font-size: 0.26rem !important;
-    white-space: nowrap !important;
-  }
-
-  /* Small buy box */
-  .pixel-buy {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 28px !important;
-    height: 28px !important;
-    padding: 0 10px !important;
-    border: 1.5px solid #2a2118 !important;
-    background: linear-gradient(180deg, #e86a3c 0%, #c24e2e 100%) !important;
-    box-shadow: 1px 1px 0 #2a2118 !important;
-    animation: none !important;
-    border-radius: 2px !important;
-  }
-  .pixel-buy__text {
-    font-size: 0.26rem !important;
-    letter-spacing: 0.3px !important;
-  }
-  .pixel-buy__icon,
-  .pixel-buy__arrow { display: none !important; }
-
-  /* Toolbar: three neat boxes */
-  .toolbar {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-wrap: nowrap !important;
-
-  width: 100% !important;
-  box-sizing: border-box !important;
-
-  gap: 8px !important;
-  padding: 7px 10px !important;
-
-  background: #f7f0df !important;
-  border-bottom: 2px solid #2a2118 !important;
-
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none !important;
-}
-
-.toolbar::-webkit-scrollbar {
-  display: none !important;
-}
-  .toolbar::-webkit-scrollbar { display: none; }
-
-  .toolbar .tool-gap { display: none !important; }
-
-  .tool-group {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-
-  gap: 5px !important;
-  flex: 0 0 auto !important;
-
-  padding: 3px !important;
-
-  background: #fffdf8 !important;
-  border: 2px solid #2a2118 !important;
-  border-radius: 2px !important;
-
-  box-shadow: 2px 2px 0 #c9a34e !important;
-}
-  
-  .tool-group--zoom {
-    background: #fff !important;
-    border: 1.5px solid #c9b896 !important;
-    padding: 3px 4px !important;
-  }
-
-  .tb-full { display: none !important; }
-  .tb-short { display: inline !important; }
-
-  .toolbar .tool-btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-
-  height: 30px !important;
-  min-height: 30px !important;
-
-  padding: 0 10px !important;
-
-  font-size: 0.28rem !important;
-  line-height: 1 !important;
-  white-space: nowrap !important;
-
-  border: 1px solid #2a2118 !important;
-  background: #fffef9 !important;
-
-  box-shadow: none !important;
-  border-radius: 1px !important;
-}
-  .toolbar .tool-btn:active {
-    background: #f0c14b !important;
-  }
-  .toolbar .zoom-lvl {
-    min-width: 34px !important;
-    font-size: 0.7rem !important;
-    line-height: 26px !important;
-    padding: 0 3px !important;
-    border: none !important;
-    background: transparent !important;
-  }
-
-  .site-copy {
-    font-size: 0.6rem !important;
-    padding: 3px 8px !important;
-  }
-}
-
-@media (max-width: 360px) {
-  .pixel-brand h1 { font-size: 0.28rem !important; }
-  .pixel-buy { padding: 0 7px !important; }
-  .pixel-buy__text { font-size: 0.22rem !important; }
-  .toolbar .tool-btn { padding: 0 5px !important; font-size: 0.2rem !important; }
-}
-
-
-/* ============================================================
-   MOBILE TOP BAR — single source of truth (overrides all above)
-   ============================================================ */
+/* —— Classic top bars: desktop unchanged, mobile compact —— */
 @media (max-width: 700px) {
   .pixel-header {
     display: flex !important;
@@ -1910,413 +1707,82 @@
     align-items: center !important;
     justify-content: space-between !important;
     grid-template-columns: none !important;
-    grid-template-rows: none !important;
-    column-gap: 0 !important;
-    row-gap: 0 !important;
-    gap: 6px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    padding: 0 8px !important;
-    overflow: visible !important;
-    background: #fffef9 !important;
-    border-bottom: 2px solid #2a2118 !important;
-    box-shadow: none !important;
-  }
-  .pixel-header__grid,
-  .pixel-header::before,
-  .pixel-header::after {
-    display: none !important;
-    content: none !important;
-  }
-
-  .pixel-brand {
-    display: flex !important;
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    max-width: 42% !important;
-    justify-self: auto !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    padding: 0 10px !important;
+    gap: 8px !important;
     overflow: hidden !important;
   }
-  .pixel-brand__copy {
-    min-width: 0 !important;
-    gap: 0 !important;
-  }
+  .pixel-header__grid { display: none !important; }
+  .pixel-brand { flex: 1 1 auto; min-width: 0; }
   .pixel-brand__eyebrow { display: none !important; }
   .pixel-brand p { display: none !important; }
   .pixel-brand h1 {
-    font-size: 0.32rem !important;
-    line-height: 1.2 !important;
-    letter-spacing: 0.2px !important;
-    text-shadow: none !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    font-size: 0.38rem !important;
+    text-shadow: 1px 1px 0 #e8d5b0 !important;
   }
-
   .pixel-center {
     display: flex !important;
-    flex-direction: row !important;
     align-items: center !important;
-    justify-content: flex-end !important;
-    gap: 5px !important;
+    gap: 6px !important;
     flex: 0 0 auto !important;
-    justify-self: auto !important;
   }
   .pixel-price-card { display: none !important; }
-
   .pixel-buy {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    padding: 0 10px !important;
-    margin: 0 !important;
-    border: 1.5px solid #2a2118 !important;
-    background: linear-gradient(180deg, #e86a3c 0%, #c24e2e 100%) !important;
-    box-shadow: 1px 1px 0 #2a2118 !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 12px !important;
     animation: none !important;
-    border-radius: 2px !important;
   }
-  .pixel-buy__icon,
-  .pixel-buy__arrow { display: none !important; }
-  .pixel-buy__text {
-    font-size: 0.26rem !important;
-    line-height: 1 !important;
-    letter-spacing: 0.2px !important;
-  }
-
-  .pixel-stats {
-    display: flex !important;
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-    order: 0 !important;
-  }
+  .pixel-buy__icon, .pixel-buy__arrow { display: none !important; }
+  .pixel-buy__text { font-size: 0.3rem !important; }
+  .pixel-stats { flex: 0 0 auto; }
   .pixel-stat {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 4px 7px !important;
-    margin: 0 !important;
-    border: 1.5px solid #c9b896 !important;
-    background: #fff !important;
-    box-shadow: none !important;
-    border-radius: 2px !important;
-    min-width: 0 !important;
-    width: auto !important;
-  }
-  .pixel-stat__top,
-  .pixel-stat__foot,
-  .pixel-progress,
-  .pixel-stat__unit { display: none !important; }
-  .pixel-stat__main { margin: 0 !important; line-height: 1 !important; }
-  .pixel-stat .counter-num {
-    font-size: 0.24rem !important;
-    line-height: 1 !important;
-    white-space: nowrap !important;
-  }
-
-  /* Reorder: brand | buy | stats via flex order if needed */
-  .pixel-brand { order: 1 !important; }
-  .pixel-center { order: 2 !important; }
-  .pixel-stats { order: 3 !important; }
-
-  /* Toolbar — tight chip groups */
-  .toolbar {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 5px !important;
-    padding: 5px 6px !important;
-    background: #f5efe4 !important;
-    border-bottom: 1px solid #e0d4c0 !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none !important;
-    min-height: 0 !important;
-    height: auto !important;
-  }
-  .toolbar::-webkit-scrollbar { display: none !important; }
-  .toolbar .tool-gap { display: none !important; }
-
-  .tool-group {
-    display: inline-flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 2px !important;
-    flex: 0 0 auto !important;
-    padding: 2px !important;
-    margin: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    background: #fff !important;
-    border: 1.5px solid #c9b896 !important;
-    border-radius: 3px !important;
+    padding: 4px 8px !important;
     box-shadow: none !important;
   }
-  .tool-group--zoom {
-    border: 1.5px solid #c9b896 !important;
-    padding: 2px !important;
-  }
-
-  .tb-full { display: none !important; }
-  .tb-short { display: inline !important; line-height: 1 !important; }
-
-  .toolbar .tool-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: auto !important;
-    min-height: 0 !important;
-    padding: 6px 7px !important;
-    margin: 0 !important;
-    font-size: 0.22rem !important;
-    line-height: 1 !important;
-    border: 1px solid #e8dcc8 !important;
-    background: #fffef9 !important;
-    box-shadow: none !important;
-    animation: none !important;
-    white-space: nowrap !important;
-    border-radius: 2px !important;
-  }
-  .toolbar .tool-btn:active {
-    background: #f0c14b !important;
-  }
-  .toolbar .zoom-lvl {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-width: 34px !important;
-    height: auto !important;
-    padding: 4px 2px !important;
-    font-size: 0.65rem !important;
-    line-height: 1 !important;
-    border: none !important;
-    background: transparent !important;
-  }
-
-  .site-copy {
-    font-size: 0.6rem !important;
-    padding: 3px 8px !important;
-  }
-}
-
-
-/* ============================================================
-   SECOND BAR (toolbar) — pixel theme, clean & visible
-   ============================================================ */
-@media (max-width: 700px) {
-  .toolbar {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 6px !important;
-    padding: 6px 8px !important;
-    margin: 0 !important;
-    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
-    border-bottom: 3px solid #2a2118 !important;
-    box-shadow: 0 2px 0 #c9a34e !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none !important;
-    height: auto !important;
-    min-height: 40px !important;
-    max-height: none !important;
-    box-sizing: border-box !important;
-  }
-  .toolbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
-  .toolbar .tool-gap { display: none !important; }
-
-  /* Flat pixel chips — no nested boxes, just buttons in a row group */
-  .toolbar .tool-group {
-    display: inline-flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 0 !important;
-    flex: 0 0 auto !important;
-    width: auto !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    box-sizing: border-box !important;
-  }
-
-  .toolbar .tool-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex: 0 0 auto !important;
-    width: auto !important;
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    padding: 0 10px !important;
-    margin: 0 !important;
-    font-family: 'Press Start 2P', monospace !important;
-    font-size: 0.3rem !important;
-    line-height: 1 !important;
-    letter-spacing: 0.4px !important;
-    color: #2a2118 !important;
-    background: #fffdf8 !important;
-    border: 2px solid #2a2118 !important;
-    border-radius: 0 !important;
-    box-shadow: 2px 2px 0 #c9a34e !important;
-    animation: none !important;
-    white-space: nowrap !important;
-    box-sizing: border-box !important;
-  }
-  /* Join buttons in a group: shared border, single outer shadow */
-  .toolbar .tool-group .tool-btn + .tool-btn {
-    margin-left: -2px !important;
-  }
-  .toolbar .tool-group .tool-btn:not(:last-child) {
-    box-shadow: none !important;
-  }
-  .toolbar .tool-group .tool-btn:last-child {
-    box-shadow: 2px 2px 0 #c9a34e !important;
-  }
-  .toolbar .tool-group .tool-btn:only-child {
-    box-shadow: 2px 2px 0 #c9a34e !important;
-  }
-
-  .toolbar .tool-btn:active,
-  .toolbar .tool-btn.tool-active {
-    background: #f0c14b !important;
-    color: #2a2118 !important;
-    border-color: #2a2118 !important;
-    transform: translate(1px, 1px) !important;
-    box-shadow: 1px 1px 0 #c9a34e !important;
-  }
-
-  /* Zoom cluster: − 100% + FIT as one joined strip */
-  .toolbar .tool-group--zoom {
-    gap: 0 !important;
-  }
-  .toolbar .zoom-lvl {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 28px !important;
-    min-width: 42px !important;
-    padding: 0 4px !important;
-    margin: 0 0 0 -2px !important;
-    font-family: 'Press Start 2P', monospace !important;
-    font-size: 0.28rem !important;
-    line-height: 1 !important;
-    color: #2a2118 !important;
-    background: #fff8e0 !important;
-    border: 2px solid #2a2118 !important;
-    border-left-width: 0 !important;
-    border-right-width: 0 !important;
-    box-shadow: none !important;
-    box-sizing: border-box !important;
-  }
-  .toolbar .tool-group--zoom #zoomOut {
-    border-right-width: 0 !important;
-    box-shadow: none !important;
-  }
-  .toolbar .tool-group--zoom #zoomIn {
-    margin-left: 0 !important;
-    border-left-width: 0 !important;
-    box-shadow: none !important;
-  }
-  .toolbar .tool-group--zoom #zoomFit {
-    margin-left: -2px !important;
-    box-shadow: 2px 2px 0 #c9a34e !important;
-  }
-
-  #toolSelect, #toolDrag, #toolDev, #exportBtn {
+  .pixel-stat__top, .pixel-stat__foot, .pixel-progress, .pixel-stat__unit {
     display: none !important;
   }
-}
+  .pixel-stat .counter-num { font-size: 0.28rem !important; }
 
-/* Desktop second bar — pixel chips, same language */
-@media (min-width: 701px) {
   .toolbar {
     display: flex !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
-    justify-content: center !important;
-    gap: 10px !important;
-    flex-wrap: wrap !important;
-    padding: 6px 10px !important;
-    background: linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%) !important;
-    border-bottom: 3px solid #2a2118 !important;
-    box-shadow: 0 2px 0 #c9a34e !important;
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    padding: 6px 8px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    background: #f3e6c8 !important;
+    border-bottom: 2px solid #d4a017 !important;
   }
-  .toolbar .tool-group {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-  }
-  .toolbar .tool-gap { display: none !important; }
+  .toolbar::-webkit-scrollbar { display: none; }
   .toolbar .tool-btn {
-    font-family: 'Press Start 2P', monospace !important;
-    font-size: 0.32rem !important;
-    height: 30px !important;
-    min-height: 30px !important;
-    padding: 0 12px !important;
-    color: #2a2118 !important;
-    background: #fffdf8 !important;
-    border: 2px solid #2a2118 !important;
-    border-radius: 0 !important;
-    box-shadow: 2px 2px 0 #c9a34e !important;
+    flex: 0 0 auto !important;
+    padding: 6px 8px !important;
+    font-size: 0.28rem !important;
+    box-shadow: 1px 1px 0 #c9a66b !important;
+    white-space: nowrap !important;
     animation: none !important;
   }
-  .toolbar .tool-group .tool-btn + .tool-btn {
-    margin-left: -2px !important;
-  }
-  .toolbar .tool-group .tool-btn:not(:last-child) {
-    box-shadow: none !important;
-  }
-  .toolbar .tool-group .tool-btn:last-child {
-    box-shadow: 2px 2px 0 #c9a34e !important;
-  }
-  .toolbar .tool-btn:hover {
-    background: #fff8e0 !important;
-  }
-  .toolbar .tool-btn:active,
-  .toolbar .tool-btn.tool-active {
-    background: #f0c14b !important;
-    transform: translate(1px, 1px) !important;
-    box-shadow: 1px 1px 0 #c9a34e !important;
-  }
   .toolbar .zoom-lvl {
-    height: 30px !important;
-    min-width: 48px !important;
-    font-family: 'Press Start 2P', monospace !important;
-    font-size: 0.3rem !important;
-    color: #2a2118 !important;
-    background: #fff8e0 !important;
-    border: 2px solid #2a2118 !important;
-    border-left-width: 0 !important;
-    border-right-width: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
+    flex: 0 0 auto !important;
+    min-width: 40px !important;
+    padding: 4px 2px !important;
+    font-size: 0.28rem !important;
   }
-  .toolbar .tool-group--zoom #zoomOut { border-right-width: 0 !important; box-shadow: none !important; }
-  .toolbar .tool-group--zoom #zoomIn { margin-left: 0 !important; border-left-width: 0 !important; box-shadow: none !important; }
-  .toolbar .tool-group--zoom #zoomFit { margin-left: -2px !important; box-shadow: 2px 2px 0 #c9a34e !important; }
+  .toolbar .tool-gap {
+    width: 4px !important;
+    flex-shrink: 0 !important;
+  }
+  .site-copy {
+    font-size: 0.65rem !important;
+    padding: 4px 8px !important;
+  }
 }
 
 </style>
@@ -2369,25 +1835,21 @@
   <div id="willow" style="display:none"></div>
 </header>
 
-<div class="toolbar" role="toolbar" aria-label="Wall tools">
+<div class="toolbar">
   <button class="tool-btn" id="toolSelect" type="button" style="display:none">SELECT</button>
   <button class="tool-btn" id="toolDrag" type="button" style="display:none">DRAG</button>
   <button class="tool-btn" id="toolDev" type="button" style="display:none">DEV</button>
-  <div class="tool-group tool-group--nav">
-    <button class="tool-btn" id="toolClaims" type="button" title="My claims">CLAIMS</button>
-    <button class="tool-btn" id="ownersBtn" type="button" title="Owners">OWNERS</button>
-  </div>
-  <div class="tool-group tool-group--zoom">
-    <button class="tool-btn" id="zoomOut" type="button" title="Zoom out">−</button>
-    <span id="zoomLvl" class="zoom-lvl">100%</span>
-    <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
-    <button class="tool-btn" id="zoomFit" type="button" title="Fit">FIT</button>
-  </div>
-  <div class="tool-group tool-group--info">
-    <button class="tool-btn" id="storyBtn" type="button">STORY</button>
-    <button class="tool-btn" id="contactBtn" type="button">MAIL</button>
-    <button class="tool-btn" id="helpBtn" type="button">HELP</button>
-  </div>
+  <button class="tool-btn" id="toolClaims" type="button" title="My claims">MY CLAIMS</button>
+  <button class="tool-btn" id="ownersBtn" type="button" title="All owners">OWNERS</button>
+  <span class="tool-gap"></span>
+  <button class="tool-btn" id="zoomOut" type="button" title="Zoom out">−</button>
+  <span id="zoomLvl" class="zoom-lvl">100%</span>
+  <button class="tool-btn" id="zoomIn" type="button" title="Zoom in">+</button>
+  <button class="tool-btn" id="zoomFit" type="button" title="Fit wall">FIT</button>
+  <span class="tool-gap"></span>
+  <button class="tool-btn" id="storyBtn" type="button">STORY</button>
+  <button class="tool-btn" id="contactBtn" type="button">CONTACT</button>
+  <button class="tool-btn" id="helpBtn" type="button">HOW IT WORKS</button>
   <button class="tool-btn" id="exportBtn" type="button" style="display:none">EXPORT</button>
 </div>
 <div class="viewport" id="viewport">

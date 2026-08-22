@@ -961,14 +961,14 @@
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 6px;
-    padding: 4px 10px;
+    gap: 8px;
+    padding: 10px 12px;
     background: #fffdf8;
-    border-top: 1px solid #e0d4c0;
-    font-family: 'VT323', monospace;
-    font-size: 0.7rem;
+    border-top: 2px solid var(--gold);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.32rem;
     color: var(--muted);
-    letter-spacing: 0.3px;
+    letter-spacing: 0.5px;
     z-index: 70;
     text-align: center;
   }
@@ -1517,10 +1517,10 @@
     display: flex !important;
     justify-content: center;
     align-items: center;
-    gap: 4px;
-    font-size: 0.65rem !important;
-    padding: 3px 8px !important;
-    padding-bottom: calc(3px + env(safe-area-inset-bottom, 0px)) !important;
+    gap: 6px;
+    font-size: 0.75rem !important;
+    padding: 5px 8px !important;
+    padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px)) !important;
     background: #f3ebe0 !important;
     border-top: 1px solid #e0d4c0 !important;
     color: #5c4a32;
@@ -1591,8 +1591,8 @@
     font-size: 0.28rem !important;
   }
   .site-copy {
-    padding: 3px 10px !important;
-    font-size: 0.65rem !important;
+    padding: 4px 10px !important;
+    font-size: 0.75rem !important;
   }
   .viewport {
     flex: 1 1 auto !important;
@@ -2506,24 +2506,13 @@ Min 10 blocks · no maximum
 
   function resize(fitReset) {
     computeGrid();
-    // Phone: full wall fits in view.
-    // Desktop: clean vertical wall — mostly height-fit, only a slight
-    // bump in size so it reads taller/clearer without extreme stretch.
-    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const margin = phone ? 6 : 16;
+    // Maximize wall on desktop AND phone — full FIT, no forced scroll.
+    // Wall uses nearly the entire viewport so it is large and fully visible.
+    const margin = 2;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s;
-    if (phone) {
-      s = Math.min(vw / COLS, vh / ROWS);
-    } else {
-      const fit = Math.min(vw / COLS, vh / ROWS);
-      const wide = vw / COLS;
-      // ~25% toward full-width — mild size boost, still vertical/centered
-      s = fit + (wide - fit) * 0.25;
-      if (s < fit) s = fit;
-    }
+    let s = Math.min(vw / COLS, vh / ROWS);
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;
@@ -2545,7 +2534,6 @@ Min 10 blocks · no maximum
       requestAnimationFrame(() => {
         const wrap = $('wallWrap');
         if (wrap && viewport) {
-          // Center the wall — clean vertical panel in the middle
           viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
           viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
         } else if (viewport) {
@@ -2572,15 +2560,15 @@ Min 10 blocks · no maximum
   // ===== Smooth zoom (layout-sized, no transform glitch) =====
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 1, Z_MAX = 24;
+  const Z_MIN = 1, Z_MAX = 14;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
+    // At fit (zoom≈1): no outer margin so the wall sits flush — no colored box.
+    // When zoomed in: padding so corners stay reachable by scrolling.
     try {
+      if ((zoom || 1) <= 1.05) return 0;
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
-      const phone = w < 700;
-      // Fit: tiny pad so the wall reads as a clean centered panel
-      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
-      return phone ? 36 : 40;
+      return w < 700 ? 36 : 48;
     } catch (e) { return 0; }
   }
   function isPhoneLayout() {
@@ -2595,8 +2583,7 @@ Min 10 blocks · no maximum
 
   function zClamp(z) {
     z = Number(z);
-    if (!isFinite(z) || z <= 0) return Z_MIN;
-    if (z < Z_MIN) return Z_MIN;
+    if (!isFinite(z) || z < Z_MIN) return Z_MIN;
     if (z > Z_MAX) return Z_MAX;
     return z;
   }
@@ -2674,10 +2661,10 @@ Min 10 blocks · no maximum
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
     // High internal resolution so claim photos stay sharp (esp. phone zoom)
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const minLong = isPhoneLayout() ? 3600 : 4200;
+    const minLong = isPhoneLayout() ? 3200 : 2800;
     const long = Math.max(baseW, baseH);
     const boost = long < minLong ? (minLong / long) : 1;
-    const scale = dpr * Math.min(boost, 4);
+    const scale = dpr * Math.min(boost, 3.5);
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -2742,17 +2729,9 @@ Min 10 blocks · no maximum
   function zoomFrame() {
     zoomRaf = 0;
     const target = zClamp(zoomTarget);
-    if (!isFinite(target) || !isFinite(zoom)) {
-      zoom = Z_MIN;
-      zoomTarget = Z_MIN;
-      layoutAtZoom(zoom);
-      clampScroll();
-      return;
-    }
     const diff = target - zoom;
-    if (Math.abs(diff) < 0.0015) {
+    if (Math.abs(diff) < 0.002) {
       zoom = target;
-      zoomTarget = target;
       layoutAtZoom(zoom);
       keepAnchor();
       zoomAnchor = null;
@@ -2761,9 +2740,7 @@ Min 10 blocks · no maximum
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;
     }
-    // Ease toward target; larger steps when far for responsive zoom
-    const step = Math.abs(diff) > 0.5 ? 0.4 : 0.28;
-    zoom = zClamp(zoom + diff * step);
+    zoom += diff * 0.32;
     layoutAtZoom(zoom);
     keepAnchor();
     zoomRaf = requestAnimationFrame(zoomFrame);
@@ -2772,25 +2749,21 @@ Min 10 blocks · no maximum
   function bumpZoom(d, clientX, clientY, continuous) {
     let factor;
     if (continuous) {
-      const clamped = Math.max(-0.35, Math.min(0.35, d));
+      const clamped = Math.max(-0.25, Math.min(0.25, d));
       factor = Math.exp(clamped);
     } else {
-      // Button / key: ~25% steps, stable
-      factor = d > 0 ? 1.25 : 0.8;
+      factor = d > 0 ? 1.2 : 1 / 1.2;
     }
     if (!isFinite(factor) || factor <= 0) return;
 
-    try {
-      if (!zoomAnchor) anchorAt(clientX, clientY);
-      else if (clientX != null && isFinite(clientX)) {
-        const vr = viewport.getBoundingClientRect();
-        zoomAnchor.mx = clientX - vr.left;
-        zoomAnchor.my = clientY - vr.top;
-      }
-    } catch (e) {}
+    if (!zoomAnchor) anchorAt(clientX, clientY);
+    else if (clientX != null && isFinite(clientX)) {
+      const vr = viewport.getBoundingClientRect();
+      zoomAnchor.mx = clientX - vr.left;
+      zoomAnchor.my = clientY - vr.top;
+    }
 
-    const base = isFinite(zoomTarget) ? zoomTarget : (zoom || 1);
-    zoomTarget = zClamp(base * factor);
+    zoomTarget = zClamp(zoomTarget * factor);
     if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
   }
 
@@ -3184,13 +3157,11 @@ function getImg(src) {
 
     // 4) Buy-mode grid — soft lines when zoomed so each pixel is clear
     const visCell = (baseCell || drawCell) * (zoom || 1);
-    if (buyMode && visCell >= 3) {
+    if (buyMode && visCell >= 4) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      // Stronger lines when zoomed in so each pixel is obvious
-      const lineA = visCell >= 12 ? 0.28 : 0.14;
-      ctx.strokeStyle = 'rgba(42, 33, 24, ' + lineA + ')';
-      ctx.lineWidth = Math.max(0.4, drawCell * (visCell >= 12 ? 0.05 : 0.03));
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.12)';
+      ctx.lineWidth = Math.max(0.4, drawCell * 0.03);
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
         const x = Math.floor(c * drawCell) + 0.5;
@@ -3249,8 +3220,8 @@ function getImg(src) {
         });
 
         // Inner pixel lines only when cells are large enough (zoomed in)
-        if (visCell >= 3) {
-          ctx.strokeStyle = 'rgba(5, 120, 90, 0.45)';
+        if (visCell >= 5) {
+          ctx.strokeStyle = 'rgba(5, 120, 90, 0.35)';
           ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
           ctx.beginPath();
           for (let c = sMinC; c <= sMaxC + 1; c++) {
@@ -3284,8 +3255,8 @@ function getImg(src) {
       ctx.save();
       ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
       ctx.fillRect(dx, dy, dw, dh);
-      if (visCell >= 3) {
-        ctx.strokeStyle = 'rgba(5, 120, 90, 0.4)';
+      if (visCell >= 5) {
+        ctx.strokeStyle = 'rgba(5, 120, 90, 0.3)';
         ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
         ctx.beginPath();
         for (let c = minC; c <= maxC + 1; c++) {
@@ -6261,7 +6232,7 @@ function clearPending() {
   }, { passive: false });
   viewport.addEventListener('gesturechange', e => {
     e.preventDefault();
-    const target = Math.max(Z_MIN, Math.min(Z_MAX, gestureStartZoom * e.scale));
+    const target = Math.max(1, Math.min(12, gestureStartZoom * e.scale));
     const delta = target - zoom;
     if (Math.abs(delta) > 0.001) {
       bumpZoom(delta, e.clientX || lastMouseX, e.clientY || lastMouseY, true);

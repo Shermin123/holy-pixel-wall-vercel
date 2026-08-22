@@ -3286,15 +3286,17 @@ function getImg(src) {
       ctx.restore();
     });
 
-    // 4) Buy-mode grid — soft lines when zoomed so each pixel is clear
+    // 4) Buy-mode grid — hairline strokes (stay ~1px on screen at any zoom)
     const visCell = (baseCell || drawCell) * (zoom || 1);
+    // Canvas is CSS-scaled by zoom, so divide by zoom for true thin lines
+    const zNow = Math.max(zoom || 1, 1);
+    const hair = Math.max(0.04, 0.9 / zNow);       // ~1 screen px
+    const hairBold = Math.max(0.06, 1.4 / zNow);   // slightly thicker section lines
     if (buyMode && visCell >= 3) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      // Stronger lines when zoomed in so each pixel is obvious
-      const lineA = visCell >= 12 ? 0.28 : 0.14;
-      ctx.strokeStyle = 'rgba(42, 33, 24, ' + lineA + ')';
-      ctx.lineWidth = Math.max(0.4, drawCell * (visCell >= 12 ? 0.05 : 0.03));
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.22)';
+      ctx.lineWidth = hair;
       ctx.beginPath();
       for (let c = gc0; c <= gc1 + 1; c++) {
         const x = Math.floor(c * drawCell) + 0.5;
@@ -3307,9 +3309,9 @@ function getImg(src) {
         ctx.lineTo((gc1 + 1) * drawCell, y);
       }
       ctx.stroke();
-      // Stronger 10×10 blocks
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.22)';
-      ctx.lineWidth = Math.max(0.7, drawCell * 0.06);
+      // 10×10 section lines — still thin
+      ctx.strokeStyle = 'rgba(42, 33, 24, 0.35)';
+      ctx.lineWidth = hairBold;
       ctx.beginPath();
       const sec = SECTION || 10;
       for (let c = Math.floor(gc0 / sec) * sec; c <= gc1 + 1; c += sec) {
@@ -3326,7 +3328,7 @@ function getImg(src) {
       ctx.restore();
     }
 
-    // 5) CLEAN SEE-THROUGH SELECTION — one glass layer + pixel grid + outer frame
+    // 5) Selection — thin pixel grid + light fill + slim outer frame
     if (selected.size) {
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
       const freeKeys = [];
@@ -3346,16 +3348,15 @@ function getImg(src) {
         const bh = (sMaxR - sMinR + 1) * drawCell;
 
         ctx.save();
-        // Soft see-through fill (wall stays visible underneath)
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
         freeKeys.forEach(([c, r]) => {
           ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
         });
 
-        // Inner pixel lines only when cells are large enough (zoomed in)
+        // Thin inner grid so every selected pixel is visible
         if (visCell >= 3) {
-          ctx.strokeStyle = 'rgba(5, 120, 90, 0.45)';
-          ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
+          ctx.strokeStyle = 'rgba(5, 120, 90, 0.55)';
+          ctx.lineWidth = hair;
           ctx.beginPath();
           for (let c = sMinC; c <= sMaxC + 1; c++) {
             const x = Math.floor(c * drawCell) + 0.5;
@@ -3370,27 +3371,27 @@ function getImg(src) {
           ctx.stroke();
         }
 
-        // Single clean outer frame
+        // Slim outer frame (~2 screen px)
         ctx.strokeStyle = 'rgba(4, 120, 87, 0.95)';
-        ctx.lineWidth = Math.max(1.5, Math.min(3, drawCell * 0.2));
+        ctx.lineWidth = Math.max(hair * 1.6, 1.5 / zNow);
         ctx.setLineDash([]);
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
         ctx.restore();
       }
     }
 
-    // 6) Drag preview — same see-through style while dragging
+    // 6) Drag preview — same thin lines
     if (dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
       const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
       const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
       const dx = minC * drawCell, dy = minR * drawCell;
       const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
       ctx.save();
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.10)';
       ctx.fillRect(dx, dy, dw, dh);
       if (visCell >= 3) {
-        ctx.strokeStyle = 'rgba(5, 120, 90, 0.4)';
-        ctx.lineWidth = Math.max(0.5, drawCell * 0.04);
+        ctx.strokeStyle = 'rgba(5, 120, 90, 0.5)';
+        ctx.lineWidth = hair;
         ctx.beginPath();
         for (let c = minC; c <= maxC + 1; c++) {
           const x = Math.floor(c * drawCell) + 0.5;
@@ -3403,8 +3404,8 @@ function getImg(src) {
         ctx.stroke();
       }
       ctx.strokeStyle = 'rgba(4, 120, 87, 0.9)';
-      ctx.lineWidth = Math.max(1.25, Math.min(2.5, drawCell * 0.16));
-      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = Math.max(hair * 1.5, 1.25 / zNow);
+      ctx.setLineDash([4 / zNow, 3 / zNow]);
       ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
       ctx.setLineDash([]);
       ctx.restore();

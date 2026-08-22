@@ -621,9 +621,9 @@
     padding: 0;
     transform-origin: 0 0;
     overflow: hidden;
-    image-rendering: auto;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
     backface-visibility: hidden;
-    -webkit-font-smoothing: antialiased;
   }
 
   canvas {
@@ -634,7 +634,10 @@
     margin: 0;
     padding: 0;
     background: #faf7f0;
-    image-rendering: auto;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    -ms-interpolation-mode: nearest-neighbor;
   }
 
   .media-layer {
@@ -2710,7 +2713,8 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    canvas.style.imageRendering = 'auto';
+    canvas.style.imageRendering = 'pixelated';
+    try { stage.style.imageRendering = 'pixelated'; } catch (e) {}
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -2745,8 +2749,8 @@ Min 10 blocks · no maximum
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+    // Nearest-neighbor — sharp pixels when CSS-zoomed
+    ctx.imageSmoothingEnabled = false;
     // draw() uses logical size baseW×baseH via cell=baseCell temporarily
     const savedCell = cell;
     const savedW = sizeW, savedH = sizeH;
@@ -3003,6 +3007,10 @@ Min 10 blocks · no maximum
   // Draw image to fully cover (w,h) with zoom scale and focus (fx,fy in 0..1)
   function drawCoverCrop(c, img, x, y, w, h, scale, fx, fy) {
     if (!img || !img.complete || !img.naturalWidth) return;
+    // Smooth only the photo itself; grid stays nearest-neighbor
+    const prevSmooth = c.imageSmoothingEnabled;
+    c.imageSmoothingEnabled = true;
+    try { if (c.imageSmoothingQuality) c.imageSmoothingQuality = 'high'; } catch (e) {}
     scale = Math.max(1, scale || 1);
     fx = fx == null ? 0.5 : fx;
     fy = fy == null ? 0.5 : fy;
@@ -3023,6 +3031,7 @@ Min 10 blocks · no maximum
     c.imageSmoothingEnabled = true;
     if (c.imageSmoothingQuality) c.imageSmoothingQuality = 'high';
     c.drawImage(img, dx, dy, dw, dh);
+    c.imageSmoothingEnabled = prevSmooth;
     c.restore();
   }
 
@@ -3115,6 +3124,7 @@ function getImg(src) {
     off.height = Math.max(1, Math.ceil(bh));
     const g = off.getContext('2d');
     g.imageSmoothingEnabled = false;
+    try { if (g.imageSmoothingQuality) g.imageSmoothingQuality = 'low'; } catch (e) {}
     // local aliases used below
     const sizeW = bw, sizeH = bh, cell = bc;
 
@@ -3184,8 +3194,7 @@ function getImg(src) {
     const drawCell = baseCell;
     const drawW = baseW;
     const drawH = baseH;
-    ctx.imageSmoothingEnabled = true;
-    if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingEnabled = false;
 
     // 1) Blit cached checker + section grid (fast)
     const grid = rebuildGridCache();

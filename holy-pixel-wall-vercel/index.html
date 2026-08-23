@@ -1605,6 +1605,243 @@
   }
 }
 
+/* ============================================================
+   PIXEL-CARTOON POLISH + STEPPED ANIMATIONS
+   Game Boy × modern indie — warm paper, hard shadows, steps()
+   ============================================================ */
+
+/* Soft paper grain + subtle header shimmer (grid, not continuous noise) */
+.pixel-header {
+  background-image:
+    linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 7px,
+      rgba(201, 163, 78, 0.06) 7px 8px
+    ) !important;
+  animation: hpwHeaderShimmer 4.8s steps(6) infinite;
+}
+@keyframes hpwHeaderShimmer {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.03); }
+}
+
+/* LIVE status — strict 2-frame blink */
+.status-dot,
+.pixel-live {
+  animation: hpwBlink 1.2s steps(2) infinite !important;
+}
+
+/* BUY PIXELS — cartoon bounce + press-in + optional star pop */
+.pixel-buy {
+  position: relative;
+  transition: transform 0.12s steps(2), box-shadow 0.12s steps(2) !important;
+}
+.pixel-buy:hover:not(.is-active) {
+  transform: translate(-2px, -2px) scale(1.04) !important;
+  animation: hpwBuyBounce 0.9s steps(2) infinite !important;
+}
+.pixel-buy:active:not(.is-active) {
+  transform: translate(2px, 2px) scale(0.97) !important;
+  box-shadow: 1px 1px 0 #2a2118 !important;
+  animation: none !important;
+}
+@keyframes hpwBuyBounce {
+  0%, 100% { transform: translate(-2px, -2px) scale(1.04); }
+  50% { transform: translate(-2px, -4px) scale(1.05); }
+}
+.pixel-buy:hover:not(.is-active)::after {
+  content: '✦';
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  font-size: 0.55rem;
+  color: #f0c14b;
+  text-shadow: 1px 1px 0 #2a2118;
+  animation: hpwStarPop 0.6s steps(3) infinite;
+  pointer-events: none;
+}
+@keyframes hpwStarPop {
+  0%, 100% { opacity: 0.4; transform: scale(0.85) rotate(-8deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(8deg); }
+}
+
+/* Toolbar — 1–2px press + tiny highlight flash */
+.toolbar .tool-btn {
+  transition: transform 0.1s steps(2), box-shadow 0.1s steps(2), background 0.1s steps(2) !important;
+  position: relative;
+}
+.toolbar .tool-btn:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: none !important;
+}
+.toolbar .tool-btn.tool-flash::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 248, 220, 0.55);
+  pointer-events: none;
+  animation: hpwBtnFlash 0.22s steps(3) forwards;
+}
+@keyframes hpwBtnFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Stage / wall — solid cartoon tile feel when zoomed */
+.stage {
+  box-shadow:
+    0 0 0 2px #2a2118,
+    4px 4px 0 rgba(42, 33, 24, 0.18) !important;
+  transition: box-shadow 0.2s steps(3);
+}
+
+/* Float bar — stepped slide up */
+.float-bar {
+  transition: transform 0.22s steps(5), opacity 0.22s steps(4) !important;
+}
+.float-bar.visible {
+  transform: translateX(-50%) translateY(0) !important;
+  opacity: 1 !important;
+}
+
+/* Toasts — stepped pop */
+.toast {
+  transition: transform 0.18s steps(4), opacity 0.18s steps(4) !important;
+  box-shadow: 4px 4px 0 #3d2b1a !important;
+}
+.toast.show {
+  transform: translateX(-50%) translateY(0) !important;
+  opacity: 1 !important;
+}
+
+/* Modals — stepped slide + overlay fade */
+.overlay {
+  transition: opacity 0.18s steps(4);
+  opacity: 0;
+  pointer-events: none;
+}
+.overlay[style*="flex"],
+.overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  display: flex !important;
+}
+.overlay .modal,
+.overlay .motivation-card {
+  transform: translateY(18px);
+  transition: transform 0.22s steps(5);
+}
+.overlay[style*="flex"] .modal,
+.overlay[style*="flex"] .motivation-card,
+.overlay.is-open .modal,
+.overlay.is-open .motivation-card {
+  transform: translateY(0);
+}
+
+/* Progress bar — chunky pixel fill */
+.pixel-progress .progress-fill,
+.progress-fill {
+  transition: width 0.35s steps(10) !important;
+  image-rendering: pixelated;
+}
+
+/* Soft hover pulse outline for owned (via tip / canvas driven) */
+.tip {
+  transition: opacity 0.15s steps(3), transform 0.15s steps(3);
+  box-shadow: 5px 5px 0 #3d2b1a !important;
+}
+
+/* Loading / sync — bouncing pixel block */
+.hpw-loader {
+  position: fixed;
+  bottom: 56px;
+  right: 14px;
+  z-index: 2500;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fffdf8;
+  border: 2px solid #2a2118;
+  box-shadow: 3px 3px 0 #c9a34e;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.28rem;
+  color: #5c3d0e;
+  pointer-events: none;
+}
+.hpw-loader.show { display: flex; }
+.hpw-loader__block {
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(180deg, #f0c14b, #d4a017);
+  border: 2px solid #2a2118;
+  animation: hpwBounceBlock 0.55s steps(2) infinite;
+  box-shadow: 2px 2px 0 #5c3d1e;
+}
+@keyframes hpwBounceBlock {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Pixel confetti canvas (success burst) */
+#hpwConfetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4000;
+  image-rendering: pixelated;
+}
+
+/* Viewport subtle idle sparkle layer */
+.viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background-image:
+    radial-gradient(1px 1px at 12% 28%, rgba(212, 160, 23, 0.35), transparent),
+    radial-gradient(1px 1px at 68% 42%, rgba(201, 163, 78, 0.28), transparent),
+    radial-gradient(1px 1px at 34% 76%, rgba(240, 193, 75, 0.3), transparent),
+    radial-gradient(1px 1px at 88% 18%, rgba(212, 160, 23, 0.22), transparent),
+    radial-gradient(1px 1px at 52% 58%, rgba(201, 163, 78, 0.25), transparent);
+  background-size: 180px 140px;
+  animation: hpwTwinkle 3.6s steps(4) infinite;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+}
+@keyframes hpwTwinkle {
+  0%, 100% { opacity: 0.35; }
+  25% { opacity: 0.55; }
+  50% { opacity: 0.4; }
+  75% { opacity: 0.6; }
+}
+
+/* Reduced motion — simplify everything distracting */
+@media (prefers-reduced-motion: reduce) {
+  .pixel-header,
+  .status-dot,
+  .pixel-live,
+  .pixel-buy,
+  .pixel-buy:hover:not(.is-active),
+  .pixel-buy:hover:not(.is-active)::after,
+  .toolbar .tool-btn,
+  .float-bar,
+  .toast,
+  .overlay .modal,
+  .overlay .motivation-card,
+  .hpw-loader__block,
+  .viewport::after,
+  .progress-fill,
+  .pixel-progress .progress-fill {
+    animation: none !important;
+    transition: none !important;
+  }
+  .viewport::after { opacity: 0.25; }
+  .pixel-buy:hover:not(.is-active)::after { display: none; }
+}
+
 </style>
 </head>
 <body>
@@ -2028,6 +2265,11 @@ Min 10 blocks · no maximum
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="hpw-loader" id="hpwLoader" aria-hidden="true">
+  <span class="hpw-loader__block"></span>
+  <span>SYNC</span>
+</div>
+<canvas id="hpwConfetti" width="1" height="1"></canvas>
 <script>
 (() => {
   const MS_DAY = 86400000;
@@ -2332,7 +2574,121 @@ Min 10 blocks · no maximum
     toastEl.classList.add('show');
     clearTimeout(toastEl._t);
     toastEl._t = setTimeout(() => toastEl.classList.remove('show', 'toast-err', 'toast-ok'), kind === 'error' ? 4200 : 2600);
+    if (kind === 'ok' && typeof hpwConfettiBurst === 'function') {
+      try { hpwConfettiBurst(); } catch (e) {}
+    }
   }
+
+  // ===== Pixel confetti (8-bit star / square burst) =====
+  let confettiParts = [];
+  let confettiRaf = 0;
+  const reduceMotion = (() => {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  })();
+
+  function hpwConfettiBurst(cx, cy) {
+    if (reduceMotion) return;
+    const cnv = document.getElementById('hpwConfetti');
+    if (!cnv) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cnv.width = Math.floor(window.innerWidth * dpr);
+    cnv.height = Math.floor(window.innerHeight * dpr);
+    cnv.style.width = '100%';
+    cnv.style.height = '100%';
+    const c = cnv.getContext('2d');
+    if (!c) return;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const originX = cx != null ? cx : window.innerWidth * 0.5;
+    const originY = cy != null ? cy : window.innerHeight * 0.42;
+    const colors = ['#d4a017', '#f0c14b', '#a84c32', '#6f8a62', '#fff8e8', '#2a2118', '#c47a3a'];
+    confettiParts = [];
+    for (let i = 0; i < 42; i++) {
+      const ang = (Math.PI * 2 * i) / 42 + (Math.random() - 0.5) * 0.4;
+      const spd = 2.2 + Math.random() * 4.5;
+      confettiParts.push({
+        x: originX,
+        y: originY,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 2.5,
+        size: 3 + (i % 4),
+        color: colors[i % colors.length],
+        life: 28 + (i % 10),
+        rot: (i % 4) * 0.2,
+        star: i % 5 === 0
+      });
+    }
+    if (confettiRaf) cancelAnimationFrame(confettiRaf);
+    function tick() {
+      c.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      let alive = false;
+      confettiParts.forEach(p => {
+        if (p.life <= 0) return;
+        alive = true;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.18;
+        p.vx *= 0.99;
+        p.life -= 1;
+        c.globalAlpha = Math.max(0, p.life / 20);
+        c.fillStyle = p.color;
+        if (p.star) {
+          // tiny plus / star pixel
+          const s = p.size;
+          c.fillRect(p.x - 1, p.y - s, 2, s * 2);
+          c.fillRect(p.x - s, p.y - 1, s * 2, 2);
+        } else {
+          c.fillRect(Math.floor(p.x), Math.floor(p.y), p.size, p.size);
+        }
+      });
+      c.globalAlpha = 1;
+      if (alive) confettiRaf = requestAnimationFrame(tick);
+      else {
+        confettiRaf = 0;
+        c.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      }
+    }
+    confettiRaf = requestAnimationFrame(tick);
+  }
+
+  function setHpwLoader(on) {
+    const el = document.getElementById('hpwLoader');
+    if (!el) return;
+    el.classList.toggle('show', !!on);
+  }
+
+  // Toolbar click flash (pixel highlight)
+  document.addEventListener('click', e => {
+    const btn = e.target && e.target.closest && e.target.closest('.toolbar .tool-btn');
+    if (!btn || reduceMotion) return;
+    btn.classList.remove('tool-flash');
+    void btn.offsetWidth;
+    btn.classList.add('tool-flash');
+    setTimeout(() => btn.classList.remove('tool-flash'), 240);
+  }, true);
+
+  // Marching ants offset for selection border (stepped)
+  let antsOffset = 0;
+  let antsTimer = 0;
+  let hoverRegion = null;
+  let hoverPulse = 0;
+  function tickAnts() {
+    if (reduceMotion) return;
+    let need = false;
+    if (selected && selected.size) {
+      antsOffset = (antsOffset + 1) % 16;
+      need = true;
+    }
+    if (hoverRegion) {
+      hoverPulse = (hoverPulse + 1) % 2;
+      need = true;
+    }
+    if (need) {
+      try { scheduleDraw(); } catch (e) {}
+    }
+  }
+  try {
+    antsTimer = setInterval(tickAnts, 180);
+  } catch (e) {}
 
   function friendlyError(err, fallback) {
     const raw = err && (err.message || err.error) ? String(err.message || err.error) : String(err || '');
@@ -3171,6 +3527,22 @@ function getImg(src) {
       }
     }
 
+    // Sparse static “pixel dust” on empty paper (cartoon sparkle seeds)
+    // Deterministic so cache stays valid; CSS layer animates perceived twinkle
+    if (cell >= 0.4) {
+      g.fillStyle = 'rgba(212, 160, 23, 0.09)';
+      for (let sc = 3; sc < COLS; sc += 17) {
+        for (let sr = 5; sr < ROWS; sr += 19) {
+          if (((sc * 13 + sr * 7) % 11) < 2) {
+            const px = Math.floor(sc * cell) + Math.max(0, (cell * 0.3) | 0);
+            const py = Math.floor(sr * cell) + Math.max(0, (cell * 0.35) | 0);
+            const s = Math.max(1, Math.min(2, cell * 0.25));
+            g.fillRect(px, py, s, s);
+          }
+        }
+      }
+    }
+
     // Fine cell lines ONLY when cells are large enough (zoomed in)
     // When zoomed out they turn into mud — skip them
     if (cell >= 3) {
@@ -3335,6 +3707,26 @@ function getImg(src) {
       ctx.restore();
     }
 
+    // 4b) Hover pulse on owned claim (2-step soft outline)
+    if (hoverRegion && !dragging) {
+      const hr = hoverRegion;
+      if (hr.maxC >= c0 && hr.minC <= c1 && hr.maxR >= r0 && hr.minR <= r1) {
+        const hx = hr.minC * drawCell, hy = hr.minR * drawCell;
+        const hw = (hr.maxC - hr.minC + 1) * drawCell;
+        const hh = (hr.maxR - hr.minR + 1) * drawCell;
+        const pulse = (typeof hoverPulse === 'number' ? hoverPulse : 0);
+        ctx.save();
+        ctx.strokeStyle = pulse ? 'rgba(212, 160, 23, 0.95)' : 'rgba(212, 160, 23, 0.45)';
+        ctx.lineWidth = Math.max(1.2, hairFrame * 1.2);
+        ctx.setLineDash([]);
+        ctx.strokeRect(hx + 0.5, hy + 0.5, Math.max(0, hw - 1), Math.max(0, hh - 1));
+        ctx.strokeStyle = pulse ? 'rgba(255, 248, 220, 0.55)' : 'rgba(255, 248, 220, 0.2)';
+        ctx.lineWidth = hair;
+        ctx.strokeRect(hx + 2.5, hy + 2.5, Math.max(0, hw - 5), Math.max(0, hh - 5));
+        ctx.restore();
+      }
+    }
+
     // 5) Selection — gold glass fill + crisp thin pixel borders
     if (selected.size) {
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
@@ -3388,14 +3780,24 @@ function getImg(src) {
           }
           ctx.stroke();
         }
-        // Outer frame
-        ctx.strokeStyle = 'rgba(92, 61, 30, 0.95)';
-        ctx.lineWidth = hairFrame;
+        // Outer frame — gold glass + marching ants (stepped dash offset)
+        const dashA = Math.max(3, 6 / zNow);
+        const dashB = Math.max(2, 4 / zNow);
+        ctx.strokeStyle = 'rgba(42, 33, 24, 0.92)';
+        ctx.lineWidth = hairFrame + 0.5;
         ctx.setLineDash([]);
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
-        ctx.strokeStyle = 'rgba(240, 193, 75, 0.75)';
-        ctx.lineWidth = hair;
+        // Marching ants gold border
+        ctx.strokeStyle = 'rgba(240, 193, 75, 0.95)';
+        ctx.lineWidth = Math.max(1, hairFrame);
+        ctx.setLineDash([dashA, dashB]);
+        ctx.lineDashOffset = -(typeof antsOffset === 'number' ? antsOffset : 0);
         ctx.strokeRect(bx + hairFrame + 0.5, by + hairFrame + 0.5, Math.max(0, bw - hairFrame * 2 - 1), Math.max(0, bh - hairFrame * 2 - 1));
+        // Soft inner gold wash edge
+        ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(212, 160, 23, 0.45)';
+        ctx.lineWidth = hair;
+        ctx.strokeRect(bx + hairFrame * 2 + 0.5, by + hairFrame * 2 + 0.5, Math.max(0, bw - hairFrame * 4 - 1), Math.max(0, bh - hairFrame * 4 - 1));
         ctx.restore();
       }
     }
@@ -3407,7 +3809,7 @@ function getImg(src) {
       const dx = minC * drawCell, dy = minR * drawCell;
       const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
       ctx.save();
-      ctx.fillStyle = 'rgba(212, 160, 23, 0.16)';
+      ctx.fillStyle = 'rgba(212, 160, 23, 0.18)';
       ctx.fillRect(dx, dy, dw, dh);
       if (visCell >= 2.5) {
         ctx.strokeStyle = 'rgba(139, 90, 43, 0.65)';
@@ -3423,9 +3825,12 @@ function getImg(src) {
         }
         ctx.stroke();
       }
-      ctx.strokeStyle = 'rgba(92, 61, 30, 0.9)';
+      const dashA = Math.max(3, 6 / zNow);
+      const dashB = Math.max(2, 4 / zNow);
+      ctx.strokeStyle = 'rgba(92, 61, 30, 0.95)';
       ctx.lineWidth = hairFrame;
-      ctx.setLineDash([5 / zNow, 4 / zNow]);
+      ctx.setLineDash([dashA, dashB]);
+      ctx.lineDashOffset = -(typeof antsOffset === 'number' ? antsOffset : 0);
       ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
       ctx.setLineDash([]);
       ctx.restore();
@@ -3780,6 +4185,11 @@ function getImg(src) {
         const p = pos(e);
         const r = sold.get(p.c + ',' + p.r);
         if (r && tip) {
+          if (hoverRegion !== r) {
+            hoverRegion = r;
+            hoverPulse = 0;
+            try { scheduleDraw(); } catch (e) {}
+          }
           const nm = escapeHtml(r.name || 'Anonymous');
           const desc = r.desc ? escapeHtml(String(r.desc).slice(0, 200)) : '';
           tip.innerHTML =
@@ -3792,6 +4202,10 @@ function getImg(src) {
           tip.style.left = Math.min((e.pageX || cx || 0) + 14, window.innerWidth - 200) + 'px';
           tip.style.top = Math.max(8, (e.pageY || cy || 0) - 10) + 'px';
         } else if (tip) {
+          if (hoverRegion) {
+            hoverRegion = null;
+            try { scheduleDraw(); } catch (e) {}
+          }
           tip.style.display = 'none';
         }
       } catch (err) {}
@@ -3846,7 +4260,13 @@ function getImg(src) {
   }
   canvas.addEventListener('pointerenter', forceCrosshair);
   canvas.addEventListener('pointermove', forceCrosshair);
-  canvas.addEventListener('mouseleave', () => tip.style.display = 'none');
+  canvas.addEventListener('mouseleave', () => {
+    tip.style.display = 'none';
+    if (hoverRegion) {
+      hoverRegion = null;
+      try { scheduleDraw(); } catch (e) {}
+    }
+  });
   canvas.addEventListener('click', e => {
     // Ignore click that ends a drag-select (second select used to break here)
     if (dragging || didDrag) {
@@ -6606,6 +7026,7 @@ let scrollDrawRaf = 0;
 
   async function pullWall() {
     try {
+      try { setHpwLoader(true); } catch (e) {}
       const data = await apiFetch('/api/wall', { timeout: 15000 }, 'Wall sync');
       try { applyServerGrid(data); } catch (e) {}
       regions = [];
@@ -6653,6 +7074,8 @@ let scrollDrawRaf = 0;
     } catch (e) {
       // Expected when API is offline / static host — use local data quietly
       return false;
+    } finally {
+      try { setHpwLoader(false); } catch (e) {}
     }
   }
 

@@ -832,11 +832,14 @@
   }
 
   .upload {
+    position: relative;
     border: 3px dashed var(--border);
     background: #ffffff;
     padding: 14px;
     text-align: center;
     cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .upload:hover, .upload.drag { border-color: var(--gold); }
   .upload.has { border-style: solid; border-color: var(--success); }
@@ -2203,13 +2206,15 @@
       </div>
       <div class="field">
         <label>YOUR MEDIA (PHOTO / GIF / VIDEO)</label>
-        <div class="upload" id="upload">
-          <input type="file" id="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*" hidden>
+        <div class="upload" id="upload" role="button" tabindex="0" title="Tap to add or change photo">
+          <input type="file" id="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*" style="position:absolute;width:0.1px;height:0.1px;opacity:0;overflow:hidden;z-index:-1">
           <p style="line-height:1.4"><strong style="color:var(--dark)">Photo · GIF · Video</strong><br>
           <span style="font-size:0.9rem">tap, drag, or paste · high quality</span></p>
           <img id="preview" alt="" style="display:none">
           <video id="previewVideo" muted loop playsinline style="display:none;max-width:100%;max-height:110px;margin:0 auto"></video>
         </div>
+        <button type="button" class="btn btn-sec" id="changeMediaBtn" style="display:none;width:100%;margin-top:8px;font-size:0.35rem;padding:10px 12px">CHANGE PHOTO</button>
+        <button type="button" class="btn btn-sec" id="pickMediaBtn" style="width:100%;margin-top:8px;font-size:0.35rem;padding:10px 12px">ADD PHOTO / VIDEO</button>
         <input type="url" id="imgUrl" placeholder="Or paste photo link (https://…)" style="width:100%;margin-top:8px;padding:8px 10px;background:#fff;border:3px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1.05rem">
         <div id="blockPreviewWrap" style="display:none;margin-top:12px">
           <p style="font-family:'Press Start 2P',monospace;font-size:0.38rem;color:var(--dark);margin-bottom:6px">CROP</p>
@@ -5171,6 +5176,16 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       return;
     }
     editingRegion = null;
+    // Fresh claim — always reset media so admin/user can pick a new photo
+    try { clearPending(); } catch (e) {}
+    try {
+      if ($('ownerName')) $('ownerName').value = '';
+      if ($('desc')) $('desc').value = '';
+      if ($('imgUrl')) $('imgUrl').value = '';
+      if ($('link')) $('link').value = '';
+      if ($('linkType')) $('linkType').value = 'none';
+      try { syncLinkUI(); } catch (e2) {}
+    } catch (e) {}
     updatePayTotal();
     if (adminMode) {
       $('confirmBtn').textContent = 'ADD FREE TO WALL';
@@ -5178,12 +5193,14 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       const payField = $('payment-element') && $('payment-element').closest('.field');
       if (payField) payField.style.display = 'none';
       const dur = $('duration');
-      if (dur) { dur.disabled = false; if (!dur.value) dur.value = 'permanent'; }
+      if (dur) { dur.disabled = false; if (!dur.value || dur.value === '1month') dur.value = 'permanent'; }
     } else {
       $('confirmBtn').textContent = 'PAY & CLAIM';
       if ($('payTotalLine')) updatePayTotal();
       const payField = $('payment-element') && $('payment-element').closest('.field');
       if (payField) payField.style.display = '';
+      const dur = $('duration');
+      if (dur) { dur.disabled = false; }
     }
     paying = false;
     const cbtn = $('confirmBtn');
@@ -5191,10 +5208,19 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       cbtn.disabled = false;
       if (!adminMode) cbtn.textContent = 'PAY & CLAIM';
     }
+    const head = document.querySelector('#claimModal .modal-head h3');
+    if (head) head.textContent = adminMode ? 'ADMIN — ADD FREE' : 'CLAIM PIXELS';
+    const sub = document.querySelector('#claimModal .modal-head p');
+    if (sub) sub.textContent = adminMode
+      ? 'Add name + photo. Saved free to the wall (no Stripe).'
+      : 'Once paid, your pixels stay locked until time runs out.';
+    // Hide admin edit-only actions on new claim
+    const aa = document.getElementById('adminEditActions');
+    if (aa) aa.style.display = 'none';
+    if ($('paymentField')) $('paymentField').style.display = adminMode ? 'none' : '';
     $('claimModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     try { updateBlockPreview(); refreshClaimValidation(); } catch (e) {}
-    // Ensure pay button is interactive after open
     setTimeout(() => {
       try {
         paying = false;
@@ -5242,24 +5268,9 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       if (upload) upload.classList.add('has');
       if ($('fitRow')) $('fitRow').style.display = 'flex';
       if ($('fitHint')) $('fitHint').style.display = 'block';
-      // Show / enable change control
       try {
-        let ch = $('changeMediaBtn');
-        if (!ch && upload) {
-          ch = document.createElement('button');
-          ch.type = 'button';
-          ch.id = 'changeMediaBtn';
-          ch.className = 'btn btn-sec';
-          ch.textContent = 'CHANGE PHOTO';
-          ch.style.cssText = 'display:block;width:100%;margin-top:8px;font-size:0.35rem;padding:8px 10px';
-          upload.parentNode.insertBefore(ch, upload.nextSibling);
-          ch.onclick = (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            openFilePicker();
-          };
-        }
-        if (ch) ch.style.display = 'block';
+        if ($('changeMediaBtn')) $('changeMediaBtn').style.display = 'block';
+        if ($('pickMediaBtn')) $('pickMediaBtn').style.display = 'none';
       } catch (e) {}
       if (pendingType === 'video') {
         if (previewImg) {
@@ -5324,10 +5335,17 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
 
   function openFilePicker() {
     const input = $('file');
-    if (!input) return;
-    // Reset so choosing the same file again still fires change
+    if (!input) {
+      try { toast('File picker missing — refresh the page', 'error'); } catch (e) {}
+      return;
+    }
     try { input.value = ''; } catch (e) {}
-    input.click();
+    // Synchronous click from user gesture (required on iOS/Safari)
+    try {
+      input.click();
+    } catch (e) {
+      try { toast('Could not open file picker', 'error'); } catch (e2) {}
+    }
   }
 
   function selectionBounds() {
@@ -5590,8 +5608,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     if ($('file')) $('file').value = '';
     if ($('imgUrl')) $('imgUrl').value = '';
     if ($('blockPreviewWrap')) $('blockPreviewWrap').style.display = 'none';
-    const ch = $('changeMediaBtn');
-    if (ch) ch.style.display = 'none';
+    if ($('changeMediaBtn')) $('changeMediaBtn').style.display = 'none';
+    if ($('pickMediaBtn')) $('pickMediaBtn').style.display = 'block';
     try { refreshClaimValidation(); } catch (e) {}
   }
 
@@ -5738,26 +5756,48 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     }
   }
 
-  $('file').onchange = () => {
-    const f = $('file') && $('file').files && $('file').files[0];
-    if (f) handleFile(f);
-  };
-  // Click anywhere on the upload box (including current preview image) → pick a new file
-  if (upload) {
-    upload.onclick = e => {
-      e.preventDefault();
-      openFilePicker();
-    };
-    upload.addEventListener('dragover', e => { e.preventDefault(); upload.classList.add('drag'); });
-    upload.addEventListener('dragleave', () => upload.classList.remove('drag'));
-    upload.addEventListener('drop', e => {
-      e.preventDefault();
-      upload.classList.remove('drag');
-      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
-        handleFile(e.dataTransfer.files[0]);
-      }
-    });
-  }
+  (function wireMediaPicker() {
+    const input = $('file');
+    if (input) {
+      input.addEventListener('change', () => {
+        const f = input.files && input.files[0];
+        if (f) handleFile(f);
+      });
+    }
+    function bindPick(el) {
+      if (!el) return;
+      el.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        openFilePicker();
+      });
+    }
+    bindPick($('pickMediaBtn'));
+    bindPick($('changeMediaBtn'));
+    if (upload) {
+      upload.addEventListener('click', e => {
+        // Don't steal clicks from nested controls
+        if (e.target && e.target.closest && e.target.closest('button')) return;
+        e.preventDefault();
+        openFilePicker();
+      });
+      upload.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openFilePicker();
+        }
+      });
+      upload.addEventListener('dragover', e => { e.preventDefault(); upload.classList.add('drag'); });
+      upload.addEventListener('dragleave', () => upload.classList.remove('drag'));
+      upload.addEventListener('drop', e => {
+        e.preventDefault();
+        upload.classList.remove('drag');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      });
+    }
+  })();
   function applyImgUrl() {
     const v = ($('imgUrl') && $('imgUrl').value || '').trim();
     if (v) setPending(v, detectMediaType(v));

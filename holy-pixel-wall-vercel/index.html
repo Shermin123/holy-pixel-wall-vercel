@@ -2476,14 +2476,37 @@ Min 10 blocks · no maximum
   }
 
   function price() {
-    // $0.50 / pixel for 6 months · $1 / pixel for 1 year · $10 permanent
+    // Canonical unit prices (must match Stripe /api/checkout)
+    // $0.50 / px · 6 months · $1 / px · 1 year · $10 / px permanent
     const d = ($('duration') && $('duration').value) || '6month';
     if (d === 'permanent') return 10;
-    if (d === '1year') return 1;
-    if (d === '6month') return 0.50;
-    // legacy keys from older claims
-    if (d === '3month') return 0.50;
-    return 0.50;
+    if (d === '1year' || d === 'year' || d === '12month') return 1;
+    if (d === '6month' || d === '6months') return 0.5;
+    if (d === '3month') return 0.5;
+    return 0.5;
+  }
+
+  function roundMoney(n) {
+    return Math.round(Number(n) * 100) / 100;
+  }
+
+  function priceQuote(pixelCount, duration) {
+    const n = Math.max(0, Number(pixelCount) || 0);
+    let unit = 0.5;
+    const d = duration || (($('duration') && $('duration').value) || '6month');
+    if (d === 'permanent') unit = 10;
+    else if (d === '1year' || d === 'year' || d === '12month') unit = 1;
+    else if (d === '6month' || d === '6months' || d === '3month') unit = 0.5;
+    else unit = 0.5;
+    const amount = roundMoney(n * unit);
+    return {
+      pixels: n,
+      duration: d,
+      unitPrice: unit,
+      amount: amount,
+      amountCents: Math.round(amount * 100),
+      currency: 'usd'
+    };
   }
 
   function durationMs(d) {
@@ -3676,7 +3699,7 @@ function getImg(src) {
     const n = selected.size;
     if (n > 0) {
       const issues = typeof selectionIssues === 'function'? selectionIssues() : [];
-      const unit = price();
+      const q = priceQuote(n);
       if (adminMode && editingRegion) {
         $('selCount').textContent = n + ' pixels · resize';
         $('selPrice').textContent = 'SAVE';
@@ -3685,11 +3708,11 @@ function getImg(src) {
         if (issues.length) {
           $('selCount').textContent = n + ' pixels · ' + issues[0];
         } else if (n < MIN_BUY) {
-          $('selCount').textContent = n + ' pixels (min ' + MIN_BUY + ') · $' + unit.toFixed(2) + ' each';
+          $('selCount').textContent = n + ' pixels (min ' + MIN_BUY + ') · $' + q.unitPrice.toFixed(2) + ' each';
         } else {
-          $('selCount').textContent = n + ' pixels · $' + unit.toFixed(2) + ' each';
+          $('selCount').textContent = n + ' pixels · $' + q.unitPrice.toFixed(2) + ' each';
         }
-        $('selPrice').textContent = '$' + (n * unit).toFixed(2);
+        $('selPrice').textContent = '$' + q.amount.toFixed(2);
         if ($('claimBtn')) $('claimBtn').textContent = 'CLAIM';
       }
       floatBar.classList.add('visible');
@@ -3943,10 +3966,10 @@ function getImg(src) {
 
   function updatePayTotal() {
     const n = selected.size;
-    const total = (n * price()).toFixed(2);
-    $('infoPixels').value = n + ' PIXELS';
-    $('infoPrice').value = '$' + total;
-    if ($('payTotalLine')) $('payTotalLine').textContent = 'TOTAL: $' + total;
+    const q = priceQuote(n);
+    $('infoPixels').value = n + ' PIXELS · $' + q.unitPrice.toFixed(2) + '/px';
+    $('infoPrice').value = '$' + q.amount.toFixed(2);
+    if ($('payTotalLine')) $('payTotalLine').textContent = 'TOTAL: $' + q.amount.toFixed(2);
   }
 
 
@@ -5359,7 +5382,8 @@ function clearPending() {
       cropY: crop.y,
       link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
       linkType: ($('linkType') && $('linkType').value) || 'none',
-      paid: keys.length * price(),
+      paid: priceQuote(keys.length, ($('duration') && $('duration').value) || '6month').amount,
+      unitPrice: priceQuote(keys.length, ($('duration') && $('duration').value) || '6month').unitPrice,
       claimedAt: Date.now()
     };
     try {
@@ -5421,13 +5445,31 @@ function clearPending() {
         }
         try { storeSet('hpw_pending_flag', '1'); } catch (e) {}
         // Checkout only needs pricing fields (no huge media body)
+        // Explicit totals so Stripe page matches what the user saw
+        const quote = priceQuote(payload.cells.length, payload.duration);
+        payload.paid = quote.amount;
+        payload.unitPrice = quote.unitPrice;
         const checkoutBody = {
           cells: payload.cells,
-          duration: payload.duration,
-          name: payload.name
+          duration: quote.duration,
+          name: payload.name,
+          pixels: quote.pixels,
+          unitPrice: quote.unitPrice,
+          amount: quote.amount,
+          paid: quote.amount,
+          total: quote.amount,
+          amountCents: quote.amountCents,
+          currency: quote.currency
         };
+        // Keep pending claim total in sync
+        try {
+          const pending = Object.assign({}, payload, { paid: quote.amount, unitPrice: quote.unitPrice });
+          await idbSet('pending', pending);
+        } catch (e) {}
         btn.textContent = 'OPENING PAY…';
-        if ($('payHint')) $('payHint').textContent = 'Redirecting to secure Stripe Checkout…';
+        if ($('payHint')) {
+          $('payHint').textContent = 'Stripe: ' + quote.pixels + ' px × $' + quote.unitPrice.toFixed(2) + ' = $' + quote.amount.toFixed(2);
+        }
         const data = await apiFetch('/api/checkout', {
           method: 'POST',
           body: JSON.stringify(checkoutBody),
@@ -6716,13 +6758,8 @@ let scrollDrawRaf = 0;
   
   function setAdminKey(k) {
     try {
-      if (k) {
-        storeSet('hpw_admin_key', k);
-        sessionStorage.setItem('hpw_admin_key', k);
-      } else {
-        storeDel('hpw_admin_key');
-        sessionStorage.removeItem('hpw_admin_key');
-      }
+      if (k) storeSet('hpw_admin_key', k);
+      else storeDel('hpw_admin_key');
     } catch (e) {}
   }
 

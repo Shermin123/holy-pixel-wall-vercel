@@ -843,13 +843,32 @@
   .upload p { color: var(--muted); font-size: 0.95rem; }
   .upload img, .upload video {
     max-width: 100%;
-    max-height: 110px;
+    max-height: 140px;
     display: none;
-    margin: 0 auto 6px;
+    margin: 0 auto 8px;
     object-fit: contain;
+    background: #1a1512;
+    border: 2px solid var(--gold);
   }
-  .upload.has img, .upload.has video { display: block; }
-  .upload.has p { display: none; }
+  .upload.has img, .upload.has video {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  .upload.has p { display: none !important; }
+  #blockPreviewWrap {
+    min-height: 80px;
+  }
+  #previewStage {
+    min-height: 80px;
+    background: #1a1512 !important;
+  }
+  #blockPreview {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    image-rendering: auto;
+  }
 
   .fit-row { display: flex; gap: 4px; margin-top: 6px; }
   .fit-btn {
@@ -3588,20 +3607,34 @@ Min 10 blocks · no maximum
   }
 
 
-function getImg(src) {
+  function getImg(src) {
     if (!src) return null;
-    if (imgCache.has(src)) return imgCache.get(src);
+    if (imgCache.has(src)) {
+      const cached = imgCache.get(src);
+      // Drop broken cache entries so a retry can succeed
+      if (cached && cached._hpwBroken) {
+        imgCache.delete(src);
+      } else {
+        return cached;
+      }
+    }
     const img = new Image();
     img.decoding = 'async';
     try { img.loading = 'eager'; } catch (e) {}
-    if (!String(src).startsWith('data:')) img.crossOrigin = 'anonymous';
+    // Do NOT set crossOrigin by default — many hosts block CORS and the
+    // image never loads (blank preview). Wall display does not need export.
     img.onload = () => {
+      img._hpwBroken = false;
       try {
         if (img.decode) img.decode().then(() => scheduleDraw()).catch(() => scheduleDraw());
         else scheduleDraw();
-      } catch (e) { scheduleDraw(); }
+      } catch (e) { try { scheduleDraw(); } catch (e2) {} }
+      try { if (typeof updateBlockPreview === 'function') updateBlockPreview(); } catch (e) {}
     };
-    img.onerror = () => { imgCache.delete(src); };
+    img.onerror = () => {
+      img._hpwBroken = true;
+      try { imgCache.delete(src); } catch (e) {}
+    };
     try { img.src = src; } catch (e) { return null; }
     imgCache.set(src, img);
     return img;
@@ -5085,7 +5118,14 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     try {
       // Drop cached decode of previous pending image so 2nd upload always shows
       if (pendingMedia && pendingMedia !== src && typeof imgCache !== 'undefined' && imgCache.has(pendingMedia)) {
-        imgCache.delete(pendingMedia);
+        try { imgCache.delete(pendingMedia); } catch (e) {}
+      }
+      // Also clear any broken cache for this exact src
+      if (typeof imgCache !== 'undefined' && imgCache.has(src)) {
+        const old = imgCache.get(src);
+        if (old && (old._hpwBroken || !old.naturalWidth)) {
+          try { imgCache.delete(src); } catch (e) {}
+        }
       }
       pendingMedia = src;
       pendingType = type || detectMediaType(src) || 'image';
@@ -5096,7 +5136,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       if (pendingType === 'video') {
         if (previewImg) {
           previewImg.style.display = 'none';
-          previewImg.removeAttribute('src');
+          try { previewImg.removeAttribute('src'); } catch (e) {}
         }
         if (previewVideo) {
           previewVideo.style.display = 'block';
@@ -5107,22 +5147,45 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         if (previewVideo) {
           try { previewVideo.pause(); } catch (e) {}
           previewVideo.style.display = 'none';
-          previewVideo.removeAttribute('src');
+          try { previewVideo.removeAttribute('src'); } catch (e) {}
         }
         if (previewImg) {
           previewImg.style.display = 'block';
-          previewImg.onerror = () => { try { toast('Preview failed — try another file', 'error'); } catch (e) {} };
-          // force reload even if browser cached empty
+          previewImg.style.visibility = 'visible';
+          previewImg.style.opacity = '1';
+          previewImg.onerror = () => {
+            try { toast('Preview failed — try JPG or PNG', 'error'); } catch (e) {}
+          };
+          previewImg.onload = () => {
+            try { updateBlockPreview(); } catch (e) {}
+          };
           try {
-            previewImg.removeAttribute('src');
-            previewImg.src = src;
-          } catch (e) {}
+            // Assign src directly (avoid removeAttribute race that blanks some browsers)
+            if (previewImg.src !== src) previewImg.src = src;
+            else {
+              // force reload same url
+              previewImg.src = '';
+              previewImg.src = src;
+            }
+          } catch (e) {
+            try { previewImg.src = src; } catch (e2) {}
+          }
         }
       }
-      // Refresh wall + modal block preview (never let this throw out of setPending)
-      try { if (typeof draw === 'function') draw(); } catch (e) {}
+      // Show crop box immediately, then paint after layout
+      try {
+        const wrap = $('blockPreviewWrap');
+        if (wrap && pendingType !== 'video') wrap.style.display = 'block';
+      } catch (e) {}
       try { bindPreviewControls(); } catch (e) {}
       try { updateBlockPreview(); } catch (e) {}
+      // Second paint after modal layout (clientWidth was often 0 on first pass)
+      requestAnimationFrame(() => {
+        try { updateBlockPreview(); } catch (e) {}
+        try { if (typeof draw === 'function') draw(); } catch (e) {}
+      });
+      setTimeout(() => { try { updateBlockPreview(); } catch (e) {} }, 80);
+      setTimeout(() => { try { updateBlockPreview(); } catch (e) {} }, 250);
       try { refreshClaimValidation(); } catch (e) {}
     } catch (err) {
       console.warn('setPending', err);
@@ -5171,34 +5234,38 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     if (!wrap || !cv || !pStage) return;
     try {
       const b = previewBlockBounds();
-      if (!pendingMedia || !b || pendingType === 'video') {
-        if (pendingType === 'video' && pendingMedia && b) {
-          wrap.style.display = 'block';
-          const maxW = Math.min(320, (pStage.parentElement && pStage.parentElement.clientWidth) || 320);
-          const aspect = b.w / Math.max(1, b.h);
-          let pw = maxW, ph = Math.round(maxW / aspect);
-          if (ph > 200) { ph = 200; pw = Math.round(200 * aspect); }
-          pStage.style.width = pw + 'px';
-          pStage.style.height = ph + 'px';
-          const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          cv.width = Math.max(1, Math.round(pw * dpr));
-          cv.height = Math.max(1, Math.round(ph * dpr));
-          const c = cv.getContext('2d');
-          if (!c) return;
-          c.setTransform(dpr, 0, 0, dpr, 0, 0);
-          c.fillStyle = '#1a1512';
-          c.fillRect(0, 0, pw, ph);
-          c.fillStyle = '#c4a574';
-          c.font = '14px sans-serif';
-          c.textAlign = 'center';
-          c.fillText('Video fills this block', pw / 2, ph / 2);
-        } else {
-          wrap.style.display = 'none';
-        }
+      if (!pendingMedia || !b) {
+        wrap.style.display = 'none';
         return;
       }
+      if (pendingType === 'video') {
+        wrap.style.display = 'block';
+        const parentW = (wrap.clientWidth || pStage.parentElement && pStage.parentElement.clientWidth || 280);
+        const maxW = Math.min(320, Math.max(120, parentW));
+        const aspect = b.w / Math.max(1, b.h);
+        let pw = maxW, ph = Math.round(maxW / aspect);
+        if (ph > 200) { ph = 200; pw = Math.round(200 * aspect); }
+        pw = Math.max(80, pw); ph = Math.max(60, ph);
+        pStage.style.width = pw + 'px';
+        pStage.style.height = ph + 'px';
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        cv.width = Math.max(1, Math.round(pw * dpr));
+        cv.height = Math.max(1, Math.round(ph * dpr));
+        const c = cv.getContext('2d');
+        if (!c) return;
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        c.fillStyle = '#1a1512';
+        c.fillRect(0, 0, pw, ph);
+        c.fillStyle = '#c4a574';
+        c.font = '14px VT323, monospace';
+        c.textAlign = 'center';
+        c.fillText('Video fills this block', pw / 2, ph / 2);
+        return;
+      }
+
       wrap.style.display = 'block';
-      const maxW = Math.min(320, (wrap.clientWidth || 320));
+      const parentW = wrap.clientWidth || 280;
+      const maxW = Math.min(320, Math.max(120, parentW));
       const aspect = b.w / Math.max(1, b.h);
       let pw = maxW, ph = Math.round(maxW / aspect);
       if (ph > 220) { ph = 220; pw = Math.round(220 * aspect); }
@@ -5213,21 +5280,75 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.fillStyle = '#1a1512';
       c.fillRect(0, 0, pw, ph);
-      const img = getImg(pendingMedia);
-      if (img && img.complete && img.naturalWidth) {
+
+      function paintImg(img) {
+        if (!img || !img.naturalWidth) return false;
         try {
-          drawCoverCrop(c, img, 0, 0, pw, ph, crop.scale, crop.x, crop.y);
-        } catch (e) { console.warn('crop preview', e); }
-      } else if (img) {
-        const onReady = () => {
-          try { updateBlockPreview(); } catch (e) {}
-          try { if (typeof scheduleDraw === 'function') scheduleDraw(); else if (typeof draw === 'function') draw(); } catch (e) {}
-        };
-        img.addEventListener('load', onReady, { once: true });
+          drawCoverCrop(c, img, 0, 0, pw, ph, (crop && crop.scale) || 1, (crop && crop.x) != null ? crop.x : 0.5, (crop && crop.y) != null ? crop.y : 0.5);
+          c.strokeStyle = '#d4a017';
+          c.lineWidth = 2;
+          c.strokeRect(1, 1, pw - 2, ph - 2);
+          return true;
+        } catch (e) {
+          console.warn('crop preview paint', e);
+          return false;
+        }
       }
-      c.strokeStyle = '#d4a017';
-      c.lineWidth = 2;
-      c.strokeRect(1, 1, pw - 2, ph - 2);
+
+      let img = null;
+      try { img = getImg(pendingMedia); } catch (e) {}
+
+      if (img && img.complete && img.naturalWidth > 0) {
+        paintImg(img);
+      } else {
+        // Loading placeholder
+        c.fillStyle = '#c4a574';
+        c.font = '14px VT323, monospace';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText('Loading…', pw / 2, ph / 2);
+        c.strokeStyle = '#d4a017';
+        c.lineWidth = 2;
+        c.strokeRect(1, 1, pw - 2, ph - 2);
+
+        // Dedicated load path (works even if getImg onload already fired)
+        const tryPaint = () => {
+          const ready = getImg(pendingMedia);
+          if (ready && ready.complete && ready.naturalWidth > 0) {
+            try { updateBlockPreview(); } catch (e) {}
+            return;
+          }
+        };
+        if (img) {
+          img.addEventListener('load', tryPaint, { once: true });
+          img.addEventListener('error', () => {
+            try {
+              c.fillStyle = '#1a1512';
+              c.fillRect(0, 0, pw, ph);
+              c.fillStyle = '#b33a2b';
+              c.font = '13px VT323, monospace';
+              c.textAlign = 'center';
+              c.fillText('Image failed', pw / 2, ph / 2);
+            } catch (e) {}
+          }, { once: true });
+          // Sync-complete edge case
+          if (img.complete && img.naturalWidth > 0) tryPaint();
+        } else {
+          // Fallback: load without cache
+          const fallback = new Image();
+          fallback.onload = () => {
+            try {
+              if (typeof imgCache !== 'undefined') imgCache.set(pendingMedia, fallback);
+              updateBlockPreview();
+            } catch (e) {}
+          };
+          fallback.onerror = () => {
+            try { toast('Could not load image preview', 'error'); } catch (e) {}
+          };
+          try { fallback.src = pendingMedia; } catch (e) {}
+        }
+      }
+
       const zl = $('zoomPreviewLabel');
       if (zl) zl.textContent = Math.round(((crop && crop.scale) || 1) * 100) + '%';
       const sl = $('cropZoomSlider');

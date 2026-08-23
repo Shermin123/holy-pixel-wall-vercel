@@ -724,74 +724,85 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(60,40,20,0.55);
+    background: rgba(42, 33, 24, 0.5);
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    padding: 12px;
   }
   .modal {
-    background: var(--surface);
-    border: 4px solid var(--gold);
-    box-shadow: 8px 8px 0 #3d2b1a;
+    background: #fffdf8;
+    border: 3px solid var(--gold);
+    box-shadow: 6px 6px 0 rgba(61, 43, 26, 0.35);
     width: 100%;
-    max-width: 440px;
-    max-height: 90vh;
+    max-width: 400px;
+    max-height: min(92vh, 720px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-radius: 2px;
   }
   .modal-head {
-    padding: 14px 18px;
-    background: var(--panel);
-    border-bottom: 3px solid var(--border);
+    padding: 14px 16px 12px;
+    background: linear-gradient(180deg, #f7ecd4 0%, #f0e2c4 100%);
+    border-bottom: 2px solid var(--border);
   }
   .modal-head h3 {
     font-family: 'Press Start 2P', monospace;
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     color: var(--dark);
+    letter-spacing: 0.5px;
   }
   .modal-head p {
-    font-size: 0.9rem;
+    font-family: 'VT323', monospace;
+    font-size: 1rem;
     color: var(--muted);
-    margin-top: 4px;
+    margin-top: 6px;
+    line-height: 1.3;
   }
   .modal-body {
-    padding: 14px 18px;
+    padding: 14px 16px 16px;
     overflow-y: auto;
     flex: 1;
+    -webkit-overflow-scrolling: touch;
   }
   .modal-foot {
-    padding: 12px 18px;
-    background: var(--panel);
-    border-top: 3px solid var(--border);
+    padding: 12px 16px;
+    background: #f7ecd4;
+    border-top: 2px solid var(--border);
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
   }
 
-  .field { margin-bottom: 12px; }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 4px; }
   .field input.invalid, .field select.invalid, .field .upload.invalid {
-    border-color: var(--danger) !important;
+    border-color: #c9a66b !important;
+    box-shadow: inset 0 0 0 1px rgba(179, 58, 43, 0.25);
   }
   .field input.valid, .field .upload.valid {
-    border-color: var(--success) !important;
+    border-color: #a8c4a0 !important;
   }
   .form-status {
-    font-size: 0.95rem;
+    font-family: 'VT323', monospace;
+    font-size: 1rem;
     line-height: 1.35;
-    margin: 0 0 12px;
+    margin: 0 0 14px;
     padding: 8px 10px;
-    border: 2px solid var(--border);
+    border: 1px solid var(--border);
     background: #fff;
     color: var(--muted);
   }
   .form-status.ok {
-    border-color: var(--success);
+    border-color: #a8c4a0;
     color: var(--success);
+    background: #f4faf4;
   }
   .form-status.err {
-    border-color: var(--danger);
+    border-color: #e0b4ae;
     color: var(--danger);
+    background: #fdf6f5;
   }
   .btn-pri:disabled, .btn-claim:disabled {
     opacity: 0.45;
@@ -803,35 +814,65 @@
   .field label {
     display: block;
     font-family: 'Press Start 2P', monospace;
-    font-size: 0.4rem;
+    font-size: 0.34rem;
     color: var(--muted);
-    margin-bottom: 4px;
-    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    letter-spacing: 0.8px;
   }
   .field input[type="text"],
   .field input[type="url"],
   .field select {
     width: 100%;
-    padding: 8px 10px;
+    padding: 10px 12px;
     background: #ffffff;
-    border: 3px solid var(--border);
+    border: 2px solid var(--border);
     color: var(--text);
     font-family: 'VT323', monospace;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     outline: none;
+    border-radius: 1px;
   }
+  .field input::placeholder { color: #b5a08a; }
   .field input:focus, .field select:focus {
     border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
   }
   .field input[type="color"] {
     width: 100%;
     height: 36px;
-    border: 3px solid var(--border);
+    border: 2px solid var(--border);
     background: #ffffff;
     cursor: pointer;
   }
 
-  /* Visually hidden but still activatable via <label for="file"> */
+  /* Price chips */
+  #priceSummaryRow {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  #priceSummaryRow > div {
+    flex: 1;
+    background: #fff;
+    border: 2px solid var(--border);
+    padding: 8px 10px;
+  }
+  #priceSummaryRow label {
+    margin-bottom: 2px;
+  }
+  #priceSummaryRow input {
+    border: none !important;
+    padding: 2px 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 1.2rem !important;
+  }
+  #infoPrice {
+    color: var(--gold) !important;
+    font-weight: bold;
+  }
+
+  /* File input: accessible, not visible */
   #file {
     position: absolute;
     width: 1px;
@@ -844,33 +885,50 @@
   }
   .upload {
     position: relative;
-    display: block;
-    border: 2px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 88px;
+    border: 2px dashed #c9a66b;
     background: #fff;
-    padding: 16px 12px;
+    padding: 18px 14px;
     text-align: center;
     cursor: pointer;
-    transition: border-color 0.15s steps(2);
   }
-  .upload:hover, .upload.drag { border-color: var(--gold); background: #fffdf8; }
-  .upload.has { border-style: solid; border-color: var(--gold); }
+  .upload:hover, .upload.drag {
+    border-color: var(--gold);
+    background: #fffbf0;
+  }
+  .upload.has {
+    border-style: solid;
+    border-color: var(--gold);
+    padding: 10px;
+    min-height: 0;
+  }
   .upload p {
+    font-family: 'VT323', monospace;
     color: var(--muted);
-    font-size: 0.95rem;
-    line-height: 1.4;
+    font-size: 1.1rem;
+    line-height: 1.35;
     margin: 0;
   }
-  .upload p strong { color: var(--dark); }
+  .upload p strong {
+    display: block;
+    color: var(--dark);
+    font-size: 1.25rem;
+    margin-bottom: 2px;
+  }
   .upload img, .upload video {
     max-width: 100%;
-    max-height: 120px;
+    max-height: 130px;
     display: none;
     margin: 0 auto;
     object-fit: contain;
   }
   .upload.has img, .upload.has video { display: block !important; }
   .upload.has p { display: none !important; }
-  #blockPreviewWrap { margin-top: 10px; }
+  #blockPreviewWrap { margin-top: 12px; }
   #previewStage {
     margin: 0 auto;
     background: #1a1512;
@@ -2118,10 +2176,10 @@
       <p>Once paid, your pixels stay locked until time runs out.</p>
     </div>
     <div class="modal-body">
-      <div class="form-status" id="formStatus">Fill in the fields to continue</div>
+      <div class="form-status" id="formStatus">Enter your name to continue</div>
       <div class="field">
-        <label>OWNER / BRAND</label>
-        <input type="text" id="ownerName" placeholder="YOUR NAME" maxlength="40">
+        <label>NAME</label>
+        <input type="text" id="ownerName" placeholder="Your name or brand" maxlength="40">
       </div>
 
       <div class="field">
@@ -2189,77 +2247,76 @@
       </div>
 
       <div class="field">
-        <label>SHORT DESCRIPTION (SHOWN ON HOVER)</label>
-        <input type="text" id="desc" placeholder="A few words about you or your brand" maxlength="120">
+        <label>DESCRIPTION</label>
+        <input type="text" id="desc" placeholder="Short bio (shown on hover)" maxlength="120">
       </div>
       <div class="field">
         <label>DURATION</label>
         <select id="duration">
-          <option value="6month" selected>6 MONTHS — $0.50 / PIXEL</option>
-          <option value="1year">1 YEAR — $1 / PIXEL</option>
-          <option value="permanent">PERMANENT — $10 / PIXEL (limited)</option>
+          <option value="6month" selected>6 months — $0.50 / pixel</option>
+          <option value="1year">1 year — $1 / pixel</option>
+          <option value="permanent">Permanent — $10 / pixel</option>
         </select>
       </div>
-      <div class="field" id="priceSummaryRow" style="display:flex;gap:10px">
-        <div style="flex:1">
+      <div class="field" id="priceSummaryRow">
+        <div>
           <label>PIXELS</label>
           <input type="text" id="infoPixels" readonly>
         </div>
-        <div style="flex:1">
+        <div>
           <label>TOTAL</label>
-          <input type="text" id="infoPrice" readonly style="color:var(--gold);font-weight:bold">
+          <input type="text" id="infoPrice" readonly>
         </div>
       </div>
       <div class="field">
-        <label>PHOTO / GIF / VIDEO</label>
+        <label>PHOTO</label>
         <input type="file" id="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*">
         <label class="upload" id="upload" for="file">
-          <p><strong>Tap to add photo</strong><br>or drag &amp; drop · JPG PNG GIF MP4</p>
+          <p><strong>Add photo</strong>JPG · PNG · GIF · MP4</p>
           <img id="preview" alt="" style="display:none;pointer-events:none">
           <video id="previewVideo" muted loop playsinline style="display:none;max-width:100%;max-height:120px;margin:0 auto;pointer-events:none"></video>
         </label>
-        <input type="url" id="imgUrl" placeholder="Or paste image URL (https://…)" style="width:100%;margin-top:8px;padding:8px 10px;background:#fff;border:2px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1.05rem">
+        <input type="url" id="imgUrl" placeholder="Or paste image URL" style="margin-top:8px">
         <div id="blockPreviewWrap" style="display:none;margin-top:12px">
-          <p style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dark);margin-bottom:6px">CROP</p>
-          <p style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Drag to pan · slider to zoom</p>
+          <label style="margin-bottom:6px">CROP</label>
           <div id="previewStage" style="position:relative;max-width:100%;touch-action:none;cursor:grab">
             <canvas id="blockPreview"></canvas>
           </div>
           <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
             <input type="range" id="cropZoomSlider" min="100" max="400" value="100" step="5" style="flex:1;accent-color:var(--gold)">
-            <span id="zoomPreviewLabel" style="font-family:'Press Start 2P',monospace;font-size:0.32rem;color:var(--dark);min-width:42px;text-align:right">100%</span>
-            <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:8px 12px">RESET</button>
+            <span id="zoomPreviewLabel" style="font-family:VT323,monospace;font-size:1rem;color:var(--dark);min-width:36px;text-align:right">100%</span>
+            <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:6px 10px;font-size:0.32rem">RESET</button>
           </div>
         </div>
         <div class="fit-row" id="fitRow" style="display:none"></div>
         <p id="fitHint" style="display:none"></p>
       </div>
       <div class="field">
-        <label>YOUR LINK</label>
-        <p style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">When people click your block, they open this</p>
+        <label>LINK</label>
         <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-          <select id="linkType" style="flex:1;min-width:120px;padding:8px 6px;background:#fff;border:3px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1rem">
-            <option value="none">NO LINK</option>
-            <option value="instagram">INSTAGRAM</option>
-            <option value="tiktok">TIKTOK</option>
-            <option value="youtube">YOUTUBE</option>
-            <option value="twitter">X / TWITTER</option>
-            <option value="website">WEBSITE</option>
-            <option value="other">OTHER</option>
+          <select id="linkType" style="flex:1;min-width:120px">
+            <option value="none">No link</option>
+            <option value="instagram">Instagram</option>
+            <option value="tiktok">TikTok</option>
+            <option value="youtube">YouTube</option>
+            <option value="twitter">X / Twitter</option>
+            <option value="website">Website</option>
+            <option value="other">Other</option>
           </select>
-          <select id="linkKind" style="flex:1;min-width:120px;padding:8px 6px;background:#fff;border:3px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1rem;display:none">
-            <option value="profile">PROFILE / ACCOUNT</option>
-            <option value="post">POST / VIDEO</option>
+          <select id="linkKind" style="flex:1;min-width:120px;display:none">
+            <option value="profile">Profile</option>
+            <option value="post">Post / video</option>
           </select>
         </div>
-        <input type="text" id="link" placeholder="Paste profile or post link" style="display:none">
-      </div><div class="field" id="paymentField">
+        <input type="text" id="link" placeholder="Paste link" style="display:none">
+      </div>
+      <div class="field" id="paymentField">
         <label>PAYMENT</label>
-        <p style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Secure Stripe Checkout · Card, Apple Pay & Google Pay</p>
-        <div id="payment-element" style="padding:10px;background:#fff;border:3px solid var(--border);min-height:48px"></div>
-        <p id="payment-message" style="color:var(--danger);font-size:0.9rem;margin-top:6px;min-height:1.1em"></p>
-        <p id="payTotalLine" style="font-family:'Press Start 2P',monospace;font-size:0.45rem;color:var(--dark);margin-top:10px">TOTAL: $0.00</p>
-        <p id="payHint" style="font-size:0.85rem;color:var(--muted);margin-top:6px">One click → Stripe · Apple Pay available in Safari after domain is verified</p>
+        <p style="font-family:VT323,monospace;font-size:1rem;color:var(--muted);margin-bottom:8px">Stripe · Card · Apple Pay · Google Pay</p>
+        <div id="payment-element" style="padding:10px;background:#fff;border:2px solid var(--border);min-height:40px"></div>
+        <p id="payment-message" style="color:var(--danger);font-size:0.95rem;margin-top:6px;min-height:1em"></p>
+        <p id="payTotalLine" style="font-family:'Press Start 2P',monospace;font-size:0.4rem;color:var(--dark);margin-top:10px">TOTAL: $0.00</p>
+        <p id="payHint" style="font-family:VT323,monospace;font-size:0.95rem;color:var(--muted);margin-top:4px"></p>
       </div>
     </div>
     <div class="modal-foot">
@@ -5273,7 +5330,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       if ($('fitHint')) $('fitHint').style.display = 'block';
       try {
         const hint = upload && upload.querySelector('p');
-        if (hint) hint.innerHTML = '<strong>Tap to change photo</strong><br>or drag a new file';
+        if (hint) hint.innerHTML = '<strong>Change photo</strong>JPG · PNG · GIF · MP4';
       } catch (e) {}
       if (pendingType === 'video') {
         if (previewImg) {
@@ -5613,7 +5670,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     if ($('blockPreviewWrap')) $('blockPreviewWrap').style.display = 'none';
     try {
       const hint = upload && upload.querySelector('p');
-      if (hint) hint.innerHTML = '<strong>Tap to add photo</strong><br>or drag &amp; drop · JPG PNG GIF MP4';
+      if (hint) hint.innerHTML = '<strong>Add photo</strong>JPG · PNG · GIF · MP4';
     } catch (e) {}
     try { refreshClaimValidation(); } catch (e) {}
   }

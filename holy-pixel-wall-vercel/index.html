@@ -831,8 +831,23 @@
     cursor: pointer;
   }
 
+  /* Native file input — keep in layout for label[for=file], visually minimal */
+  #file {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 8px;
+    padding: 8px 4px;
+    font-family: 'VT323', monospace;
+    font-size: 1rem;
+    color: var(--text);
+    background: #fff;
+    border: 2px dashed var(--border);
+    cursor: pointer;
+  }
   .upload {
     position: relative;
+    display: block;
     border: 3px dashed var(--border);
     background: #ffffff;
     padding: 14px;
@@ -2206,15 +2221,15 @@
       </div>
       <div class="field">
         <label>YOUR MEDIA (PHOTO / GIF / VIDEO)</label>
-        <div class="upload" id="upload" role="button" tabindex="0" title="Tap to add or change photo">
-          <input type="file" id="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*" style="position:absolute;width:0.1px;height:0.1px;opacity:0;overflow:hidden;z-index:-1">
+        <input type="file" id="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*">
+        <label class="upload" id="upload" for="file" title="Tap to add or change photo">
           <p style="line-height:1.4"><strong style="color:var(--dark)">Photo · GIF · Video</strong><br>
           <span style="font-size:0.9rem">tap, drag, or paste · high quality</span></p>
-          <img id="preview" alt="" style="display:none">
-          <video id="previewVideo" muted loop playsinline style="display:none;max-width:100%;max-height:110px;margin:0 auto"></video>
-        </div>
-        <button type="button" class="btn btn-sec" id="changeMediaBtn" style="display:none;width:100%;margin-top:8px;font-size:0.35rem;padding:10px 12px">CHANGE PHOTO</button>
-        <button type="button" class="btn btn-sec" id="pickMediaBtn" style="width:100%;margin-top:8px;font-size:0.35rem;padding:10px 12px">ADD PHOTO / VIDEO</button>
+          <img id="preview" alt="" style="display:none;pointer-events:none">
+          <video id="previewVideo" muted loop playsinline style="display:none;max-width:100%;max-height:110px;margin:0 auto;pointer-events:none"></video>
+        </label>
+        <label for="file" class="btn btn-sec" id="pickMediaBtn" style="display:block;width:100%;margin-top:8px;font-size:0.35rem;padding:10px 12px;text-align:center;cursor:pointer;box-sizing:border-box">ADD PHOTO / VIDEO</label>
+        <label for="file" class="btn btn-sec" id="changeMediaBtn" style="display:none;width:100%;margin-top:8px;font-size:0.35rem;padding:10px 12px;text-align:center;cursor:pointer;box-sizing:border-box">CHANGE PHOTO</label>
         <input type="url" id="imgUrl" placeholder="Or paste photo link (https://…)" style="width:100%;margin-top:8px;padding:8px 10px;background:#fff;border:3px solid var(--border);color:var(--text);font-family:VT323,monospace;font-size:1.05rem">
         <div id="blockPreviewWrap" style="display:none;margin-top:12px">
           <p style="font-family:'Press Start 2P',monospace;font-size:0.38rem;color:var(--dark);margin-bottom:6px">CROP</p>
@@ -5759,41 +5774,35 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   (function wireMediaPicker() {
     const input = $('file');
     if (input) {
+      // Native <label for="file"> opens the picker — we only handle the result
       input.addEventListener('change', () => {
-        const f = input.files && input.files[0];
-        if (f) handleFile(f);
-      });
-    }
-    function bindPick(el) {
-      if (!el) return;
-      el.addEventListener('click', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        openFilePicker();
-      });
-    }
-    bindPick($('pickMediaBtn'));
-    bindPick($('changeMediaBtn'));
-    if (upload) {
-      upload.addEventListener('click', e => {
-        // Don't steal clicks from nested controls
-        if (e.target && e.target.closest && e.target.closest('button')) return;
-        e.preventDefault();
-        openFilePicker();
-      });
-      upload.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          openFilePicker();
+        try {
+          const f = input.files && input.files[0];
+          if (f) {
+            handleFile(f);
+          }
+        } catch (err) {
+          console.warn('file change', err);
+          try { toast('Could not read file', 'error'); } catch (e) {}
         }
       });
-      upload.addEventListener('dragover', e => { e.preventDefault(); upload.classList.add('drag'); });
+    }
+    // Drag & drop onto the upload zone (label)
+    if (upload) {
+      upload.addEventListener('dragover', e => {
+        e.preventDefault();
+        upload.classList.add('drag');
+      });
       upload.addEventListener('dragleave', () => upload.classList.remove('drag'));
       upload.addEventListener('drop', e => {
         e.preventDefault();
         upload.classList.remove('drag');
-        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
-          handleFile(e.dataTransfer.files[0]);
+        try {
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFile(e.dataTransfer.files[0]);
+          }
+        } catch (err) {
+          console.warn('drop', err);
         }
       });
     }

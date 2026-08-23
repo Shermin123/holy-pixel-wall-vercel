@@ -1842,9 +1842,114 @@
   .pixel-buy:hover:not(.is-active)::after { display: none; }
 }
 
+/* ===== Self-destruct strip — neat pixel chip ===== */
+.hpw-destruct {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 28px;
+  padding: 5px 12px;
+  background: linear-gradient(180deg, #2a2118 0%, #3d2b1a 100%);
+  border-bottom: 2px solid #c9a34e;
+  box-shadow: 0 2px 0 rgba(201, 163, 78, 0.35);
+  color: #f5efe3;
+  z-index: 80;
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+}
+.hpw-destruct__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.28rem;
+  color: #f0c14b;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.hpw-destruct__dot {
+  width: 6px;
+  height: 6px;
+  background: #a84c32;
+  box-shadow: 0 0 0 1px #2a2118, 0 0 4px rgba(168, 76, 50, 0.7);
+  animation: hpwDestructBlink 1.4s steps(2) infinite;
+  flex-shrink: 0;
+}
+@keyframes hpwDestructBlink {
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0.25; }
+}
+.hpw-destruct__msg {
+  color: #e8dcc4;
+  white-space: nowrap;
+}
+.hpw-destruct__msg strong {
+  color: #fff8e8;
+  font-weight: normal;
+}
+.hpw-destruct__sep {
+  color: #c9a34e;
+  opacity: 0.7;
+}
+.hpw-destruct__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.26rem;
+  color: #fff8e8;
+  background: #1a1512;
+  border: 2px solid #c9a34e;
+  box-shadow: 2px 2px 0 #5c3d1e;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.hpw-destruct__unit {
+  color: #c9a34e;
+  margin-right: 2px;
+}
+.hpw-destruct__num {
+  color: #f0c14b;
+  min-width: 1.1em;
+  display: inline-block;
+  text-align: right;
+}
+@media (max-width: 700px) {
+  .hpw-destruct {
+    min-height: 24px;
+    padding: 4px 8px;
+    gap: 6px;
+    font-size: 0.85rem;
+  }
+  .hpw-destruct__label { font-size: 0.22rem; }
+  .hpw-destruct__count { font-size: 0.2rem; padding: 3px 6px; gap: 3px; }
+  .hpw-destruct__msg { font-size: 0.8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hpw-destruct__dot { animation: none !important; opacity: 1; }
+}
+
 </style>
 </head>
 <body>
+
+<div class="hpw-destruct" id="hpwDestruct" role="status" aria-live="polite" title="Scheduled end of service">
+  <span class="hpw-destruct__label"><span class="hpw-destruct__dot" aria-hidden="true"></span> SELF-DESTRUCT</span>
+  <span class="hpw-destruct__sep">·</span>
+  <span class="hpw-destruct__msg">Website will self-destroy in <strong>2100</strong></span>
+  <span class="hpw-destruct__sep">·</span>
+  <span class="hpw-destruct__count" id="hpwDestructCount" aria-label="Countdown to 2100">
+    <span class="hpw-destruct__num" id="hpwY">—</span><span class="hpw-destruct__unit">Y</span>
+    <span class="hpw-destruct__num" id="hpwD">—</span><span class="hpw-destruct__unit">D</span>
+    <span class="hpw-destruct__num" id="hpwH">—</span><span class="hpw-destruct__unit">H</span>
+    <span class="hpw-destruct__num" id="hpwM">—</span><span class="hpw-destruct__unit">M</span>
+    <span class="hpw-destruct__num" id="hpwS">—</span><span class="hpw-destruct__unit">S</span>
+  </span>
+</div>
 
 <header class="pixel-header">
   <div class="pixel-header__grid" aria-hidden="true"></div>
@@ -2655,6 +2760,49 @@ Min 10 blocks · no maximum
     if (!el) return;
     el.classList.toggle('show', !!on);
   }
+
+  // ===== Self-destruct countdown → 2100-01-01 00:00:00 local =====
+  (function initDestructCountdown() {
+    const target = new Date(2100, 0, 1, 0, 0, 0, 0).getTime();
+    const elY = document.getElementById('hpwY');
+    const elD = document.getElementById('hpwD');
+    const elH = document.getElementById('hpwH');
+    const elM = document.getElementById('hpwM');
+    const elS = document.getElementById('hpwS');
+    if (!elY) return;
+    function pad(n, w) {
+      n = Math.max(0, Math.floor(n));
+      const s = String(n);
+      return w && s.length < w ? ('000' + s).slice(-w) : s;
+    }
+    function tick() {
+      let ms = target - Date.now();
+      if (ms <= 0) {
+        elY.textContent = '0';
+        elD.textContent = '0';
+        elH.textContent = '00';
+        elM.textContent = '00';
+        elS.textContent = '00';
+        return;
+      }
+      const sec = Math.floor(ms / 1000);
+      const years = Math.floor(sec / (365.25 * 24 * 3600));
+      let rem = sec - Math.floor(years * 365.25 * 24 * 3600);
+      const days = Math.floor(rem / 86400);
+      rem -= days * 86400;
+      const hours = Math.floor(rem / 3600);
+      rem -= hours * 3600;
+      const mins = Math.floor(rem / 60);
+      const secs = rem % 60;
+      elY.textContent = pad(years);
+      elD.textContent = pad(days);
+      elH.textContent = pad(hours, 2);
+      elM.textContent = pad(mins, 2);
+      elS.textContent = pad(secs, 2);
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
 
   // Toolbar click flash (pixel highlight)
   document.addEventListener('click', e => {

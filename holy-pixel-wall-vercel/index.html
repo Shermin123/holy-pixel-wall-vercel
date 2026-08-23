@@ -5229,16 +5229,12 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   function setPending(src, type) {
     if (!src) return;
     try {
-      // Drop cached decode of previous pending image so 2nd upload always shows
-      if (pendingMedia && pendingMedia !== src && typeof imgCache !== 'undefined' && imgCache.has(pendingMedia)) {
+      // Always drop previous pending media from cache so a replacement shows
+      if (pendingMedia && typeof imgCache !== 'undefined') {
         try { imgCache.delete(pendingMedia); } catch (e) {}
       }
-      // Also clear any broken cache for this exact src
       if (typeof imgCache !== 'undefined' && imgCache.has(src)) {
-        const old = imgCache.get(src);
-        if (old && (old._hpwBroken || !old.naturalWidth)) {
-          try { imgCache.delete(src); } catch (e) {}
-        }
+        try { imgCache.delete(src); } catch (e) {}
       }
       pendingMedia = src;
       pendingType = type || detectMediaType(src) || 'image';
@@ -5246,6 +5242,25 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       if (upload) upload.classList.add('has');
       if ($('fitRow')) $('fitRow').style.display = 'flex';
       if ($('fitHint')) $('fitHint').style.display = 'block';
+      // Show / enable change control
+      try {
+        let ch = $('changeMediaBtn');
+        if (!ch && upload) {
+          ch = document.createElement('button');
+          ch.type = 'button';
+          ch.id = 'changeMediaBtn';
+          ch.className = 'btn btn-sec';
+          ch.textContent = 'CHANGE PHOTO';
+          ch.style.cssText = 'display:block;width:100%;margin-top:8px;font-size:0.35rem;padding:8px 10px';
+          upload.parentNode.insertBefore(ch, upload.nextSibling);
+          ch.onclick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            openFilePicker();
+          };
+        }
+        if (ch) ch.style.display = 'block';
+      } catch (e) {}
       if (pendingType === 'video') {
         if (previewImg) {
           previewImg.style.display = 'none';
@@ -5272,27 +5287,28 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
           previewImg.onload = () => {
             try { updateBlockPreview(); } catch (e) {}
           };
+          // Force browser to accept the new image every time
           try {
-            // Assign src directly (avoid removeAttribute race that blanks some browsers)
-            if (previewImg.src !== src) previewImg.src = src;
-            else {
-              // force reload same url
-              previewImg.src = '';
-              previewImg.src = src;
-            }
+            previewImg.src = '';
+            previewImg.src = src;
           } catch (e) {
             try { previewImg.src = src; } catch (e2) {}
           }
         }
       }
-      // Show crop box immediately, then paint after layout
+      // Reset crop slider UI
+      try {
+        const sl = $('cropZoomSlider');
+        if (sl) sl.value = '100';
+        const zl = $('zoomPreviewLabel');
+        if (zl) zl.textContent = '100%';
+      } catch (e) {}
       try {
         const wrap = $('blockPreviewWrap');
         if (wrap && pendingType !== 'video') wrap.style.display = 'block';
       } catch (e) {}
       try { bindPreviewControls(); } catch (e) {}
       try { updateBlockPreview(); } catch (e) {}
-      // Second paint after modal layout (clientWidth was often 0 on first pass)
       requestAnimationFrame(() => {
         try { updateBlockPreview(); } catch (e) {}
         try { if (typeof draw === 'function') draw(); } catch (e) {}
@@ -5304,6 +5320,14 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       console.warn('setPending', err);
       try { toast('Could not load media — try JPG or PNG', 'error'); } catch (e) {}
     }
+  }
+
+  function openFilePicker() {
+    const input = $('file');
+    if (!input) return;
+    // Reset so choosing the same file again still fires change
+    try { input.value = ''; } catch (e) {}
+    input.click();
   }
 
   function selectionBounds() {
@@ -5550,6 +5574,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     } catch (e) {}
     pendingMedia = '';
     pendingType = 'image';
+    crop = { scale: 1, x: 0.5, y: 0.5 };
     if (upload) upload.classList.remove('has');
     if ($('fitRow')) $('fitRow').style.display = 'none';
     if ($('fitHint')) $('fitHint').style.display = 'none';
@@ -5565,6 +5590,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     if ($('file')) $('file').value = '';
     if ($('imgUrl')) $('imgUrl').value = '';
     if ($('blockPreviewWrap')) $('blockPreviewWrap').style.display = 'none';
+    const ch = $('changeMediaBtn');
+    if (ch) ch.style.display = 'none';
     try { refreshClaimValidation(); } catch (e) {}
   }
 
@@ -5711,21 +5738,26 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     }
   }
 
-  $('file').onchange = () => handleFile($('file').files[0]);
-  upload.onclick = e => {
-    if (e.target.closest('video') || e.target.closest('img')) return;
-    if ($('file')) {
-      $('file').value = ''; // allow selecting the same or a second file
-      $('file').click();
-    }
+  $('file').onchange = () => {
+    const f = $('file') && $('file').files && $('file').files[0];
+    if (f) handleFile(f);
   };
-  upload.addEventListener('dragover', e => { e.preventDefault(); upload.classList.add('drag'); });
-  upload.addEventListener('dragleave', () => upload.classList.remove('drag'));
-  upload.addEventListener('drop', e => {
-    e.preventDefault();
-    upload.classList.remove('drag');
-    handleFile(e.dataTransfer.files[0]);
-  });
+  // Click anywhere on the upload box (including current preview image) → pick a new file
+  if (upload) {
+    upload.onclick = e => {
+      e.preventDefault();
+      openFilePicker();
+    };
+    upload.addEventListener('dragover', e => { e.preventDefault(); upload.classList.add('drag'); });
+    upload.addEventListener('dragleave', () => upload.classList.remove('drag'));
+    upload.addEventListener('drop', e => {
+      e.preventDefault();
+      upload.classList.remove('drag');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+  }
   function applyImgUrl() {
     const v = ($('imgUrl') && $('imgUrl').value || '').trim();
     if (v) setPending(v, detectMediaType(v));

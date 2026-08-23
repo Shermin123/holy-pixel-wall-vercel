@@ -916,20 +916,50 @@
     font-size: 1.05rem;
     pointer-events: none;
     display: none;
-    z-index: 200;
-    max-width: 260px;
+    z-index: 3200;
     min-width: 140px;
+    max-width: min(280px, calc(100vw - 24px));
     line-height: 1.35;
-    max-width: 240px;
-    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    box-sizing: border-box;
+    left: 12px;
+    top: 12px;
   }
   .tip strong {
     font-family: 'Press Start 2P', monospace;
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     color: var(--dark);
     display: block;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
+    line-height: 1.4;
+    word-break: break-word;
   }
+  .tip .tip-desc {
+    display: block;
+    color: var(--muted);
+    font-size: 1rem;
+    max-height: 4.5em;
+    overflow: hidden;
+  }
+  .tip.tip-touch {
+    pointer-events: auto;
+    max-width: min(320px, calc(100vw - 24px));
+  }
+  .tip .tip-close {
+    display: none;
+    margin-top: 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.32rem;
+    padding: 8px 12px;
+    background: var(--gold);
+    color: #2c221e;
+    border: 2px solid #2a2118;
+    cursor: pointer;
+    width: 100%;
+  }
+  .tip.tip-touch .tip-close { display: block; }
 
   .toast {
     position: fixed;
@@ -3953,23 +3983,27 @@ Min 10 blocks · no maximum
         const bh = (sMaxR - sMinR + 1) * drawCell;
 
         ctx.save();
-        // Gold fill on each selected pixel
-        freeKeys.forEach(([c, r]) => {
-          ctx.fillStyle = 'rgba(212, 160, 23, 0.28)';
-          ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
-          // Individual pixel border when large enough to see
-          if (visCell >= 4) {
-            ctx.strokeStyle = 'rgba(92, 61, 30, 0.85)';
-            ctx.lineWidth = hair;
-            ctx.strokeRect(
-              Math.floor(c * drawCell) + 0.5,
-              Math.floor(r * drawCell) + 0.5,
-              Math.max(0, drawCell - 1),
-              Math.max(0, drawCell - 1)
-            );
-          }
-        });
-        // Grid through selection region
+        // Zoomed out: solid gold block so selection stays visible
+        // Zoomed in: per-pixel glass fill
+        if (visCell < 2.2) {
+          ctx.fillStyle = 'rgba(212, 160, 23, 0.55)';
+          ctx.fillRect(bx, by, bw, bh);
+        } else {
+          freeKeys.forEach(([c, r]) => {
+            ctx.fillStyle = 'rgba(212, 160, 23, 0.35)';
+            ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
+            if (visCell >= 4) {
+              ctx.strokeStyle = 'rgba(92, 61, 30, 0.85)';
+              ctx.lineWidth = hair;
+              ctx.strokeRect(
+                Math.floor(c * drawCell) + 0.5,
+                Math.floor(r * drawCell) + 0.5,
+                Math.max(0, drawCell - 1),
+                Math.max(0, drawCell - 1)
+              );
+            }
+          });
+        }
         if (visCell >= 2.5 && freeKeys.length > 1) {
           ctx.strokeStyle = 'rgba(139, 90, 43, 0.7)';
           ctx.lineWidth = hair;
@@ -3986,24 +4020,20 @@ Min 10 blocks · no maximum
           }
           ctx.stroke();
         }
-        // Outer frame — gold glass + marching ants (stepped dash offset)
+        // Outer frame — always visible at any zoom
         const dashA = Math.max(3, 6 / zNow);
         const dashB = Math.max(2, 4 / zNow);
-        ctx.strokeStyle = 'rgba(42, 33, 24, 0.92)';
-        ctx.lineWidth = hairFrame + 0.5;
+        const frameW = Math.max(1.5, hairFrame + (visCell < 2 ? 2 : 0.5));
+        ctx.strokeStyle = '#2a2118';
+        ctx.lineWidth = frameW;
         ctx.setLineDash([]);
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
-        // Marching ants gold border
-        ctx.strokeStyle = 'rgba(240, 193, 75, 0.95)';
-        ctx.lineWidth = Math.max(1, hairFrame);
+        ctx.strokeStyle = '#f0c14b';
+        ctx.lineWidth = Math.max(1.2, frameW * 0.9);
         ctx.setLineDash([dashA, dashB]);
         ctx.lineDashOffset = -(typeof antsOffset === 'number' ? antsOffset : 0);
-        ctx.strokeRect(bx + hairFrame + 0.5, by + hairFrame + 0.5, Math.max(0, bw - hairFrame * 2 - 1), Math.max(0, bh - hairFrame * 2 - 1));
-        // Soft inner gold wash edge
+        ctx.strokeRect(bx + 1.5, by + 1.5, Math.max(0, bw - 3), Math.max(0, bh - 3));
         ctx.setLineDash([]);
-        ctx.strokeStyle = 'rgba(212, 160, 23, 0.45)';
-        ctx.lineWidth = hair;
-        ctx.strokeRect(bx + hairFrame * 2 + 0.5, by + hairFrame * 2 + 0.5, Math.max(0, bw - hairFrame * 4 - 1), Math.max(0, bh - hairFrame * 4 - 1));
         ctx.restore();
       }
     }
@@ -4383,10 +4413,87 @@ Min 10 blocks · no maximum
     applyDrag();
   }
 
+  function ownerTipHtml(r, touch) {
+    const nm = escapeHtml(r.name || 'Anonymous');
+    const desc = r.desc ? escapeHtml(String(r.desc).slice(0, 160)) : '';
+    const px = r.pixels || (r.cells && r.cells.length) || 0;
+    let timeLeft = '';
+    try { timeLeft = left(r); } catch (e) {}
+    return (
+      '<div style="font-family:VT323,monospace;font-size:1rem;color:var(--muted);letter-spacing:0.5px;margin-bottom:2px">Owned by</div>' +
+      '<strong style="display:block;color:var(--dark);font-size:1.15rem;line-height:1.35;margin-bottom:4px">' +
+      (r.country ? countryFlag(r.country) + ' ' : '') + nm + '</strong>' +
+      (desc ? '<span class="tip-desc">' + desc + '</span>' : '') +
+      '<div style="margin-top:6px;color:var(--dark);font-size:1rem">' + px + ' px' +
+      (timeLeft ? ' · ' + escapeHtml(timeLeft) : '') + '</div>' +
+      (r.link && safeUrl(r.link)
+        ? '<div style="margin-top:4px;color:var(--gold);font-size:0.95rem">' +
+          (touch ? 'Tap Open to visit link' : 'Click → open link') + '</div>'
+        : '') +
+      (touch
+        ? '<button type="button" class="tip-close" id="tipCloseBtn">CLOSE</button>' +
+          (r.link && safeUrl(r.link)
+            ? '<button type="button" class="tip-close" id="tipOpenBtn" style="margin-top:6px;background:#fff;color:var(--dark)">OPEN LINK</button>'
+            : '')
+        : '')
+    );
+  }
+
+  function placeTip(clientX, clientY) {
+    if (!tip) return;
+    tip.style.display = 'block';
+    // Measure after content is set
+    const pad = 12;
+    const tw = tip.offsetWidth || 240;
+    const th = tip.offsetHeight || 80;
+    const vw = window.innerWidth || 360;
+    const vh = window.innerHeight || 640;
+    let x = (clientX != null ? clientX : vw / 2) + 14;
+    let y = (clientY != null ? clientY : vh / 2) - 10;
+    if (x + tw > vw - pad) x = Math.max(pad, clientX - tw - 12);
+    if (x < pad) x = pad;
+    if (y + th > vh - pad) y = Math.max(pad, vh - th - pad);
+    if (y < pad) y = pad;
+    tip.style.left = Math.round(x) + 'px';
+    tip.style.top = Math.round(y) + 'px';
+  }
+
+  function hideTip() {
+    if (!tip) return;
+    tip.style.display = 'none';
+    tip.classList.remove('tip-touch');
+    tip.innerHTML = '';
+  }
+
+  function showOwnerTip(r, clientX, clientY, touch) {
+    if (!tip || !r) return;
+    tip.classList.toggle('tip-touch', !!touch);
+    tip.innerHTML = ownerTipHtml(r, !!touch);
+    tip.style.display = 'block';
+    placeTip(clientX, clientY);
+    if (touch) {
+      const close = $('tipCloseBtn');
+      if (close) close.onclick = (ev) => { ev.preventDefault(); hideTip(); };
+      const open = $('tipOpenBtn');
+      if (open) {
+        open.onclick = (ev) => {
+          ev.preventDefault();
+          const lu = safeUrl(r.link);
+          if (lu) window.open(lu, '_blank', 'noopener,noreferrer');
+          hideTip();
+        };
+      }
+    }
+  }
+
   function onMove(e) {
     const cx = e.clientX ?? e.touches?.[0]?.clientX;
     const cy = e.clientY ?? e.touches?.[0]?.clientY;
     if (!dragging) {
+      // Skip hover tips on touch devices (use tap instead)
+      if (e.touches || (window.matchMedia && window.matchMedia('(hover: none)').matches)) {
+        return;
+      }
       try {
         const p = pos(e);
         const r = sold.get(p.c + ',' + p.r);
@@ -4396,23 +4503,13 @@ Min 10 blocks · no maximum
             hoverPulse = 0;
             try { scheduleDraw(); } catch (e) {}
           }
-          const nm = escapeHtml(r.name || 'Anonymous');
-          const desc = r.desc ? escapeHtml(String(r.desc).slice(0, 200)) : '';
-          tip.innerHTML =
-            '<div style="font-family:VT323,monospace;font-size:1rem;color:var(--muted);letter-spacing:0.5px;margin-bottom:2px">Owned by</div>' +
-            '<strong style="display:block;color:var(--dark);font-size:1.35rem;line-height:1.2;margin-bottom:4px">' +
-            (r.country ? countryFlag(r.country) + ' ' : '') + nm + '</strong>' +
-            (desc ? '<span style="display:block;color:var(--muted);font-size:1rem">' + desc + '</span>' : '') +
-            (r.link && safeUrl(r.link) ? '<br><em style="color:var(--gold);font-size:0.95rem">Click → open link</em>' : '');
-          tip.style.display = 'block';
-          tip.style.left = Math.min((e.pageX || cx || 0) + 14, window.innerWidth - 200) + 'px';
-          tip.style.top = Math.max(8, (e.pageY || cy || 0) - 10) + 'px';
-        } else if (tip) {
+          showOwnerTip(r, cx, cy, false);
+        } else if (tip && !tip.classList.contains('tip-touch')) {
           if (hoverRegion) {
             hoverRegion = null;
             try { scheduleDraw(); } catch (e) {}
           }
-          tip.style.display = 'none';
+          hideTip();
         }
       } catch (err) {}
       return;
@@ -4467,7 +4564,8 @@ Min 10 blocks · no maximum
   canvas.addEventListener('pointerenter', forceCrosshair);
   canvas.addEventListener('pointermove', forceCrosshair);
   canvas.addEventListener('mouseleave', () => {
-    tip.style.display = 'none';
+    if (tip && tip.classList.contains('tip-touch')) return; // keep mobile tip open
+    hideTip();
     if (hoverRegion) {
       hoverRegion = null;
       try { scheduleDraw(); } catch (e) {}
@@ -4481,7 +4579,11 @@ Min 10 blocks · no maximum
     }
     const p = pos(e);
     const r = sold.get(p.c + ',' + p.r);
-    if (!r) return;
+    if (!r) {
+      // Tap empty space dismisses mobile tip
+      if (tip && tip.classList.contains('tip-touch')) hideTip();
+      return;
+    }
     if (adminMode || devMode) {
       try {
         if (typeof openAdminEdit === 'function') openAdminEdit(r);
@@ -4492,6 +4594,17 @@ Min 10 blocks · no maximum
       }
       return;
     }
+    // Mobile / no-hover: show owner card on tap
+    const isTouch = (window.matchMedia && window.matchMedia('(hover: none)').matches) ||
+      (e.detail === 0) || ('ontouchstart' in window);
+    if (isTouch) {
+      hoverRegion = r;
+      hoverPulse = 0;
+      try { scheduleDraw(); } catch (err) {}
+      showOwnerTip(r, e.clientX, e.clientY, true);
+      return;
+    }
+    // Desktop: toast + optional link
     const ownerName = r.name || 'Anonymous';
     const px = r.pixels || (r.cells && r.cells.length) || 0;
     toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
@@ -7141,11 +7254,19 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
   }, { passive: true });
-  if ($('zoomIn')) $('zoomIn').onclick = () => bumpZoom(0.25, lastMouseX, lastMouseY);
-  if ($('zoomOut')) $('zoomOut').onclick = () => bumpZoom(-0.25, lastMouseX, lastMouseY);
+  if ($('zoomIn')) $('zoomIn').onclick = () => {
+    bumpZoom(0.25, lastMouseX, lastMouseY);
+    try { updateFloat(); scheduleDraw(); } catch (e) {}
+  };
+  if ($('zoomOut')) $('zoomOut').onclick = () => {
+    bumpZoom(-0.25, lastMouseX, lastMouseY);
+    try { updateFloat(); scheduleDraw(); } catch (e) {}
+  };
   if ($('zoomFit')) $('zoomFit').onclick = () => {
+    // Keep current pixel selection when fitting the wall
     resize(true);
-    toast('FULL WALL', 'ok');
+    try { updateFloat(); scheduleDraw(); } catch (e) {}
+    toast(selected.size ? ('FULL WALL · ' + selected.size + ' PX selected') : 'FULL WALL', 'ok');
   };
   // Navigation: scroll/trackpad = pan · pinch or Ctrl+wheel = zoom toward cursor
   viewport.addEventListener('wheel', e => {

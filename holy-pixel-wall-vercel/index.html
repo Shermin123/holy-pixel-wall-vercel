@@ -1842,92 +1842,110 @@
   .pixel-buy:hover:not(.is-active)::after { display: none; }
 }
 
-/* ===== Self-destruct strip — neat pixel chip ===== */
+/* ===== Self-destruct strip — high-contrast pixel countdown ===== */
 .hpw-destruct {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
-  min-height: 28px;
-  padding: 5px 12px;
-  background: linear-gradient(180deg, #2a2118 0%, #3d2b1a 100%);
-  border-bottom: 2px solid #c9a34e;
-  box-shadow: 0 2px 0 rgba(201, 163, 78, 0.35);
-  color: #f5efe3;
+  min-height: 36px;
+  padding: 8px 14px;
+  background: linear-gradient(180deg, #1a1512 0%, #2a2118 55%, #3d2b1a 100%);
+  border-bottom: 3px solid #f0c14b;
+  box-shadow: 0 3px 0 #c9a34e;
+  color: #fff8e8;
   z-index: 80;
   font-family: 'VT323', monospace;
-  font-size: 0.95rem;
+  font-size: 1.15rem;
   letter-spacing: 0.5px;
 }
 .hpw-destruct__label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.28rem;
+  font-size: 0.42rem;
+  line-height: 1.35;
   color: #f0c14b;
   letter-spacing: 1px;
   white-space: nowrap;
+  text-shadow: 1px 1px 0 #000;
 }
 .hpw-destruct__dot {
-  width: 6px;
-  height: 6px;
-  background: #a84c32;
-  box-shadow: 0 0 0 1px #2a2118, 0 0 4px rgba(168, 76, 50, 0.7);
+  width: 8px;
+  height: 8px;
+  background: #e85a3c;
+  border: 1px solid #fff8e8;
+  box-shadow: 0 0 0 1px #2a2118, 0 0 6px rgba(232, 90, 60, 0.85);
   animation: hpwDestructBlink 1.4s steps(2) infinite;
   flex-shrink: 0;
 }
 @keyframes hpwDestructBlink {
   0%, 45% { opacity: 1; }
-  46%, 100% { opacity: 0.25; }
+  46%, 100% { opacity: 0.3; }
 }
 .hpw-destruct__msg {
   color: #e8dcc4;
   white-space: nowrap;
+  font-size: 1.2rem;
 }
 .hpw-destruct__msg strong {
   color: #fff8e8;
   font-weight: normal;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 1px;
 }
 .hpw-destruct__sep {
   color: #c9a34e;
-  opacity: 0.7;
+  opacity: 0.85;
+  font-size: 1.1rem;
 }
 .hpw-destruct__count {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  align-items: baseline;
+  gap: 8px;
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.26rem;
+  font-size: 0.48rem;
+  line-height: 1.4;
   color: #fff8e8;
-  background: #1a1512;
-  border: 2px solid #c9a34e;
-  box-shadow: 2px 2px 0 #5c3d1e;
-  padding: 4px 8px;
+  background: #0d0a08;
+  border: 3px solid #f0c14b;
+  box-shadow: 3px 3px 0 #5c3d1e;
+  padding: 7px 12px;
   white-space: nowrap;
+}
+.hpw-destruct__cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
 }
 .hpw-destruct__unit {
   color: #c9a34e;
-  margin-right: 2px;
+  font-size: 0.32rem;
+  letter-spacing: 0.5px;
 }
 .hpw-destruct__num {
-  color: #f0c14b;
-  min-width: 1.1em;
+  color: #ffe566;
+  min-width: 1.25em;
   display: inline-block;
   text-align: right;
+  text-shadow: 1px 1px 0 #000;
 }
 @media (max-width: 700px) {
   .hpw-destruct {
-    min-height: 24px;
-    padding: 4px 8px;
-    gap: 6px;
-    font-size: 0.85rem;
+    min-height: 32px;
+    padding: 6px 8px;
+    gap: 8px;
+    font-size: 1rem;
   }
-  .hpw-destruct__label { font-size: 0.22rem; }
-  .hpw-destruct__count { font-size: 0.2rem; padding: 3px 6px; gap: 3px; }
-  .hpw-destruct__msg { font-size: 0.8rem; }
+  .hpw-destruct__label { font-size: 0.32rem; }
+  .hpw-destruct__count { font-size: 0.34rem; padding: 5px 8px; gap: 5px; }
+  .hpw-destruct__unit { font-size: 0.26rem; }
+  .hpw-destruct__msg { font-size: 1rem; }
+  .hpw-destruct__msg strong { font-size: 0.4rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hpw-destruct__dot { animation: none !important; opacity: 1; }
@@ -1940,14 +1958,14 @@
 <div class="hpw-destruct" id="hpwDestruct" role="status" aria-live="polite" title="Scheduled end of service">
   <span class="hpw-destruct__label"><span class="hpw-destruct__dot" aria-hidden="true"></span> SELF-DESTRUCT</span>
   <span class="hpw-destruct__sep">·</span>
-  <span class="hpw-destruct__msg">Website will self-destroy in <strong>2100</strong></span>
+  <span class="hpw-destruct__msg">Wall ends <strong>2100</strong></span>
   <span class="hpw-destruct__sep">·</span>
   <span class="hpw-destruct__count" id="hpwDestructCount" aria-label="Countdown to 2100">
-    <span class="hpw-destruct__num" id="hpwY">—</span><span class="hpw-destruct__unit">Y</span>
-    <span class="hpw-destruct__num" id="hpwD">—</span><span class="hpw-destruct__unit">D</span>
-    <span class="hpw-destruct__num" id="hpwH">—</span><span class="hpw-destruct__unit">H</span>
-    <span class="hpw-destruct__num" id="hpwM">—</span><span class="hpw-destruct__unit">M</span>
-    <span class="hpw-destruct__num" id="hpwS">—</span><span class="hpw-destruct__unit">S</span>
+    <span class="hpw-destruct__cell"><span class="hpw-destruct__num" id="hpwY">—</span><span class="hpw-destruct__unit">Y</span></span>
+    <span class="hpw-destruct__cell"><span class="hpw-destruct__num" id="hpwD">—</span><span class="hpw-destruct__unit">D</span></span>
+    <span class="hpw-destruct__cell"><span class="hpw-destruct__num" id="hpwH">—</span><span class="hpw-destruct__unit">H</span></span>
+    <span class="hpw-destruct__cell"><span class="hpw-destruct__num" id="hpwM">—</span><span class="hpw-destruct__unit">M</span></span>
+    <span class="hpw-destruct__cell"><span class="hpw-destruct__num" id="hpwS">—</span><span class="hpw-destruct__unit">S</span></span>
   </span>
 </div>
 
@@ -2679,8 +2697,12 @@ Min 10 blocks · no maximum
     toastEl.classList.add('show');
     clearTimeout(toastEl._t);
     toastEl._t = setTimeout(() => toastEl.classList.remove('show', 'toast-err', 'toast-ok'), kind === 'error' ? 4200 : 2600);
+    // Confetti only for real claim/payment success — not every OK toast (e.g. photo loaded)
     if (kind === 'ok' && typeof hpwConfettiBurst === 'function') {
-      try { hpwConfettiBurst(); } catch (e) {}
+      const t = String(msg || '').toLowerCase();
+      if (/paid|claimed|payment ok|pixels claimed/.test(t)) {
+        try { hpwConfettiBurst(); } catch (e) {}
+      }
     }
   }
 
@@ -2831,7 +2853,10 @@ Min 10 blocks · no maximum
       need = true;
     }
     if (need) {
-      try { scheduleDraw(); } catch (e) {}
+      try {
+        if (typeof scheduleDraw === 'function') scheduleDraw();
+        else if (typeof draw === 'function') draw();
+      } catch (e) {}
     }
   }
   try {
@@ -5057,44 +5082,52 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
 
   function setPending(src, type) {
     if (!src) return;
-    // Drop cached decode of previous pending image so 2nd upload always shows
-    if (pendingMedia && pendingMedia !== src && typeof imgCache !== 'undefined' && imgCache.has(pendingMedia)) {
-      imgCache.delete(pendingMedia);
+    try {
+      // Drop cached decode of previous pending image so 2nd upload always shows
+      if (pendingMedia && pendingMedia !== src && typeof imgCache !== 'undefined' && imgCache.has(pendingMedia)) {
+        imgCache.delete(pendingMedia);
+      }
+      pendingMedia = src;
+      pendingType = type || detectMediaType(src) || 'image';
+      crop = { scale: 1, x: 0.5, y: 0.5 };
+      if (upload) upload.classList.add('has');
+      if ($('fitRow')) $('fitRow').style.display = 'flex';
+      if ($('fitHint')) $('fitHint').style.display = 'block';
+      if (pendingType === 'video') {
+        if (previewImg) {
+          previewImg.style.display = 'none';
+          previewImg.removeAttribute('src');
+        }
+        if (previewVideo) {
+          previewVideo.style.display = 'block';
+          previewVideo.src = src;
+          previewVideo.play().catch(() => {});
+        }
+      } else {
+        if (previewVideo) {
+          try { previewVideo.pause(); } catch (e) {}
+          previewVideo.style.display = 'none';
+          previewVideo.removeAttribute('src');
+        }
+        if (previewImg) {
+          previewImg.style.display = 'block';
+          previewImg.onerror = () => { try { toast('Preview failed — try another file', 'error'); } catch (e) {} };
+          // force reload even if browser cached empty
+          try {
+            previewImg.removeAttribute('src');
+            previewImg.src = src;
+          } catch (e) {}
+        }
+      }
+      // Refresh wall + modal block preview (never let this throw out of setPending)
+      try { if (typeof draw === 'function') draw(); } catch (e) {}
+      try { bindPreviewControls(); } catch (e) {}
+      try { updateBlockPreview(); } catch (e) {}
+      try { refreshClaimValidation(); } catch (e) {}
+    } catch (err) {
+      console.warn('setPending', err);
+      try { toast('Could not load media — try JPG or PNG', 'error'); } catch (e) {}
     }
-    pendingMedia = src;
-    pendingType = type || detectMediaType(src);
-    crop = { scale: 1, x: 0.5, y: 0.5 };
-    upload.classList.add('has');
-    if ($('fitRow')) $('fitRow').style.display = 'flex';
-    if ($('fitHint')) $('fitHint').style.display = 'block';
-    if (pendingType === 'video') {
-      if (previewImg) {
-        previewImg.style.display = 'none';
-        previewImg.removeAttribute('src');
-      }
-      if (previewVideo) {
-        previewVideo.style.display = 'block';
-        previewVideo.src = src;
-        previewVideo.play().catch(() => {});
-      }
-    } else {
-      if (previewVideo) {
-        previewVideo.pause();
-        previewVideo.style.display = 'none';
-        previewVideo.removeAttribute('src');
-      }
-      if (previewImg) {
-        previewImg.style.display = 'block';
-        previewImg.onerror = () => toast('Preview failed — try another file', 'error');
-        // force reload even if browser cached empty
-        previewImg.src = '';
-        previewImg.src = src;
-      }
-    }
-    // Refresh wall + modal block preview
-    try { draw(); } catch (e) {}
-    try { bindPreviewControls(); updateBlockPreview(); } catch (e) {}
-    try { refreshClaimValidation(); } catch (e) {}
   }
 
   function selectionBounds() {
@@ -5134,63 +5167,74 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   function updateBlockPreview() {
     const wrap = $('blockPreviewWrap');
     const cv = $('blockPreview');
-    const stage = $('previewStage');
-    if (!wrap || !cv || !stage) return;
-    const b = previewBlockBounds();
-    if (!pendingMedia || !b || pendingType === 'video') {
-      if (pendingType === 'video' && pendingMedia && b) {
-        wrap.style.display = 'block';
-        const maxW = Math.min(320, (stage.parentElement && stage.parentElement.clientWidth) || 320);
-        const aspect = b.w / Math.max(1, b.h);
-        let pw = maxW, ph = Math.round(maxW / aspect);
-        if (ph > 200) { ph = 200; pw = Math.round(200 * aspect); }
-        stage.style.width = pw + 'px';
-        stage.style.height = ph + 'px';
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        cv.width = Math.round(pw * dpr);
-        cv.height = Math.round(ph * dpr);
-        const c = cv.getContext('2d');
-        c.setTransform(dpr, 0, 0, dpr, 0, 0);
-        c.fillStyle = '#1a1512';
-        c.fillRect(0, 0, pw, ph);
-        c.fillStyle = '#c4a574';
-        c.font = '14px sans-serif';
-        c.textAlign = 'center';
-        c.fillText('Video fills this block', pw / 2, ph / 2);
-      } else {
-        wrap.style.display = 'none';
+    const pStage = $('previewStage');
+    if (!wrap || !cv || !pStage) return;
+    try {
+      const b = previewBlockBounds();
+      if (!pendingMedia || !b || pendingType === 'video') {
+        if (pendingType === 'video' && pendingMedia && b) {
+          wrap.style.display = 'block';
+          const maxW = Math.min(320, (pStage.parentElement && pStage.parentElement.clientWidth) || 320);
+          const aspect = b.w / Math.max(1, b.h);
+          let pw = maxW, ph = Math.round(maxW / aspect);
+          if (ph > 200) { ph = 200; pw = Math.round(200 * aspect); }
+          pStage.style.width = pw + 'px';
+          pStage.style.height = ph + 'px';
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          cv.width = Math.max(1, Math.round(pw * dpr));
+          cv.height = Math.max(1, Math.round(ph * dpr));
+          const c = cv.getContext('2d');
+          if (!c) return;
+          c.setTransform(dpr, 0, 0, dpr, 0, 0);
+          c.fillStyle = '#1a1512';
+          c.fillRect(0, 0, pw, ph);
+          c.fillStyle = '#c4a574';
+          c.font = '14px sans-serif';
+          c.textAlign = 'center';
+          c.fillText('Video fills this block', pw / 2, ph / 2);
+        } else {
+          wrap.style.display = 'none';
+        }
+        return;
       }
-      return;
+      wrap.style.display = 'block';
+      const maxW = Math.min(320, (wrap.clientWidth || 320));
+      const aspect = b.w / Math.max(1, b.h);
+      let pw = maxW, ph = Math.round(maxW / aspect);
+      if (ph > 220) { ph = 220; pw = Math.round(220 * aspect); }
+      pw = Math.max(80, pw); ph = Math.max(80, ph);
+      pStage.style.width = pw + 'px';
+      pStage.style.height = ph + 'px';
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      cv.width = Math.max(1, Math.round(pw * dpr));
+      cv.height = Math.max(1, Math.round(ph * dpr));
+      const c = cv.getContext('2d');
+      if (!c) return;
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.fillStyle = '#1a1512';
+      c.fillRect(0, 0, pw, ph);
+      const img = getImg(pendingMedia);
+      if (img && img.complete && img.naturalWidth) {
+        try {
+          drawCoverCrop(c, img, 0, 0, pw, ph, crop.scale, crop.x, crop.y);
+        } catch (e) { console.warn('crop preview', e); }
+      } else if (img) {
+        const onReady = () => {
+          try { updateBlockPreview(); } catch (e) {}
+          try { if (typeof scheduleDraw === 'function') scheduleDraw(); else if (typeof draw === 'function') draw(); } catch (e) {}
+        };
+        img.addEventListener('load', onReady, { once: true });
+      }
+      c.strokeStyle = '#d4a017';
+      c.lineWidth = 2;
+      c.strokeRect(1, 1, pw - 2, ph - 2);
+      const zl = $('zoomPreviewLabel');
+      if (zl) zl.textContent = Math.round(((crop && crop.scale) || 1) * 100) + '%';
+      const sl = $('cropZoomSlider');
+      if (sl && document.activeElement !== sl) sl.value = String(Math.round(((crop && crop.scale) || 1) * 100));
+    } catch (err) {
+      console.warn('updateBlockPreview', err);
     }
-    wrap.style.display = 'block';
-    const maxW = Math.min(320, (wrap.clientWidth || 320));
-    const aspect = b.w / Math.max(1, b.h);
-    let pw = maxW, ph = Math.round(maxW / aspect);
-    if (ph > 220) { ph = 220; pw = Math.round(220 * aspect); }
-    pw = Math.max(80, pw); ph = Math.max(80, ph);
-    stage.style.width = pw + 'px';
-    stage.style.height = ph + 'px';
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    cv.width = Math.round(pw * dpr);
-    cv.height = Math.round(ph * dpr);
-    const c = cv.getContext('2d');
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    c.fillStyle = '#1a1512';
-    c.fillRect(0, 0, pw, ph);
-    const img = getImg(pendingMedia);
-    if (img && img.complete) {
-      drawCoverCrop(c, img, 0, 0, pw, ph, crop.scale, crop.x, crop.y);
-    } else if (img) {
-      img.onload = () => { try { updateBlockPreview(); draw(); } catch (e) {} };
-    }
-    // frame
-    c.strokeStyle = '#d4a017';
-    c.lineWidth = 2;
-    c.strokeRect(1, 1, pw - 2, ph - 2);
-    const zl = $('zoomPreviewLabel');
-    if (zl) zl.textContent = Math.round(crop.scale * 100) + '%';
-    const sl = $('cropZoomSlider');
-    if (sl && document.activeElement !== sl) sl.value = String(Math.round(crop.scale * 100));
   }
 
   
@@ -5265,22 +5309,24 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     }
   }
 
-function clearPending() {
+  function clearPending() {
     mediaGen++; // invalidate in-flight optimize
-    if (pendingMedia && typeof imgCache !== 'undefined') imgCache.delete(pendingMedia);
+    try {
+      if (pendingMedia && typeof imgCache !== 'undefined') imgCache.delete(pendingMedia);
+    } catch (e) {}
     pendingMedia = '';
     pendingType = 'image';
-    upload.classList.remove('has');
+    if (upload) upload.classList.remove('has');
     if ($('fitRow')) $('fitRow').style.display = 'none';
     if ($('fitHint')) $('fitHint').style.display = 'none';
     if (previewImg) {
-      previewImg.removeAttribute('src');
+      try { previewImg.removeAttribute('src'); } catch (e) {}
       previewImg.style.display = 'none';
     }
     if (previewVideo) {
-      previewVideo.pause();
+      try { previewVideo.pause(); } catch (e) {}
       previewVideo.style.display = 'none';
-      previewVideo.removeAttribute('src');
+      try { previewVideo.removeAttribute('src'); } catch (e) {}
     }
     if ($('file')) $('file').value = '';
     if ($('imgUrl')) $('imgUrl').value = '';
@@ -5358,60 +5404,77 @@ function clearPending() {
 
   function handleFile(f) {
     if (!f) return;
-    const myGen = ++mediaGen;
-    const type = (f.type || '').toLowerCase();
-    const name = (f.name || '').toLowerCase();
-    const isVideo = type.startsWith('video/') || /\.(mp4|webm|mov|ogg)$/.test(name);
-    const isGif = type === 'image/gif' || /\.gif$/.test(name);
-    const isImage = type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)$/.test(name);
-    if (!isVideo && !isImage) {
-      toast('USE PNG, JPG, GIF, WEBP, OR MP4/WEBM');
-      return;
-    }
-    if (/heic|heif/i.test(type) || /\.(heic|heif)$/.test(name)) {
-      toast('HEIC NOT SUPPORTED — USE JPG OR PNG');
-      return;
-    }
-    if (isVideo && f.size > 40 * 1024 * 1024) {
-      toast('VIDEO TOO LARGE (MAX 40MB)', 'error');
-      return;
-    }
-    if (!isVideo && f.size > 25 * 1024 * 1024) {
-      toast('IMAGE TOO LARGE (MAX 25MB)', 'error');
-      return;
-    }
-    toast(isVideo ? 'LOADING VIDEO…' : (isGif ? 'LOADING GIF…' : 'LOADING HIGH-QUALITY PHOTO…'));
-    if (isVideo) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        if (myGen !== mediaGen) return;
-        setPending(e.target.result, 'video');
-        toast('VIDEO READY — clear & looping', 'ok');
-      };
-      reader.onerror = () => { if (myGen === mediaGen) toast('Could not read video', 'error'); };
-      reader.readAsDataURL(f);
-      if ($('file')) $('file').value = '';
-      return;
-    }
-    optimizeImageFile(f)
-      .then(dataUrl => {
-        if (myGen !== mediaGen) return;
-        const mediaType = (type === 'image/gif' || name.endsWith('.gif')) ? 'gif' : 'image';
-        setPending(dataUrl, mediaType);
-        toast(mediaType === 'gif' ? 'GIF READY — animated' : 'PHOTO READY — high quality', 'ok');
-      })
-      .catch(() => {
-        if (myGen !== mediaGen) return;
+    try {
+      const myGen = ++mediaGen;
+      const type = (f.type || '').toLowerCase();
+      const name = (f.name || '').toLowerCase();
+      const isVideo = type.startsWith('video/') || /\.(mp4|webm|mov|ogg)$/.test(name);
+      const isGif = type === 'image/gif' || /\.gif$/.test(name);
+      const isImage = type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)$/.test(name);
+      if (!isVideo && !isImage) {
+        toast('USE PNG, JPG, GIF, WEBP, OR MP4/WEBM', 'error');
+        return;
+      }
+      if (/heic|heif/i.test(type) || /\.(heic|heif)$/.test(name)) {
+        toast('HEIC NOT SUPPORTED — USE JPG OR PNG', 'error');
+        return;
+      }
+      if (isVideo && f.size > 40 * 1024 * 1024) {
+        toast('VIDEO TOO LARGE (MAX 40MB)', 'error');
+        return;
+      }
+      if (!isVideo && f.size > 25 * 1024 * 1024) {
+        toast('IMAGE TOO LARGE (MAX 25MB)', 'error');
+        return;
+      }
+      toast(isVideo ? 'LOADING VIDEO…' : (isGif ? 'LOADING GIF…' : 'LOADING HIGH-QUALITY PHOTO…'));
+      if (isVideo) {
         const reader = new FileReader();
         reader.onload = e => {
           if (myGen !== mediaGen) return;
-          setPending(e.target.result, detectMediaType(e.target.result, type));
-          toast('PHOTO ADDED');
+          try {
+            setPending(e.target.result, 'video');
+            toast('VIDEO READY — clear & looping', 'ok');
+          } catch (err) {
+            toast('Could not load video', 'error');
+          }
         };
-        reader.onerror = () => toast('Could not read image — try JPG or PNG', 'error');
+        reader.onerror = () => { if (myGen === mediaGen) toast('Could not read video', 'error'); };
         reader.readAsDataURL(f);
-      })
-      .finally(() => { if ($('file')) $('file').value = ''; });
+        if ($('file')) $('file').value = '';
+        return;
+      }
+      optimizeImageFile(f)
+        .then(dataUrl => {
+          if (myGen !== mediaGen) return;
+          try {
+            const mediaType = (type === 'image/gif' || name.endsWith('.gif')) ? 'gif' : 'image';
+            setPending(dataUrl, mediaType);
+            toast(mediaType === 'gif' ? 'GIF READY — animated' : 'PHOTO READY — high quality', 'ok');
+          } catch (err) {
+            toast('Could not load photo', 'error');
+          }
+        })
+        .catch(() => {
+          if (myGen !== mediaGen) return;
+          const reader = new FileReader();
+          reader.onload = e => {
+            if (myGen !== mediaGen) return;
+            try {
+              setPending(e.target.result, detectMediaType(e.target.result, type));
+              toast('PHOTO ADDED', 'ok');
+            } catch (err) {
+              toast('Could not load image — try JPG or PNG', 'error');
+            }
+          };
+          reader.onerror = () => toast('Could not read image — try JPG or PNG', 'error');
+          reader.readAsDataURL(f);
+        })
+        .finally(() => { if ($('file')) $('file').value = ''; });
+    } catch (err) {
+      console.warn('handleFile', err);
+      try { toast('Upload failed — try a smaller JPG/PNG', 'error'); } catch (e) {}
+    }
   }
 
   $('file').onchange = () => handleFile($('file').files[0]);

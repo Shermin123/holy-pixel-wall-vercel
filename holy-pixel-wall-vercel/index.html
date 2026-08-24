@@ -4325,6 +4325,14 @@ Min 10 blocks · no maximum
     box.onclick = e => { if (e.target === box) box.remove(); };
   }
 
+  function cellSelectable(c, r) {
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
+    const k = c + ',' + r;
+    if (!sold.has(k)) return true;
+    // During admin resize, only this claim’s own cells are allowed — never another image
+    return !!(adminMode && typeof cellOwnedByEditing === 'function' && cellOwnedByEditing(k));
+  }
+
   function applyDrag() {
     if (!Number.isFinite(startC) || !Number.isFinite(curC)) return;
     let minC = Math.max(0, Math.min(startC, curC));
@@ -4334,66 +4342,46 @@ Min 10 blocks · no maximum
     if (maxC < minC || maxR < minR) return;
 
     const aC = startC, aR = startR;
-    if (sold.has(aC + ',' + aR) && !(adminMode && cellOwnedByEditing(aC + ',' + aR))) {
+    if (!cellSelectable(aC, aR)) {
       selected = new Set();
       try { draw(); } catch (err) {}
       try { updateFloat(); } catch (err) {}
       return;
     }
 
-    function rectHasSold(c0, c1, r0, r1) {
+    function findForeignInRect(c0, c1, r0, r1) {
       for (let c = c0; c <= c1; c++)
-        for (let r = r0; r <= r1; r++) {
-          const k = c + ',' + r;
-          if (!sold.has(k)) continue;
-          if (adminMode && cellOwnedByEditing(k)) continue;
-          return true;
-        }
-      return false;
+        for (let r = r0; r <= r1; r++)
+          if (!cellSelectable(c, r)) return { c: c, r: r };
+      return null;
     }
 
-    // Shrink drag box until it is a solid free rectangle (keep start anchor)
+    // Shrink until the full rectangle has zero cells from other claims
+    // (handles obstacles on the edge AND fully inside the drag box)
     let guard = 0;
     let snapped = false;
-    while (rectHasSold(minC, maxC, minR, maxR) && guard++ < 20000) {
+    let foreign = findForeignInRect(minC, maxC, minR, maxR);
+    while (foreign && guard++ < 50000) {
       snapped = true;
-      let shrinkMaxC = false, shrinkMinC = false, shrinkMaxR = false, shrinkMinR = false;
-      for (let r = minR; r <= maxR; r++) {
-        const k1 = maxC + ',' + r, k2 = minC + ',' + r;
-        if (sold.has(k1) && !(adminMode && cellOwnedByEditing(k1))) shrinkMaxC = true;
-        if (sold.has(k2) && !(adminMode && cellOwnedByEditing(k2))) shrinkMinC = true;
-      }
-      for (let c = minC; c <= maxC; c++) {
-        const k3 = c + ',' + maxR, k4 = c + ',' + minR;
-        if (sold.has(k3) && !(adminMode && cellOwnedByEditing(k3))) shrinkMaxR = true;
-        if (sold.has(k4) && !(adminMode && cellOwnedByEditing(k4))) shrinkMinR = true;
-      }
-      const opts = [];
-      // Prefer shrinking edges away from the drag start point
-      if (shrinkMaxC && maxC > minC && maxC !== aC) opts.push(['maxC', Math.abs(maxC - aC)]);
-      if (shrinkMinC && maxC > minC && minC !== aC) opts.push(['minC', Math.abs(minC - aC)]);
-      if (shrinkMaxR && maxR > minR && maxR !== aR) opts.push(['maxR', Math.abs(maxR - aR)]);
-      if (shrinkMinR && maxR > minR && minR !== aR) opts.push(['minR', Math.abs(minR - aR)]);
-      if (!opts.length) {
-        if (shrinkMaxC && maxC > minC) opts.push(['maxC', 1]);
-        else if (shrinkMinC && maxC > minC) opts.push(['minC', 1]);
-        else if (shrinkMaxR && maxR > minR) opts.push(['maxR', 1]);
-        else if (shrinkMinR && maxR > minR) opts.push(['minR', 1]);
-        else break;
-      }
-      opts.sort((x, y) => y[1] - x[1]);
-      const pick = opts[0][0];
-      if (pick === 'maxC') maxC--;
-      else if (pick === 'minC') minC++;
-      else if (pick === 'maxR') maxR--;
-      else if (pick === 'minR') minR++;
+      const fc = foreign.c, fr = foreign.r;
+      if (fc === maxC && maxC > minC) maxC--;
+      else if (fc === minC && maxC > minC) minC++;
+      else if (fr === maxR && maxR > minR) maxR--;
+      else if (fr === minR && maxR > minR) minR++;
+      else if (fc > aC) maxC = Math.max(aC, fc - 1);
+      else if (fc < aC) minC = Math.min(aC, fc + 1);
+      else if (fr > aR) maxR = Math.max(aR, fr - 1);
+      else if (fr < aR) minR = Math.min(aR, fr + 1);
+      else break;
+      if (minC > maxC || minR > maxR) break;
+      foreign = findForeignInRect(minC, maxC, minR, maxR);
     }
 
-    if (minC > maxC || minR > maxR || rectHasSold(minC, maxC, minR, maxR)) {
+    if (minC > maxC || minR > maxR || findForeignInRect(minC, maxC, minR, maxR)) {
       selected = new Set();
       if (tip) {
         tip.style.display = 'block';
-        tip.innerHTML = '<strong>NO FREE SPACE</strong>Drag over free pixels only';
+        tip.innerHTML = '<strong>BLOCKED</strong>Cannot cover another claim — free space only';
       }
       try { draw(); } catch (err) {}
       try { updateFloat(); } catch (err) {}
@@ -4401,14 +4389,23 @@ Min 10 blocks · no maximum
     }
 
     const next = new Set();
-    for (let c = minC; c <= maxC; c++)
-      for (let r = minR; r <= maxR; r++)
-        next.add(c + ',' + r);
+    for (let c = minC; c <= maxC; c++) {
+      for (let r = minR; r <= maxR; r++) {
+        if (cellSelectable(c, r)) next.add(c + ',' + r);
+      }
+    }
+    // Final safety: never keep a foreign cell
+    next.forEach(k => {
+      const p = String(k).split(',').map(Number);
+      if (!cellSelectable(p[0], p[1])) next.delete(k);
+    });
     selected = next;
 
     if (snapped && tip) {
       tip.style.display = 'block';
-      tip.innerHTML = '<strong>' + next.size + ' PIXELS</strong>$' + price().toFixed(2) + ' each · total $' + (next.size * price()).toFixed(2);
+      tip.innerHTML = adminMode && editingRegion
+        ? ('<strong>' + next.size + ' PIXELS</strong>Resize · cannot cover other claims')
+        : ('<strong>' + next.size + ' PIXELS</strong>$' + price().toFixed(2) + ' each · total $' + (next.size * price()).toFixed(2));
     }
     try { draw(); } catch (err) { console.warn(err); }
     try { updateFloat(); } catch (err) { console.warn(err); }
@@ -5102,7 +5099,12 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       for (let r = minR; r <= maxR; r++) {
         const k = c + ',' + r;
         if (!set.has(k)) return false;
-        if (sold.has(k) && !cellOwnedByEditing(k)) return false;
+        // Never treat another claim’s pixel as part of a valid rectangle
+        if (typeof cellSelectable === 'function') {
+          if (!cellSelectable(c, r)) return false;
+        } else if (sold.has(k) && !cellOwnedByEditing(k)) {
+          return false;
+        }
       }
     }
     return true;
@@ -6202,17 +6204,16 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       let minC = er.minC, maxC = er.maxC, minR = er.minR, maxR = er.maxR;
       if (adminMode && selected.size > 0) {
         const keys = Array.from(selected);
-        let ok = true;
+        // Hard ban: any cell owned by a different claim
         for (const k of keys) {
-          if (sold.has(k) && !cellOwnedByEditing(k)) { ok = false; break; }
+          if (sold.has(k) && !cellOwnedByEditing(k)) {
+            toast('Cannot cover another claim — resize into free space only', 'error');
+            return;
+          }
         }
-        if (!ok) {
-          toast('New area overlaps another claim', 'error');
-          return;
-        }
-        // Prefer solid rectangle; if not solid, fill bounding box with free + own cells
+        // Prefer solid rectangle; if not solid, fill bounding box only if every cell is free or ours
         if (isSolidRectangle(keys)) {
-          newCells = keys;
+          newCells = keys.slice();
         } else {
           let bMinC = COLS, bMaxC = -1, bMinR = ROWS, bMaxR = -1;
           keys.forEach(k => {
@@ -6226,13 +6227,23 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
           for (let c = bMinC; c <= bMaxC && !blocked; c++) {
             for (let r = bMinR; r <= bMaxR; r++) {
               const k = c + ',' + r;
-              if (sold.has(k) && !cellOwnedByEditing(k)) { blocked = true; break; }
+              if (sold.has(k) && !cellOwnedByEditing(k)) {
+                blocked = true;
+                break;
+              }
               filled.push(k);
             }
           }
           if (!blocked && filled.length) newCells = filled;
           else {
-            toast('Selection must be one solid free rectangle', 'error');
+            toast('Cannot cover another claim — use one solid free rectangle', 'error');
+            return;
+          }
+        }
+        // Final pass before save
+        for (const k of newCells) {
+          if (sold.has(k) && !cellOwnedByEditing(k)) {
+            toast('Cannot cover another claim', 'error');
             return;
           }
         }

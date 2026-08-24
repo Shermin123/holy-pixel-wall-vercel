@@ -4442,15 +4442,22 @@ Min 10 blocks · no maximum
     try { refreshClaimValidation(); } catch (e) {}
   }
 
+  let suppressSelectUntil = 0; // after pinch, ignore stray taps that wipe selection
+  let selectAwaitingMove = false; // don't replace selection until the drag moves a cell
+
   function onDown(e) {
     if (!buyMode) return; // VIEW ONLY - no selecting
     if (spaceHeld || toolMode === 'drag' || (e.button!= null && e.button!== 0)) return;
+    // Multi-touch / just pinched — never start a new select (would clear the selection)
+    if (e.touches && e.touches.length > 1) return;
+    if (Date.now() < suppressSelectUntil) return;
     const p = pos(e);
     const key = p.c + ',' + p.r;
     const startOnEditingClaim = adminMode && editingRegion && cellOwnedByEditing(key);
     if (sold.has(key) && !startOnEditingClaim) {
       dragging = false;
       didDrag = false;
+      selectAwaitingMove = false;
       const owner = sold.get(key);
       if (tip) {
         tip.style.display = 'block';
@@ -4480,6 +4487,7 @@ Min 10 blocks · no maximum
       additiveSelect = false;
       deselect = false;
       dragBaseline = new Set();
+      selectAwaitingMove = false;
       applyDrag();
       return;
     }
@@ -4487,9 +4495,9 @@ Min 10 blocks · no maximum
     startR = curR = p.r;
     additiveSelect = false;
     deselect = false;
-    dragBaseline = new Set();
-    selected = new Set();
-    applyDrag();
+    dragBaseline = new Set(selected);
+    // Wait for movement so a tap after pinch/zoom does not wipe the selection
+    selectAwaitingMove = true;
   }
 
   function ownerTipHtml(r, touch) {
@@ -4594,7 +4602,15 @@ Min 10 blocks · no maximum
       return;
     }
     const p = pos(e);
-    if (p.c !== curC || p.r !== curR) didDrag = true;
+    if (p.c !== curC || p.r !== curR) {
+      didDrag = true;
+      if (selectAwaitingMove) {
+        selectAwaitingMove = false;
+        selected = new Set();
+      }
+    } else if (selectAwaitingMove) {
+      return; // still on same cell — keep existing selection
+    }
     curC = p.c;
     curR = p.r;
     applyDrag();
@@ -4603,6 +4619,13 @@ Min 10 blocks · no maximum
   function onUp() {
     if (!dragging) return;
     dragging = false;
+    // Tap without move: leave previous selection intact
+    if (selectAwaitingMove) {
+      selectAwaitingMove = false;
+      try { updateFloat(); } catch (err) {}
+      try { draw(); } catch (err) {}
+      return;
+    }
     // Keep didDrag true until next click tick so canvas click ignores this gesture
     if (selected.size) {
       pushSelectHistory();
@@ -4728,7 +4751,11 @@ Min 10 blocks · no maximum
       selectBigBlock(p.c, p.r, false);
       return;
     }
-    // Double-click toggles BUY ↔ VIEW mode
+    // Phones: double-tap is common while zooming — do not toggle buy mode
+    // (that was clearing the selection). Desktop only toggles BUY ↔ VIEW.
+    const touchUI = (window.matchMedia && window.matchMedia('(hover: none)').matches) ||
+      ('ontouchstart' in window);
+    if (touchUI) return;
     setBuyMode(!buyMode);
   });
 
@@ -6179,18 +6206,42 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         for (const k of keys) {
           if (sold.has(k) && !cellOwnedByEditing(k)) { ok = false; break; }
         }
-        if (ok && isSolidRectangle(keys)) {
-          newCells = keys;
-          minC = COLS; maxC = -1; minR = ROWS; maxR = -1;
-          keys.forEach(k => {
-            const p = k.split(',').map(Number);
-            minC = Math.min(minC, p[0]); maxC = Math.max(maxC, p[0]);
-            minR = Math.min(minR, p[1]); maxR = Math.max(maxR, p[1]);
-          });
-        } else if (!ok) {
+        if (!ok) {
           toast('New area overlaps another claim', 'error');
           return;
         }
+        // Prefer solid rectangle; if not solid, fill bounding box with free + own cells
+        if (isSolidRectangle(keys)) {
+          newCells = keys;
+        } else {
+          let bMinC = COLS, bMaxC = -1, bMinR = ROWS, bMaxR = -1;
+          keys.forEach(k => {
+            const p = String(k).split(',').map(Number);
+            if (!Number.isFinite(p[0])) return;
+            bMinC = Math.min(bMinC, p[0]); bMaxC = Math.max(bMaxC, p[0]);
+            bMinR = Math.min(bMinR, p[1]); bMaxR = Math.max(bMaxR, p[1]);
+          });
+          const filled = [];
+          let blocked = false;
+          for (let c = bMinC; c <= bMaxC && !blocked; c++) {
+            for (let r = bMinR; r <= bMaxR; r++) {
+              const k = c + ',' + r;
+              if (sold.has(k) && !cellOwnedByEditing(k)) { blocked = true; break; }
+              filled.push(k);
+            }
+          }
+          if (!blocked && filled.length) newCells = filled;
+          else {
+            toast('Selection must be one solid free rectangle', 'error');
+            return;
+          }
+        }
+        minC = COLS; maxC = -1; minR = ROWS; maxR = -1;
+        newCells.forEach(k => {
+          const p = String(k).split(',').map(Number);
+          minC = Math.min(minC, p[0]); maxC = Math.max(maxC, p[0]);
+          minR = Math.min(minR, p[1]); maxR = Math.max(maxR, p[1]);
+        });
       }
       const body = {
         id: rid,
@@ -6198,10 +6249,12 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         name: ($('ownerName').value.trim() || er.name || 'ANON'),
         country: ($('country') && $('country').value) || er.country || '',
         desc: ($('desc').value || '').trim().slice(0, 120),
-        // Never wipe media when only resizing
+        // Never wipe media when only resizing (keep GIF/video type so overlay stays)
         media: pendingMedia || er.media || '',
-        mediaType: pendingType || er.mediaType || detectMediaType(pendingMedia || er.media) || 'image',
-        fit: 'cover',
+        mediaType: pendingMedia
+          ? (pendingType || detectMediaType(pendingMedia) || 'image')
+          : (er.mediaType || detectMediaType(er.media) || 'image'),
+        fit: er.fit || 'cover',
         cropScale: Number(crop.scale) || Number(er.cropScale) || 1,
         cropX: crop.x != null ? Number(crop.x) : (er.cropX != null ? Number(er.cropX) : 0.5),
         cropY: crop.y != null ? Number(crop.y) : (er.cropY != null ? Number(er.cropY) : 0.5),
@@ -6259,12 +6312,14 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
           await pullWall();
           applyCropCacheToRegions();
           try { applyLocalGeomOverrides(); } catch (e) {}
+          // Re-assert geometry after server sync (especially for GIF DOM overlays)
           let synced = regions.find(x => x && (x.id === rid || x.claimId === rid || x.id === er.id));
           if (synced) {
             synced.cropScale = body.cropScale;
             synced.cropX = body.cropX;
             synced.cropY = body.cropY;
-            if (body.media) { synced.media = body.media; synced.mediaType = body.mediaType; }
+            if (body.media) { synced.media = body.media; synced.mediaType = body.mediaType || synced.mediaType; }
+            else if (body.mediaType) { synced.mediaType = body.mediaType; }
             synced.name = body.name;
             synced.desc = body.desc;
             synced.link = body.link;
@@ -7204,7 +7259,10 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       toolMode = 'drag';
       $('toolSelect')?.classList.remove('tool-active');
       $('toolDrag')?.classList.add('tool-active');
-      selected.clear();
+      // Keep selection while admin is resizing a claim
+      if (!(adminMode && editingRegion)) {
+        selected.clear();
+      }
       try { updateFloat(); } catch (e) {}
       try { draw(); } catch (e) {}
       toast('VIEW MODE');
@@ -7450,8 +7508,10 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       touchPan = true;
       startPan(e.touches[0].clientX, e.touches[0].clientY);
     } else if (e.touches.length === 2) {
-      // cancel select / 1-finger pan
+      // cancel select drag only — keep selected pixels; block stray taps after pinch
       dragging = false;
+      selectAwaitingMove = false;
+      suppressSelectUntil = Date.now() + 500;
       touchPan = true;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -7587,6 +7647,7 @@ let scrollDrawRaf = 0;
   function applyLocalGeomOverrides() {
     if (!localGeomOverride.size) return;
     let changed = false;
+    let geomApplied = false;
     regions.forEach(r => {
       if (!r) return;
       const candidates = [String(r.id || ''), String(r.claimId || '')].filter(Boolean);
@@ -7613,8 +7674,13 @@ let scrollDrawRaf = 0;
       if (o.cropX != null) r.cropX = o.cropX;
       if (o.cropY != null) r.cropY = o.cropY;
       o.cells.forEach(k => sold.set(k, r));
+      geomApplied = true;
     });
     if (changed) persistLocalGeomOverrides();
+    if (geomApplied) {
+      try { syncMediaOverlays(); } catch (e) {}
+      try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
+    }
   }
 
   try { loadLocalGeomOverrides(); } catch (e) {}

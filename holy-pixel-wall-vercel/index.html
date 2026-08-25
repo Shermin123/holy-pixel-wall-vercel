@@ -2310,13 +2310,24 @@
         </div>
         <input type="text" id="link" placeholder="Paste link" style="display:none">
       </div>
+      <div class="field" id="wallpaperPerkField">
+        <label>BUYER REWARD</label>
+        <label for="wantWallpaper" id="wallpaperOption" style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff;border:2px solid var(--gold);cursor:pointer;margin:0">
+          <input type="checkbox" id="wantWallpaper" checked style="width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:var(--gold)">
+          <span style="font-family:VT323,monospace;font-size:1.1rem;line-height:1.35;color:var(--dark)">
+            <strong style="color:var(--gold)">Unlock unique pixel wallpaper</strong><br>
+            <span style="color:var(--muted);font-size:1rem">After payment you get a one-of-a-kind phone &amp; desktop wallpaper made from your claim ID</span>
+          </span>
+        </label>
+        <button type="button" class="btn btn-sec" id="previewWallpaperBtn" style="width:100%;margin-top:8px;font-size:0.32rem;padding:8px 10px">PREVIEW STYLE</button>
+      </div>
       <div class="field" id="paymentField">
         <label>PAYMENT</label>
         <p style="font-family:VT323,monospace;font-size:1rem;color:var(--muted);margin-bottom:8px">Stripe · Card · Apple Pay · Google Pay</p>
         <div id="payment-element" style="padding:10px;background:#fff;border:2px solid var(--border);min-height:40px"></div>
         <p id="payment-message" style="color:var(--danger);font-size:0.95rem;margin-top:6px;min-height:1em"></p>
         <p id="payTotalLine" style="font-family:'Press Start 2P',monospace;font-size:0.4rem;color:var(--dark);margin-top:10px">TOTAL: $0.00</p>
-        <p id="payHint" style="font-family:VT323,monospace;font-size:0.95rem;color:var(--muted);margin-top:4px"></p>
+        <p id="payHint" style="font-family:VT323,monospace;font-size:0.95rem;color:var(--muted);margin-top:4px">Includes wallpaper unlock if selected above</p>
       </div>
     </div>
     <div class="modal-foot">
@@ -2680,11 +2691,10 @@ Min 10 blocks · no maximum
     } catch (e) { return []; }
   }
   function saveMyPackage(pkg) {
-    const arr = loadMyPackages();
+    const arr = loadMyPackages().filter(p => !(p && pkg && p.claimId && p.claimId === pkg.claimId));
     arr.unshift(pkg);
     while (arr.length > 50) arr.pop();
     try { storeSet(MY_CLAIMS_STORE, JSON.stringify(arr)); } catch (e) {}
-    try { unlockBuyerWallpaper(pkg); } catch (e) {}
   }
   function downloadText(filename, text) {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -2899,14 +2909,37 @@ Min 10 blocks · no maximum
       const raw = storeGet(key);
       const map = raw ? JSON.parse(raw) : {};
       const id = String(pkg.claimId || pkg.id);
-      if (!map[id]) {
-        map[id] = { at: Date.now(), name: pkg.name || '', pixels: pkg.pixels || 0 };
-        storeSet(key, JSON.stringify(map));
-        showWallpaperUnlock(pkg);
-      }
+      const first = !map[id];
+      map[id] = { at: Date.now(), name: pkg.name || '', pixels: pkg.pixels || 0 };
+      storeSet(key, JSON.stringify(map));
+      // Always show unlock UI after purchase (unique design for this claim)
+      showWallpaperUnlock(pkg, { silent: !first });
     } catch (e) {
       try { showWallpaperUnlock(pkg); } catch (e2) {}
     }
+  }
+
+  function readWantWallpaper() {
+    const el = $('wantWallpaper');
+    return !el || !!el.checked;
+  }
+
+  // Preview sample style (not the final unique unlock — that is post-purchase)
+  if (typeof window !== 'undefined') {
+    setTimeout(() => {
+      const btn = $('previewWallpaperBtn');
+      if (btn) {
+        btn.onclick = () => {
+          const sample = {
+            claimId: 'HPW-PREVIEW',
+            name: ($('ownerName') && $('ownerName').value.trim()) || 'YOUR NAME',
+            pixels: selected.size || 100
+          };
+          showWallpaperUnlock(sample, { silent: true });
+          toast('PREVIEW — your real unique wallpaper unlocks after payment', 'ok');
+        };
+      }
+    }, 0);
   }
   function packageToText(pkg) {
     const lines = [];
@@ -5123,6 +5156,7 @@ Min 10 blocks · no maximum
     setVal('infoPixels', (r.pixels || 0) + ' PIXELS (OWNED)');
     setVal('infoPrice', '');
     if ($('paymentField')) $('paymentField').style.display = 'none';
+    if ($('wallpaperPerkField')) $('wallpaperPerkField').style.display = 'none';
     const payField = $('payment-element') && $('payment-element').closest('.field');
     if (payField) payField.style.display = 'none';
     if ($('payTotalLine')) $('payTotalLine').style.display = 'none';
@@ -5286,6 +5320,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     const payField = $('payment-element') && $('payment-element').closest('.field');
     if (payField) payField.style.display = '';
     if ($('paymentField')) $('paymentField').style.display = '';
+    if ($('wallpaperPerkField')) $('wallpaperPerkField').style.display = '';
+    if ($('wantWallpaper')) $('wantWallpaper').checked = true;
     if ($('priceSummaryRow')) {
       $('priceSummaryRow').style.display = 'flex';
       try { if ($('priceSummaryRow').children[1]) $('priceSummaryRow').children[1].style.display = ''; } catch (e) {}
@@ -5539,6 +5575,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     const aa = document.getElementById('adminEditActions');
     if (aa) aa.style.display = 'none';
     if ($('paymentField')) $('paymentField').style.display = adminMode ? 'none' : '';
+    if ($('wallpaperPerkField')) $('wallpaperPerkField').style.display = adminMode ? 'none' : '';
+    if ($('wantWallpaper') && !adminMode) $('wantWallpaper').checked = true;
     $('claimModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     try { updateBlockPreview(); refreshClaimValidation(); } catch (e) {}
@@ -6319,9 +6357,9 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       pixels: keys.length,
       cells: keys.slice() // exact cells owned by this claim
     };
-    // Save package for MY CLAIMS download
+    // Save package for MY CLAIMS + wallpaper unlock after purchase
     try {
-      saveMyPackage({
+      const pkg = {
         claimId: claimId,
         pixelIds: pixelIds,
         cells: keys.slice(),
@@ -6331,8 +6369,11 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         pixels: keys.length,
         paid: total,
         duration: region.duration,
-        claimedAt: region.claimedAt
-      });
+        claimedAt: region.claimedAt,
+        wantWallpaper: true
+      };
+      saveMyPackage(pkg);
+      try { unlockBuyerWallpaper(pkg); } catch (e2) {}
     } catch (e) {}
 
     // Lock every cell to this owner only (never overwrite)
@@ -6657,6 +6698,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     const keys = Array.from(selected);
     const claimId = makeClaimId();
     const pixelIds = buildPixelIds(claimId, keys);
+    const wantWallpaper = readWantWallpaper();
     const payload = {
       claimId: claimId,
       pixelIds: pixelIds,
@@ -6675,9 +6717,11 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       linkType: ($('linkType') && $('linkType').value) || 'none',
       paid: priceQuote(keys.length, ($('duration') && $('duration').value) || '6month').amount,
       unitPrice: priceQuote(keys.length, ($('duration') && $('duration').value) || '6month').unitPrice,
-      claimedAt: Date.now()
+      claimedAt: Date.now(),
+      wantWallpaper: wantWallpaper
     };
     try {
+      // Save pending package only — wallpaper unlocks after payment succeeds
       saveMyPackage({
         claimId: claimId,
         pixelIds: pixelIds,
@@ -6688,7 +6732,9 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         pixels: keys.length,
         paid: payload.paid,
         duration: payload.duration,
-        claimedAt: payload.claimedAt
+        claimedAt: payload.claimedAt,
+        wantWallpaper: wantWallpaper,
+        pending: true
       });
     } catch (e) {}
 
@@ -8034,7 +8080,7 @@ let scrollDrawRaf = 0;
           await pullWall();
           try {
             if (payload.claimId) {
-              saveMyPackage({
+              const pkg = {
                 claimId: payload.claimId,
                 pixelIds: payload.pixelIds || buildPixelIds(payload.claimId, payload.cells || []),
                 cells: payload.cells || [],
@@ -8044,8 +8090,13 @@ let scrollDrawRaf = 0;
                 pixels: (payload.cells && payload.cells.length) || 0,
                 paid: payload.paid,
                 duration: payload.duration,
-                claimedAt: payload.claimedAt || Date.now()
-              });
+                claimedAt: payload.claimedAt || Date.now(),
+                wantWallpaper: payload.wantWallpaper !== false
+              };
+              saveMyPackage(pkg);
+              if (pkg.wantWallpaper !== false) {
+                try { unlockBuyerWallpaper(pkg); } catch (e) {}
+              }
             }
           } catch (e) {}
           toast('Payment OK — pixels claimed', 'ok');

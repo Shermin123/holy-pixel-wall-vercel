@@ -2769,205 +2769,241 @@ Min 10 blocks · no maximum
       cream: '#fff8e8'
     };
   }
-  /** Black-bg wallpaper: one centered unique pixel object. */
+  /** Black wallpaper + one shaded pixel gem (unique per claim). */
   function drawPixelWallpaper(ctx, w, h, pkg) {
-    const seed = wallpaperSeed(pkg);
-    const rnd = mulberry32(seed);
-    ctx.imageSmoothingEnabled = false;
+    try {
+      const seed = wallpaperSeed(pkg || {});
+      const rnd = mulberry32(seed);
+      ctx.imageSmoothingEnabled = false;
 
-    // Full black field
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(0, 0, w, h);
+      // Pure black
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, w, h);
 
-    // Soft vignette (very subtle)
-    const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.15, w / 2, h / 2, Math.min(w, h) * 0.72);
-    vg.addColorStop(0, 'rgba(20,16,12,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, w, h);
+      // 32×32 sprite, large in the center
+      const G = 32;
+      const px = Math.max(4, Math.floor(Math.min(w, h) / 42));
+      const objW = G * px;
+      const ox = Math.floor((w - objW) / 2);
+      const oy = Math.floor((h - objW) / 2) - Math.floor(px * 2);
 
-    // Single object size — large, centered
-    const grid = 16; // 16×16 pixel sprite
-    const px = Math.max(6, Math.floor(Math.min(w, h) / (grid + 10)));
-    const objW = grid * px;
-    const ox = Math.floor((w - objW) / 2);
-    const oy = Math.floor((h - objW) / 2) - Math.floor(px * 1.5);
-
-    // Unique color from seed
-    const hue = Math.floor(rnd() * 360);
-    const gold = '#d4a017';
-    const mid = 'hsl(' + hue + ', 62%, 48%)';
-    const light = 'hsl(' + hue + ', 55%, 68%)';
-    const dark = 'hsl(' + hue + ', 40%, 18%)';
-
-    // Build a clean single shape: filled diamond / pixel crystal / block (by seed)
-    const shape = Math.floor(rnd() * 3); // 0 crystal, 1 square frame, 2 cross-star
-    const cx = (grid - 1) / 2;
-    const cy = (grid - 1) / 2;
-
-    function put(c, r, color) {
-      if (c < 0 || r < 0 || c >= grid || r >= grid) return;
-      ctx.fillStyle = color;
-      ctx.fillRect(ox + c * px, oy + r * px, px, px);
-    }
-
-    // Shadow base
-    for (let c = 2; c < grid - 2; c++) {
-      for (let r = 2; r < grid - 2; r++) {
-        put(c, r, '#0a0a0a');
+      // Palette — warm gold gem (seed shifts hue slightly)
+      const hue = 28 + (seed % 40); // gold → amber → copper
+      function hsl(h, s, l) {
+        return 'hsl(' + h + ',' + s + '%,' + l + '%)';
       }
-    }
+      const C = {
+        void: '#000000',
+        outline: '#1a1208',
+        deep: hsl(hue, 55, 16),
+        shade: hsl(hue, 60, 28),
+        mid: hsl(hue, 65, 42),
+        bright: hsl(hue + 8, 70, 58),
+        light: hsl(hue + 12, 75, 72),
+        shine: '#fff6d6',
+        gold: '#d4a017',
+        rim: '#8b6914'
+      };
 
-    if (shape === 0) {
-      // Crystal / diamond
-      for (let r = 0; r < grid; r++) {
-        for (let c = 0; c < grid; c++) {
-          const d = Math.abs(c - cx) + Math.abs(r - cy);
-          if (d <= 6) {
-            const edge = d >= 5;
-            const core = d <= 2;
-            put(c, r, core ? light : (edge ? gold : mid));
+      const buf = [];
+      for (let i = 0; i < G * G; i++) buf[i] = null;
+      function set(x, y, col) {
+        if (x < 0 || y < 0 || x >= G || y >= G) return;
+        buf[y * G + x] = col;
+      }
+      function get(x, y) {
+        if (x < 0 || y < 0 || x >= G || y >= G) return null;
+        return buf[y * G + x];
+      }
+
+      // Soft oval shadow under gem
+      for (let y = 24; y < 30; y++) {
+        for (let x = 8; x < 24; x++) {
+          const dx = (x - 15.5) / 8;
+          const dy = (y - 26.5) / 3;
+          if (dx * dx + dy * dy < 1) set(x, y, '#0a0a0a');
+        }
+      }
+
+      // Faceted gem body (octagon-ish circle with light from top-left)
+      const cx = 15.5, cy = 14.5, R = 10.5;
+      for (let y = 0; y < G; y++) {
+        for (let x = 0; x < G; x++) {
+          const dx = x - cx;
+          const dy = y - cy;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d > R) continue;
+          // Facet zones
+          const ang = Math.atan2(dy, dx);
+          const lightDot = (-dx * 0.6 - dy * 0.8) / (d || 1); // top-left light
+          let col = C.mid;
+          if (d > R - 1.2) col = C.outline;
+          else if (lightDot > 0.55) col = C.light;
+          else if (lightDot > 0.2) col = C.bright;
+          else if (lightDot > -0.15) col = C.mid;
+          else if (lightDot > -0.5) col = C.shade;
+          else col = C.deep;
+          // Facet edges (radial cuts)
+          const facet = Math.floor(((ang + Math.PI) / (Math.PI * 2)) * 8);
+          if (d > 3 && d < R - 1.5 && Math.abs(((ang + Math.PI) / (Math.PI * 2)) * 8 - facet - 0.5) < 0.08) {
+            col = C.rim;
+          }
+          set(x, y, col);
+        }
+      }
+
+      // Inner core glow
+      for (let y = 11; y <= 17; y++) {
+        for (let x = 12; x <= 18; x++) {
+          const dx = x - 15, dy = y - 14;
+          if (dx * dx + dy * dy <= 6) set(x, y, C.bright);
+        }
+      }
+      set(13, 12, C.shine);
+      set(14, 11, C.shine);
+      set(14, 12, C.light);
+
+      // Gold bezel ring
+      for (let y = 0; y < G; y++) {
+        for (let x = 0; x < G; x++) {
+          const dx = x - cx, dy = y - cy;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d >= R - 0.2 && d <= R + 1.1) {
+            set(x, y, (x + y + seed) % 3 === 0 ? C.gold : C.rim);
           }
         }
       }
-      // Highlight pixel
-      put(Math.floor(cx) - 1, Math.floor(cy) - 2, '#fff6d0');
-    } else if (shape === 1) {
-      // Framed pixel square
-      for (let r = 3; r < grid - 3; r++) {
-        for (let c = 3; c < grid - 3; c++) {
-          const edge = r === 3 || r === grid - 4 || c === 3 || c === grid - 4;
-          put(c, r, edge ? gold : mid);
+
+      // Tiny unique chip on rim from seed (ownership mark)
+      const mx = 15 + ((seed >> 3) % 5) - 2;
+      const my = 5 + ((seed >> 7) % 3);
+      set(mx, my, C.shine);
+      set(mx + 1, my, C.gold);
+
+      // Flatten to canvas
+      for (let y = 0; y < G; y++) {
+        for (let x = 0; x < G; x++) {
+          const col = get(x, y);
+          if (!col) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(ox + x * px, oy + y * px, px, px);
         }
       }
-      put(Math.floor(cx), Math.floor(cy), light);
-      put(Math.floor(cx) - 1, Math.floor(cy) - 1, dark);
-    } else {
-      // Cross-star
-      for (let i = 2; i < grid - 2; i++) {
-        put(i, Math.floor(cy), gold);
-        put(Math.floor(cx), i, gold);
-      }
-      for (let i = 4; i < grid - 4; i++) {
-        put(i, Math.floor(cy), mid);
-        put(Math.floor(cx), i, mid);
-      }
-      put(Math.floor(cx), Math.floor(cy), light);
-      put(Math.floor(cx) - 1, Math.floor(cy) - 1, dark);
-      put(Math.floor(cx) + 1, Math.floor(cy) + 1, dark);
-    }
 
-    // Seed uniqueness: a few fixed offset pixels so each claim differs
-    const extra = 4 + (seed % 5);
-    for (let i = 0; i < extra; i++) {
-      const c = 2 + Math.floor(rnd() * (grid - 4));
-      const r = 2 + Math.floor(rnd() * (grid - 4));
-      put(c, r, rnd() > 0.5 ? gold : light);
-    }
-
-    // Minimal caption under the object
-    const name = String((pkg && pkg.name) || '').trim().slice(0, 20).toUpperCase();
-    const id = String((pkg && (pkg.claimId || pkg.id)) || '').slice(0, 18);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#d4a017';
-    ctx.font = 'bold ' + Math.max(14, Math.floor(px * 1.1)) + 'px monospace';
-    ctx.fillText('HOLY PIXEL', w / 2, oy + objW + px * 3);
-    if (name) {
-      ctx.fillStyle = '#c9b896';
-      ctx.font = Math.max(12, Math.floor(px * 0.9)) + 'px monospace';
-      ctx.fillText(name, w / 2, oy + objW + px * 4.6);
-    }
-    if (id && id !== 'HPW-PREVIEW') {
-      ctx.fillStyle = '#5a5248';
-      ctx.font = Math.max(10, Math.floor(px * 0.7)) + 'px monospace';
-      ctx.fillText(id, w / 2, h - px * 3);
+      // Caption
+      const name = String((pkg && pkg.name) || '').trim().slice(0, 18).toUpperCase();
+      const id = String((pkg && (pkg.claimId || pkg.id)) || '');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#d4a017';
+      ctx.font = 'bold ' + Math.max(12, Math.floor(px * 0.95)) + 'px monospace';
+      ctx.fillText('HOLY PIXEL', w / 2, oy + objW + px * 2);
+      if (name && id !== 'HPW-PREVIEW') {
+        ctx.fillStyle = '#9a9080';
+        ctx.font = Math.max(11, Math.floor(px * 0.8)) + 'px monospace';
+        ctx.fillText(name, w / 2, oy + objW + px * 3.4);
+      }
+    } catch (err) {
+      console.warn('drawPixelWallpaper', err);
+      try {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#d4a017';
+        ctx.fillRect(w / 2 - 20, h / 2 - 20, 40, 40);
+      } catch (e2) {}
     }
   }
   function downloadWallpaper(pkg, orient) {
-    const portrait = orient !== 'landscape';
-    const w = portrait ? 1080 : 1920;
-    const h = portrait ? 1920 : 1080;
-    const c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
-    const ctx = c.getContext('2d');
-    drawPixelWallpaper(ctx, w, h, pkg || {});
-    const name = 'hpw-wallpaper-' + String((pkg && pkg.claimId) || 'pixel').replace(/[^\w-]+/g, '').slice(0, 24) + (portrait ? '-phone' : '-desktop') + '.png';
     try {
+      const portrait = orient !== 'landscape';
+      const w = portrait ? 1080 : 1920;
+      const h = portrait ? 1920 : 1080;
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      drawPixelWallpaper(c.getContext('2d'), w, h, pkg || {});
+      const fname = 'hpw-wallpaper-' + String((pkg && pkg.claimId) || 'pixel').replace(/[^\w-]+/g, '').slice(0, 20) + (portrait ? '-phone' : '-desktop') + '.png';
       c.toBlob(function (blob) {
-        if (!blob) return;
+        if (!blob) {
+          try {
+            const a = document.createElement('a');
+            a.href = c.toDataURL('image/png');
+            a.download = fname;
+            a.click();
+          } catch (e) {}
+          return;
+        }
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = name;
+        a.download = fname;
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 800);
       }, 'image/png');
     } catch (e) {
-      try {
-        const a = document.createElement('a');
-        a.href = c.toDataURL('image/png');
-        a.download = name;
-        a.click();
-      } catch (e2) {}
+      try { toast('Download failed', 'error'); } catch (e2) {}
     }
   }
   function showWallpaperUnlock(pkg, opts) {
     opts = opts || {};
-    if (!pkg) return;
-    const existing = document.getElementById('wallpaperModal');
-    if (existing) existing.remove();
-    const box = document.createElement('div');
-    box.className = 'overlay';
-    box.id = 'wallpaperModal';
-    box.style.display = 'flex';
-    const preview = document.createElement('canvas');
-    preview.width = 270;
-    preview.height = 480;
-    preview.style.cssText = 'display:block;margin:0 auto 12px;width:min(180px,42vw);height:auto;border:3px solid var(--gold);box-shadow:4px 4px 0 rgba(92,61,30,0.35);image-rendering:pixelated';
-    drawPixelWallpaper(preview.getContext('2d'), preview.width, preview.height, pkg);
-    const isPreview = String(pkg.claimId || '') === 'HPW-PREVIEW';
-    box.innerHTML =
-      '<div class="modal" style="max-width:400px">' +
-      '<div class="modal-head"><h3>' + (isPreview ? 'WALLPAPER' : 'WALLPAPER UNLOCKED') + '</h3>' +
-      '<p>' + (isPreview
-        ? 'Black pixel wallpaper — unique object after you buy pixels.'
-        : 'Your unique pixel object on black. Download phone or desktop.') + '</p></div>' +
-      '<div class="modal-body" style="text-align:center;background:#0a0a0a;padding:16px"></div>' +
-      '<div class="modal-foot" style="flex-wrap:wrap;justify-content:center">' +
-      (isPreview
-        ? '<button type="button" class="btn btn-pri" id="wpBuy" style="font-size:0.32rem">BUY PIXELS</button>'
-        : '<button type="button" class="btn btn-pri" id="wpPhone" style="font-size:0.32rem">PHONE PNG</button>' +
-          '<button type="button" class="btn btn-sec" id="wpDesk" style="font-size:0.32rem">DESKTOP PNG</button>') +
-      '<button type="button" class="btn btn-sec" id="wpClose">CLOSE</button>' +
-      '</div></div>';
-    const body = box.querySelector('.modal-body');
-    body.appendChild(preview);
-    if (!isPreview) {
-      const note = document.createElement('p');
-      note.style.cssText = 'font-family:VT323,monospace;font-size:1rem;color:#c9b896;margin-top:8px';
-      note.textContent = String(pkg.name || 'Owner') + (pkg.pixels ? (' · ' + pkg.pixels + ' px') : '');
-      body.appendChild(note);
+    pkg = pkg || { claimId: 'HPW-PREVIEW', name: 'PREVIEW' };
+    try {
+      const existing = document.getElementById('wallpaperModal');
+      if (existing) existing.remove();
+      const isPreview = String(pkg.claimId || '') === 'HPW-PREVIEW';
+      const box = document.createElement('div');
+      box.className = 'overlay';
+      box.id = 'wallpaperModal';
+      box.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+      box.innerHTML =
+        '<div class="modal" style="max-width:380px">' +
+        '<div class="modal-head"><h3>' + (isPreview ? 'WALLPAPER' : 'WALLPAPER UNLOCKED') + '</h3>' +
+        '<p>' + (isPreview
+          ? 'Black field · pixel gem in the center. Buy pixels to unlock yours.'
+          : 'Your unique pixel gem. Download for phone or desktop.') + '</p></div>' +
+        '<div class="modal-body" id="wpBody" style="text-align:center;background:#000;padding:18px 16px"></div>' +
+        '<div class="modal-foot" style="flex-wrap:wrap;justify-content:center;gap:8px">' +
+        (isPreview
+          ? '<button type="button" class="btn btn-pri" id="wpBuy" style="font-size:0.32rem">BUY PIXELS</button>'
+          : '<button type="button" class="btn btn-pri" id="wpPhone" style="font-size:0.32rem">PHONE PNG</button>' +
+            '<button type="button" class="btn btn-sec" id="wpDesk" style="font-size:0.32rem">DESKTOP PNG</button>') +
+        '<button type="button" class="btn btn-sec" id="wpClose">CLOSE</button>' +
+        '</div></div>';
+      document.body.appendChild(box);
+      const body = box.querySelector('#wpBody');
+      const preview = document.createElement('canvas');
+      preview.width = 240;
+      preview.height = 420;
+      preview.style.cssText = 'display:block;margin:0 auto;width:min(160px,40vw);height:auto;image-rendering:pixelated;border:2px solid #d4a017';
+      if (body) {
+        drawPixelWallpaper(preview.getContext('2d'), preview.width, preview.height, pkg);
+        body.appendChild(preview);
+        if (!isPreview) {
+          const note = document.createElement('p');
+          note.style.cssText = 'font-family:VT323,monospace;font-size:1rem;color:#9a9080;margin-top:10px';
+          note.textContent = String(pkg.name || '') + (pkg.pixels ? (' · ' + pkg.pixels + ' px') : '');
+          body.appendChild(note);
+        }
+      }
+      const closeBtn = box.querySelector('#wpClose');
+      if (closeBtn) closeBtn.onclick = () => box.remove();
+      const phone = box.querySelector('#wpPhone');
+      const desk = box.querySelector('#wpDesk');
+      const buy = box.querySelector('#wpBuy');
+      if (phone) phone.onclick = () => { downloadWallpaper(pkg, 'portrait'); try { toast('PHONE WALLPAPER SAVED', 'ok'); } catch (e) {} };
+      if (desk) desk.onclick = () => { downloadWallpaper(pkg, 'landscape'); try { toast('DESKTOP WALLPAPER SAVED', 'ok'); } catch (e) {} };
+      if (buy) buy.onclick = () => {
+        box.remove();
+        try { if (typeof setBuyMode === 'function') setBuyMode(true); } catch (e) {}
+      };
+      box.addEventListener('click', e => { if (e.target === box) box.remove(); });
+      if (!opts.silent && !isPreview) {
+        try { toast('WALLPAPER UNLOCKED', 'ok'); } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('showWallpaperUnlock', err);
+      try { toast('Wallpaper error — try again', 'error'); } catch (e) {}
     }
-    document.body.appendChild(box);
-    box.querySelector('#wpClose').onclick = () => box.remove();
-    const phone = box.querySelector('#wpPhone');
-    const desk = box.querySelector('#wpDesk');
-    const buy = box.querySelector('#wpBuy');
-    if (phone) phone.onclick = () => {
-      downloadWallpaper(pkg, 'portrait');
-      toast('PHONE WALLPAPER SAVED', 'ok');
-    };
-    if (desk) desk.onclick = () => {
-      downloadWallpaper(pkg, 'landscape');
-      toast('DESKTOP WALLPAPER SAVED', 'ok');
-    };
-    if (buy) buy.onclick = () => {
-      box.remove();
-      try { setBuyMode(true); } catch (e) {}
-    };
-    box.onclick = e => { if (e.target === box) box.remove(); };
-    if (!opts.silent && !isPreview) toast('WALLPAPER UNLOCKED', 'ok');
   }
   function unlockBuyerWallpaper(pkg) {
     if (!pkg || !(pkg.claimId || pkg.id)) return;
@@ -2979,7 +3015,6 @@ Min 10 blocks · no maximum
       const first = !map[id];
       map[id] = { at: Date.now(), name: pkg.name || '', pixels: pkg.pixels || 0 };
       storeSet(key, JSON.stringify(map));
-      // Always show unlock UI after purchase (unique design for this claim)
       showWallpaperUnlock(pkg, { silent: !first });
     } catch (e) {
       try { showWallpaperUnlock(pkg); } catch (e2) {}
@@ -2992,25 +3027,30 @@ Min 10 blocks · no maximum
   }
 
   function openWallpaperFromHeader() {
-    const packages = loadMyPackages().filter(p => p && p.claimId && !p.pending);
-    if (packages.length) {
-      showWallpaperUnlock(packages[0], { silent: true });
-      return;
+    try {
+      const packages = (typeof loadMyPackages === 'function' ? loadMyPackages() : []).filter(p => p && p.claimId && !p.pending);
+      if (packages.length) {
+        showWallpaperUnlock(packages[0], { silent: true });
+        return;
+      }
+      showWallpaperUnlock({ claimId: 'HPW-PREVIEW', name: 'PREVIEW', pixels: 0 }, { silent: true });
+    } catch (e) {
+      console.warn(e);
+      try { toast('Could not open wallpaper', 'error'); } catch (e2) {}
     }
-    // Preview for non-buyers
-    showWallpaperUnlock({
-      claimId: 'HPW-PREVIEW',
-      name: 'BUY TO UNLOCK',
-      pixels: 0
-    }, { silent: true });
-    toast('Buy pixels to unlock your unique wallpaper', 'ok');
   }
-  if (typeof window !== 'undefined') {
-    setTimeout(() => {
-      const hdr = $('wallpaperHeaderBtn');
-      if (hdr) hdr.onclick = openWallpaperFromHeader;
-    }, 0);
-  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const hdr = document.getElementById('wallpaperHeaderBtn');
+    if (hdr) hdr.addEventListener('click', openWallpaperFromHeader);
+  });
+  // Fallback if script runs after DOM ready
+  setTimeout(() => {
+    const hdr = document.getElementById('wallpaperHeaderBtn');
+    if (hdr && !hdr._wpBound) {
+      hdr._wpBound = true;
+      hdr.addEventListener('click', openWallpaperFromHeader);
+    }
+  }, 50);
   function packageToText(pkg) {
     const lines = [];
     lines.push('HOLY PIXEL WALL — CLAIM PACKAGE');

@@ -3960,28 +3960,40 @@ Min 10 blocks · no maximum
       ctx.restore();
     });
 
-    // 4) Buy-mode: every free pixel drawn as a clear square when zoomed
+    // 4) Buy-mode: each free pixel = one clear tile (easy to aim when zoomed)
     const visCell = (baseCell || drawCell) * (zoom || 1);
     const zNow = Math.max(zoom || 1, 1);
-    // ~1.5–2 CSS pixels on screen after zoom scale
-    const hair = Math.max(0.05, 1.5 / zNow);
-    const hairBold = Math.max(0.08, 2.4 / zNow);
-    const hairFrame = Math.max(0.1, 2.8 / zNow);
+    // Line width in canvas units so it stays ~1–2 screen pixels after CSS zoom
+    const hair = Math.max(0.08, Math.min(drawCell * 0.14, 2.2 / zNow));
+    const hairBold = Math.max(hair * 1.6, 2.8 / zNow);
+    const hairFrame = Math.max(hair * 1.8, 3 / zNow);
 
-    if (buyMode && visCell >= 2) {
+    if (buyMode && visCell >= 2.5) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
-      // Free cells only — never paint grid/fill over claimed photos
-      const gridAlpha = visCell >= 16 ? 0.55 : (visCell >= 10 ? 0.4 : (visCell >= 5 ? 0.28 : 0.18));
+      // Gap inside each cell so tiles read as separate blocks
+      const inset = visCell >= 10 ? Math.max(0.6, drawCell * 0.08) : (visCell >= 5 ? Math.max(0.4, drawCell * 0.05) : 0);
+
       for (let c = gc0; c <= gc1; c++) {
         for (let r = gr0; r <= gr1; r++) {
           if (sold.has(c + ',' + r)) continue;
-          const x = c * drawCell, y = r * drawCell;
-          if (visCell >= 6) {
-            ctx.fillStyle = ((c + r) & 1) ? 'rgba(255,253,248,0.35)' : 'rgba(212,160,23,0.10)';
+          const x = c * drawCell;
+          const y = r * drawCell;
+          // Checker: cream vs light gold — strong contrast
+          if ((c + r) & 1) {
+            ctx.fillStyle = visCell >= 8 ? '#fffdf8' : 'rgba(255,253,248,0.75)';
+          } else {
+            ctx.fillStyle = visCell >= 8 ? '#f5e6b8' : 'rgba(240,193,75,0.28)';
+          }
+          if (inset > 0) {
+            ctx.fillRect(x + inset, y + inset, Math.max(0, drawCell - inset * 2), Math.max(0, drawCell - inset * 2));
+          } else {
             ctx.fillRect(x, y, drawCell, drawCell);
           }
-          ctx.strokeStyle = 'rgba(42, 33, 24, ' + gridAlpha + ')';
+          // Dark outline — each square is one selectable pixel
+          ctx.strokeStyle = visCell >= 12
+            ? 'rgba(42, 33, 24, 0.85)'
+            : (visCell >= 6 ? 'rgba(42, 33, 24, 0.65)' : 'rgba(42, 33, 24, 0.4)');
           ctx.lineWidth = hair;
           ctx.strokeRect(
             Math.floor(x) + 0.5,
@@ -3991,33 +4003,33 @@ Min 10 blocks · no maximum
           );
         }
       }
-      // 10×10 section guides — only on free spans (skip drawing through owned blocks)
-      ctx.strokeStyle = 'rgba(42, 33, 24, 0.4)';
-      ctx.lineWidth = hairBold;
-      const sec = SECTION || 10;
-      for (let c = Math.floor(gc0 / sec) * sec; c <= gc1 + 1; c += sec) {
-        const x = Math.floor(c * drawCell) + 0.5;
-        let segStart = null;
-        for (let r = gr0; r <= gr1 + 1; r++) {
-          // Column line exists between free cells to the left or is on boundary
-          const leftOwned = c > 0 && sold.has((c - 1) + ',' + Math.min(r, ROWS - 1));
-          const rightOwned = c < COLS && sold.has(c + ',' + Math.min(r, ROWS - 1));
-          const blocked = leftOwned && rightOwned;
-          if (!blocked && r <= gr1) {
-            if (segStart == null) segStart = r;
-          } else if (segStart != null) {
+
+      // 10×10 section borders (gold) — orientation only, still skip owned cells
+      if (visCell >= 4) {
+        const sec = SECTION || 10;
+        ctx.strokeStyle = 'rgba(139, 90, 43, 0.55)';
+        ctx.lineWidth = hairBold;
+        for (let c = Math.ceil(gc0 / sec) * sec; c <= gc1; c += sec) {
+          for (let r = gr0; r <= gr1; r++) {
+            if (sold.has(c + ',' + r) && sold.has((c - 1) + ',' + r)) continue;
+            if (c <= 0 || c >= COLS) continue;
+            const x = Math.floor(c * drawCell) + 0.5;
             ctx.beginPath();
-            ctx.moveTo(x, segStart * drawCell);
-            ctx.lineTo(x, r * drawCell);
+            ctx.moveTo(x, r * drawCell);
+            ctx.lineTo(x, (r + 1) * drawCell);
             ctx.stroke();
-            segStart = null;
           }
         }
-        if (segStart != null) {
-          ctx.beginPath();
-          ctx.moveTo(x, segStart * drawCell);
-          ctx.lineTo(x, (gr1 + 1) * drawCell);
-          ctx.stroke();
+        for (let r = Math.ceil(gr0 / sec) * sec; r <= gr1; r += sec) {
+          for (let c = gc0; c <= gc1; c++) {
+            if (sold.has(c + ',' + r) && sold.has(c + ',' + (r - 1))) continue;
+            if (r <= 0 || r >= ROWS) continue;
+            const y = Math.floor(r * drawCell) + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(c * drawCell, y);
+            ctx.lineTo((c + 1) * drawCell, y);
+            ctx.stroke();
+          }
         }
       }
       ctx.restore();
@@ -4064,41 +4076,25 @@ Min 10 blocks · no maximum
 
         ctx.save();
         // Zoomed out: solid gold block so selection stays visible
-        // Zoomed in: per-pixel glass fill
+        // Zoomed in: each selected pixel is a clear gold tile
         if (visCell < 2.2) {
-          ctx.fillStyle = 'rgba(212, 160, 23, 0.55)';
+          ctx.fillStyle = 'rgba(212, 160, 23, 0.6)';
           ctx.fillRect(bx, by, bw, bh);
         } else {
+          const pad = visCell >= 8 ? Math.max(0.5, drawCell * 0.06) : 0;
           freeKeys.forEach(([c, r]) => {
-            ctx.fillStyle = 'rgba(212, 160, 23, 0.35)';
-            ctx.fillRect(c * drawCell, r * drawCell, drawCell, drawCell);
-            if (visCell >= 4) {
-              ctx.strokeStyle = 'rgba(92, 61, 30, 0.85)';
-              ctx.lineWidth = hair;
-              ctx.strokeRect(
-                Math.floor(c * drawCell) + 0.5,
-                Math.floor(r * drawCell) + 0.5,
-                Math.max(0, drawCell - 1),
-                Math.max(0, drawCell - 1)
-              );
-            }
+            const x = c * drawCell, y = r * drawCell;
+            ctx.fillStyle = '#f0c14b';
+            ctx.fillRect(x + pad, y + pad, Math.max(0, drawCell - pad * 2), Math.max(0, drawCell - pad * 2));
+            ctx.strokeStyle = '#5c3d1e';
+            ctx.lineWidth = Math.max(hair, 0.12);
+            ctx.strokeRect(
+              Math.floor(x) + 0.5,
+              Math.floor(y) + 0.5,
+              Math.max(0, drawCell - 1),
+              Math.max(0, drawCell - 1)
+            );
           });
-        }
-        if (visCell >= 2.5 && freeKeys.length > 1) {
-          ctx.strokeStyle = 'rgba(139, 90, 43, 0.7)';
-          ctx.lineWidth = hair;
-          ctx.beginPath();
-          for (let c = sMinC; c <= sMaxC + 1; c++) {
-            const x = Math.floor(c * drawCell) + 0.5;
-            ctx.moveTo(x, by);
-            ctx.lineTo(x, by + bh);
-          }
-          for (let r = sMinR; r <= sMaxR + 1; r++) {
-            const y = Math.floor(r * drawCell) + 0.5;
-            ctx.moveTo(bx, y);
-            ctx.lineTo(bx + bw, y);
-          }
-          ctx.stroke();
         }
         // Outer frame — always visible at any zoom
         const dashA = Math.max(3, 6 / zNow);

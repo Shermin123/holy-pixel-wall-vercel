@@ -1293,6 +1293,38 @@
   margin: 0;
 }
 
+.pixel-wallpaper-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  background: #1a1512;
+  border: 2px solid #d4a017;
+  box-shadow: 3px 3px 0 #2a2118;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.pixel-wallpaper-card:hover {
+  background: #2a2118;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #d4a017;
+}
+.pixel-wallpaper-card:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 #d4a017;
+}
+.pixel-wallpaper-card .wallpaper-card__label {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 0.4rem !important;
+  line-height: 1.25 !important;
+  color: #f0c14b !important;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
 .pixel-buy {
   display: flex !important;
   align-items: center;
@@ -2100,6 +2132,9 @@
     <div class="pixel-price-card">
       <strong class="price-amount">1 PIXEL — $0.50</strong>
     </div>
+    <button type="button" class="pixel-wallpaper-card" id="wallpaperHeaderBtn" title="Buyer pixel wallpaper">
+      <strong class="wallpaper-card__label">WALLPAPER</strong>
+    </button>
     <button class="buy-cta pixel-buy" id="buyModeBtn" type="button">
       <span class="pixel-buy__icon">+</span>
       <span class="pixel-buy__text">BUY PIXELS</span>
@@ -2310,16 +2345,12 @@
         </div>
         <input type="text" id="link" placeholder="Paste link" style="display:none">
       </div>
+      <input type="checkbox" id="wantWallpaper" checked style="position:absolute;opacity:0;pointer-events:none" aria-hidden="true">
       <div class="field" id="wallpaperPerkField">
-        <label>BUYER REWARD</label>
-        <label for="wantWallpaper" id="wallpaperOption" style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff;border:2px solid var(--gold);cursor:pointer;margin:0">
-          <input type="checkbox" id="wantWallpaper" checked style="width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:var(--gold)">
-          <span style="font-family:VT323,monospace;font-size:1.1rem;line-height:1.35;color:var(--dark)">
-            <strong style="color:var(--gold)">Unlock unique pixel wallpaper</strong><br>
-            <span style="color:var(--muted);font-size:1rem">After payment you get a one-of-a-kind phone &amp; desktop wallpaper made from your claim ID</span>
-          </span>
-        </label>
-        <button type="button" class="btn btn-sec" id="previewWallpaperBtn" style="width:100%;margin-top:8px;font-size:0.32rem;padding:8px 10px">PREVIEW STYLE</button>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#1a1512;border:2px solid #d4a017">
+          <span style="font-family:'Press Start 2P',monospace;font-size:0.32rem;color:#f0c14b">WALLPAPER</span>
+          <span style="font-family:VT323,monospace;font-size:1.05rem;color:#c9b896;line-height:1.3">Unlocked free after payment · unique pixel art on black</span>
+        </div>
       </div>
       <div class="field" id="paymentField">
         <label>PAYMENT</label>
@@ -2327,7 +2358,7 @@
         <div id="payment-element" style="padding:10px;background:#fff;border:2px solid var(--border);min-height:40px"></div>
         <p id="payment-message" style="color:var(--danger);font-size:0.95rem;margin-top:6px;min-height:1em"></p>
         <p id="payTotalLine" style="font-family:'Press Start 2P',monospace;font-size:0.4rem;color:var(--dark);margin-top:10px">TOTAL: $0.00</p>
-        <p id="payHint" style="font-family:VT323,monospace;font-size:0.95rem;color:var(--muted);margin-top:4px">Includes wallpaper unlock if selected above</p>
+        <p id="payHint" style="font-family:VT323,monospace;font-size:0.95rem;color:var(--muted);margin-top:4px"></p>
       </div>
     </div>
     <div class="modal-foot">
@@ -2738,96 +2769,118 @@ Min 10 blocks · no maximum
       cream: '#fff8e8'
     };
   }
-  /** Draw a unique simple pixel wallpaper onto ctx (w×h). */
+  /** Black-bg wallpaper: one centered unique pixel object. */
   function drawPixelWallpaper(ctx, w, h, pkg) {
     const seed = wallpaperSeed(pkg);
     const rnd = mulberry32(seed);
-    const pal = wallpaperPalette(seed);
-    const cell = Math.max(8, Math.floor(Math.min(w, h) / 48));
-    const cols = Math.ceil(w / cell);
-    const rows = Math.ceil(h / cell);
-
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = pal.bg;
+
+    // Full black field
+    ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, w, h);
 
-    // Paper panel
-    const pad = cell * 2;
-    ctx.fillStyle = pal.paper;
-    ctx.fillRect(pad, pad, w - pad * 2, h - pad * 2);
+    // Soft vignette (very subtle)
+    const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.15, w / 2, h / 2, Math.min(w, h) * 0.72);
+    vg.addColorStop(0, 'rgba(20,16,12,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, w, h);
 
-    // Checker field
-    for (let c = 0; c < cols; c++) {
-      for (let r = 0; r < rows; r++) {
-        const x = c * cell, y = r * cell;
-        if (x < pad || y < pad || x >= w - pad || y >= h - pad) continue;
-        if (((c + r) & 1) === 0) {
-          ctx.fillStyle = (c * 13 + r * 7 + seed) % 9 === 0 ? pal.soft : '#f0e8dc';
-          ctx.fillRect(x, y, cell, cell);
+    // Single object size — large, centered
+    const grid = 16; // 16×16 pixel sprite
+    const px = Math.max(6, Math.floor(Math.min(w, h) / (grid + 10)));
+    const objW = grid * px;
+    const ox = Math.floor((w - objW) / 2);
+    const oy = Math.floor((h - objW) / 2) - Math.floor(px * 1.5);
+
+    // Unique color from seed
+    const hue = Math.floor(rnd() * 360);
+    const gold = '#d4a017';
+    const mid = 'hsl(' + hue + ', 62%, 48%)';
+    const light = 'hsl(' + hue + ', 55%, 68%)';
+    const dark = 'hsl(' + hue + ', 40%, 18%)';
+
+    // Build a clean single shape: filled diamond / pixel crystal / block (by seed)
+    const shape = Math.floor(rnd() * 3); // 0 crystal, 1 square frame, 2 cross-star
+    const cx = (grid - 1) / 2;
+    const cy = (grid - 1) / 2;
+
+    function put(c, r, color) {
+      if (c < 0 || r < 0 || c >= grid || r >= grid) return;
+      ctx.fillStyle = color;
+      ctx.fillRect(ox + c * px, oy + r * px, px, px);
+    }
+
+    // Shadow base
+    for (let c = 2; c < grid - 2; c++) {
+      for (let r = 2; r < grid - 2; r++) {
+        put(c, r, '#0a0a0a');
+      }
+    }
+
+    if (shape === 0) {
+      // Crystal / diamond
+      for (let r = 0; r < grid; r++) {
+        for (let c = 0; c < grid; c++) {
+          const d = Math.abs(c - cx) + Math.abs(r - cy);
+          if (d <= 6) {
+            const edge = d >= 5;
+            const core = d <= 2;
+            put(c, r, core ? light : (edge ? gold : mid));
+          }
         }
       }
-    }
-
-    // Unique constellation of gold pixels (from seed)
-    const stars = 18 + Math.floor(rnd() * 24);
-    for (let i = 0; i < stars; i++) {
-      const c = 3 + Math.floor(rnd() * (cols - 6));
-      const r = 3 + Math.floor(rnd() * (rows - 6));
-      const x = c * cell, y = r * cell;
-      if (x < pad || y < pad || x >= w - pad - cell || y >= h - pad - cell) continue;
-      ctx.fillStyle = rnd() > 0.35 ? pal.gold : pal.accent;
-      const s = rnd() > 0.7 ? 2 : 1;
-      ctx.fillRect(x, y, cell * s, cell * s);
-    }
-
-    // Center emblem — unique 7×7 pixel seal
-    const em = 7;
-    const emCell = Math.floor(cell * 1.4);
-    const emW = em * emCell;
-    const emX = Math.floor((w - emW) / 2);
-    const emY = Math.floor(h * 0.32);
-    ctx.fillStyle = pal.dark;
-    ctx.fillRect(emX - emCell, emY - emCell, emW + emCell * 2, emW + emCell * 2);
-    ctx.fillStyle = pal.gold;
-    ctx.fillRect(emX - emCell / 2, emY - emCell / 2, emW + emCell, emW + emCell);
-    for (let c = 0; c < em; c++) {
-      for (let r = 0; r < em; r++) {
-        const bit = ((seed >> ((c + r * 7) % 24)) ^ Math.floor(rnd() * 4)) & 1;
-        ctx.fillStyle = bit ? pal.cream : pal.accent;
-        ctx.fillRect(emX + c * emCell, emY + r * emCell, emCell, emCell);
+      // Highlight pixel
+      put(Math.floor(cx) - 1, Math.floor(cy) - 2, '#fff6d0');
+    } else if (shape === 1) {
+      // Framed pixel square
+      for (let r = 3; r < grid - 3; r++) {
+        for (let c = 3; c < grid - 3; c++) {
+          const edge = r === 3 || r === grid - 4 || c === 3 || c === grid - 4;
+          put(c, r, edge ? gold : mid);
+        }
       }
+      put(Math.floor(cx), Math.floor(cy), light);
+      put(Math.floor(cx) - 1, Math.floor(cy) - 1, dark);
+    } else {
+      // Cross-star
+      for (let i = 2; i < grid - 2; i++) {
+        put(i, Math.floor(cy), gold);
+        put(Math.floor(cx), i, gold);
+      }
+      for (let i = 4; i < grid - 4; i++) {
+        put(i, Math.floor(cy), mid);
+        put(Math.floor(cx), i, mid);
+      }
+      put(Math.floor(cx), Math.floor(cy), light);
+      put(Math.floor(cx) - 1, Math.floor(cy) - 1, dark);
+      put(Math.floor(cx) + 1, Math.floor(cy) + 1, dark);
     }
-    // Cross motif
-    ctx.fillStyle = pal.dark;
-    ctx.fillRect(emX + emCell * 3, emY + emCell, emCell, emCell * 5);
-    ctx.fillRect(emX + emCell, emY + emCell * 3, emCell * 5, emCell);
 
-    // Border frame
-    ctx.strokeStyle = pal.gold;
-    ctx.lineWidth = Math.max(4, cell * 0.35);
-    ctx.strokeRect(pad * 0.6, pad * 0.6, w - pad * 1.2, h - pad * 1.2);
-    ctx.strokeStyle = pal.dark;
-    ctx.lineWidth = Math.max(2, cell * 0.15);
-    ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
+    // Seed uniqueness: a few fixed offset pixels so each claim differs
+    const extra = 4 + (seed % 5);
+    for (let i = 0; i < extra; i++) {
+      const c = 2 + Math.floor(rnd() * (grid - 4));
+      const r = 2 + Math.floor(rnd() * (grid - 4));
+      put(c, r, rnd() > 0.5 ? gold : light);
+    }
 
-    // Titles
-    const name = String((pkg && pkg.name) || 'PIXEL OWNER').slice(0, 24).toUpperCase();
-    const id = String((pkg && (pkg.claimId || pkg.id)) || '').slice(0, 22);
-    const px = (pkg && (pkg.pixels || (pkg.cells && pkg.cells.length))) || 0;
-    ctx.fillStyle = pal.dark;
-    ctx.font = 'bold ' + Math.max(18, Math.floor(cell * 1.6)) + 'px monospace';
+    // Minimal caption under the object
+    const name = String((pkg && pkg.name) || '').trim().slice(0, 20).toUpperCase();
+    const id = String((pkg && (pkg.claimId || pkg.id)) || '').slice(0, 18);
     ctx.textAlign = 'center';
-    ctx.fillText('HOLY PIXEL WALL', w / 2, emY + emW + cell * 3);
-    ctx.font = Math.max(14, Math.floor(cell * 1.2)) + 'px monospace';
-    ctx.fillStyle = pal.accent;
-    ctx.fillText(name, w / 2, emY + emW + cell * 4.6);
-    ctx.fillStyle = pal.dark;
-    ctx.font = Math.max(11, Math.floor(cell * 0.9)) + 'px monospace';
-    ctx.fillText(px + ' PIXELS  ·  UNLOCKED', w / 2, emY + emW + cell * 6);
-    if (id) {
-      ctx.fillStyle = '#8b5a2b';
-      ctx.font = Math.max(10, Math.floor(cell * 0.75)) + 'px monospace';
-      ctx.fillText(id, w / 2, h - pad - cell);
+    ctx.fillStyle = '#d4a017';
+    ctx.font = 'bold ' + Math.max(14, Math.floor(px * 1.1)) + 'px monospace';
+    ctx.fillText('HOLY PIXEL', w / 2, oy + objW + px * 3);
+    if (name) {
+      ctx.fillStyle = '#c9b896';
+      ctx.font = Math.max(12, Math.floor(px * 0.9)) + 'px monospace';
+      ctx.fillText(name, w / 2, oy + objW + px * 4.6);
+    }
+    if (id && id !== 'HPW-PREVIEW') {
+      ctx.fillStyle = '#5a5248';
+      ctx.font = Math.max(10, Math.floor(px * 0.7)) + 'px monospace';
+      ctx.fillText(id, w / 2, h - px * 3);
     }
   }
   function downloadWallpaper(pkg, orient) {
@@ -2873,34 +2926,48 @@ Min 10 blocks · no maximum
     preview.height = 480;
     preview.style.cssText = 'display:block;margin:0 auto 12px;width:min(180px,42vw);height:auto;border:3px solid var(--gold);box-shadow:4px 4px 0 rgba(92,61,30,0.35);image-rendering:pixelated';
     drawPixelWallpaper(preview.getContext('2d'), preview.width, preview.height, pkg);
+    const isPreview = String(pkg.claimId || '') === 'HPW-PREVIEW';
     box.innerHTML =
       '<div class="modal" style="max-width:400px">' +
-      '<div class="modal-head"><h3>WALLPAPER UNLOCKED</h3>' +
-      '<p>Your purchase unlocked a unique pixel wallpaper — only for owners.</p></div>' +
-      '<div class="modal-body" style="text-align:center"></div>' +
+      '<div class="modal-head"><h3>' + (isPreview ? 'WALLPAPER' : 'WALLPAPER UNLOCKED') + '</h3>' +
+      '<p>' + (isPreview
+        ? 'Black pixel wallpaper — unique object after you buy pixels.'
+        : 'Your unique pixel object on black. Download phone or desktop.') + '</p></div>' +
+      '<div class="modal-body" style="text-align:center;background:#0a0a0a;padding:16px"></div>' +
       '<div class="modal-foot" style="flex-wrap:wrap;justify-content:center">' +
-      '<button type="button" class="btn btn-pri" id="wpPhone" style="font-size:0.32rem">PHONE PNG</button>' +
-      '<button type="button" class="btn btn-sec" id="wpDesk" style="font-size:0.32rem">DESKTOP PNG</button>' +
+      (isPreview
+        ? '<button type="button" class="btn btn-pri" id="wpBuy" style="font-size:0.32rem">BUY PIXELS</button>'
+        : '<button type="button" class="btn btn-pri" id="wpPhone" style="font-size:0.32rem">PHONE PNG</button>' +
+          '<button type="button" class="btn btn-sec" id="wpDesk" style="font-size:0.32rem">DESKTOP PNG</button>') +
       '<button type="button" class="btn btn-sec" id="wpClose">CLOSE</button>' +
       '</div></div>';
     const body = box.querySelector('.modal-body');
     body.appendChild(preview);
-    const note = document.createElement('p');
-    note.style.cssText = 'font-family:VT323,monospace;font-size:1rem;color:var(--muted);margin-top:4px';
-    note.textContent = String(pkg.name || 'Owner') + ' · ' + (pkg.pixels || 0) + ' px';
-    body.appendChild(note);
+    if (!isPreview) {
+      const note = document.createElement('p');
+      note.style.cssText = 'font-family:VT323,monospace;font-size:1rem;color:#c9b896;margin-top:8px';
+      note.textContent = String(pkg.name || 'Owner') + (pkg.pixels ? (' · ' + pkg.pixels + ' px') : '');
+      body.appendChild(note);
+    }
     document.body.appendChild(box);
     box.querySelector('#wpClose').onclick = () => box.remove();
-    box.querySelector('#wpPhone').onclick = () => {
+    const phone = box.querySelector('#wpPhone');
+    const desk = box.querySelector('#wpDesk');
+    const buy = box.querySelector('#wpBuy');
+    if (phone) phone.onclick = () => {
       downloadWallpaper(pkg, 'portrait');
       toast('PHONE WALLPAPER SAVED', 'ok');
     };
-    box.querySelector('#wpDesk').onclick = () => {
+    if (desk) desk.onclick = () => {
       downloadWallpaper(pkg, 'landscape');
       toast('DESKTOP WALLPAPER SAVED', 'ok');
     };
+    if (buy) buy.onclick = () => {
+      box.remove();
+      try { setBuyMode(true); } catch (e) {}
+    };
     box.onclick = e => { if (e.target === box) box.remove(); };
-    if (!opts.silent) toast('WALLPAPER UNLOCKED — unique to your claim', 'ok');
+    if (!opts.silent && !isPreview) toast('WALLPAPER UNLOCKED', 'ok');
   }
   function unlockBuyerWallpaper(pkg) {
     if (!pkg || !(pkg.claimId || pkg.id)) return;
@@ -2924,21 +2991,24 @@ Min 10 blocks · no maximum
     return !el || !!el.checked;
   }
 
-  // Preview sample style (not the final unique unlock — that is post-purchase)
+  function openWallpaperFromHeader() {
+    const packages = loadMyPackages().filter(p => p && p.claimId && !p.pending);
+    if (packages.length) {
+      showWallpaperUnlock(packages[0], { silent: true });
+      return;
+    }
+    // Preview for non-buyers
+    showWallpaperUnlock({
+      claimId: 'HPW-PREVIEW',
+      name: 'BUY TO UNLOCK',
+      pixels: 0
+    }, { silent: true });
+    toast('Buy pixels to unlock your unique wallpaper', 'ok');
+  }
   if (typeof window !== 'undefined') {
     setTimeout(() => {
-      const btn = $('previewWallpaperBtn');
-      if (btn) {
-        btn.onclick = () => {
-          const sample = {
-            claimId: 'HPW-PREVIEW',
-            name: ($('ownerName') && $('ownerName').value.trim()) || 'YOUR NAME',
-            pixels: selected.size || 100
-          };
-          showWallpaperUnlock(sample, { silent: true });
-          toast('PREVIEW — your real unique wallpaper unlocks after payment', 'ok');
-        };
-      }
+      const hdr = $('wallpaperHeaderBtn');
+      if (hdr) hdr.onclick = openWallpaperFromHeader;
     }, 0);
   }
   function packageToText(pkg) {

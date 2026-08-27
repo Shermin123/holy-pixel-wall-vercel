@@ -3558,27 +3558,24 @@ Min 10 blocks · no maximum
     }
   }
 
-  function centerWallInView() {
-    const wrap = $('wallWrap');
-    if (wrap && viewport) {
-      viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
-      viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
-    } else if (viewport) {
-      viewport.scrollLeft = 0;
-      viewport.scrollTop = 0;
-    }
-  }
-
   function resize(fitReset) {
     computeGrid();
-    // Base size = entire wall visible in the viewport (fit to screen).
-    // Zoom 1 is that fit. You can zoom in, but not out past the screen.
+    // Phone: full wall fits in view.
+    // Desktop: clean vertical wall — mostly height-fit, only a slight
+    // bump in size so it reads taller/clearer without extreme stretch.
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
     const margin = phone ? 6 : 16;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s = Math.min(vw / COLS, vh / ROWS);
+    let s;
+    const fit = Math.min(vw / COLS, vh / ROWS);
+    if (phone) {
+      s = fit;
+    } else {
+      // Fill the viewport width so the wall is close, not a small square
+      s = vw / COLS;
+    }
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;
@@ -3592,17 +3589,22 @@ Min 10 blocks · no maximum
       hqZoom = 1;
       zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
-    } else if ((zoom || 1) < 1) {
-      zoom = 1;
-      zoomTarget = 1;
     }
     paintBase({ fast: !window.__hpwPaintedOnce });
     window.__hpwPaintedOnce = true;
     layoutAtZoom(zoom || 1);
     try { syncMediaOverlays(); } catch (e) {}
-    if (fitReset || (zoom || 1) <= 1.001) {
+    if (fitReset) {
       requestAnimationFrame(() => {
-        centerWallInView();
+        const wrap = $('wallWrap');
+        if (wrap && viewport) {
+          // Center the wall — clean vertical panel in the middle
+          viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
+          viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
+        } else if (viewport) {
+          viewport.scrollLeft = 0;
+          viewport.scrollTop = 0;
+        }
         try { positionMediaOverlays(); } catch (e) {}
         try { draw(); } catch (e) {}
       });
@@ -3623,15 +3625,16 @@ Min 10 blocks · no maximum
   // ===== Smooth zoom (layout-sized, no transform glitch) =====
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 1, Z_MAX = 24; // 1 = fit to screen — cannot shrink past the viewport
+  const Z_MIN = 0.35, Z_MAX = 24;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
       const phone = w < 700;
-      // Keep pad stable across zoom so the wall does not jump or smear
-      return phone ? 8 : 16;
-    } catch (e) { return 16; }
+      // Fit: tiny pad so the wall reads as a clean centered panel
+      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
+      return phone ? 36 : 40;
+    } catch (e) { return 0; }
   }
   function isPhoneLayout() {
     try {
@@ -3696,11 +3699,10 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // Upscale = nearest-neighbor (crisp pixels). Downscale / fit = smooth
-    // so zooming out does not turn the grid and photos into moiré mush.
-    const upscaling = (z || 1) > 1.02;
-    canvas.style.imageRendering = upscaling ? 'pixelated' : 'auto';
-    try { stage.style.imageRendering = upscaling ? 'pixelated' : 'auto'; } catch (e) {}
+    // Smooth when zoomed so claim photos stay clear (not see-through pixel mush)
+    const smoothPhotos = (z || 1) > 1.15;
+    canvas.style.imageRendering = smoothPhotos ? 'auto' : 'pixelated';
+    try { stage.style.imageRendering = smoothPhotos ? 'auto' : 'pixelated'; } catch (e) {}
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -3713,7 +3715,7 @@ Min 10 blocks · no maximum
       mediaLayer.style.pointerEvents = 'none';
     }
 
-    if ($('zoomLvl')) $('zoomLvl').textContent = (z <= 1.001) ? 'FIT' : (Math.round(z * 100) + '%');
+    if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
     try { positionMediaOverlays(); } catch (e) {}
     // Keep GIF/video clips locked to the same cells as the canvas while zooming
     try {
@@ -3809,7 +3811,7 @@ Min 10 blocks · no maximum
       zoom = Z_MIN;
       zoomTarget = Z_MIN;
       layoutAtZoom(zoom);
-      centerWallInView();
+      clampScroll();
       return;
     }
     const diff = target - zoom;
@@ -3817,14 +3819,9 @@ Min 10 blocks · no maximum
       zoom = target;
       zoomTarget = target;
       layoutAtZoom(zoom);
-      if (zoom <= 1.001) {
-        zoomAnchor = null;
-        centerWallInView();
-      } else {
-        keepAnchor();
-        zoomAnchor = null;
-        clampScroll();
-      }
+      keepAnchor();
+      zoomAnchor = null;
+      clampScroll();
       try { positionMediaOverlays(); } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;
@@ -3859,10 +3856,6 @@ Min 10 blocks · no maximum
 
     const base = isFinite(zoomTarget) ? zoomTarget : (zoom || 1);
     zoomTarget = zClamp(base * factor);
-    // Zooming out bottoms out at fit-to-screen (whole wall visible)
-    if (factor < 1 && zoomTarget <= 1.001) {
-      zoomTarget = 1;
-    }
     if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
   }
 
@@ -4167,9 +4160,10 @@ Min 10 blocks · no maximum
       }
     }
 
-    // Dust only when a cell is large enough to not become speckle noise
-    if (cell >= 2) {
-      g.fillStyle = 'rgba(212, 160, 23, 0.08)';
+    // Sparse static “pixel dust” on empty paper (cartoon sparkle seeds)
+    // Deterministic so cache stays valid; CSS layer animates perceived twinkle
+    if (cell >= 0.4) {
+      g.fillStyle = 'rgba(212, 160, 23, 0.09)';
       for (let sc = 3; sc < COLS; sc += 17) {
         for (let sr = 5; sr < ROWS; sr += 19) {
           if (((sc * 13 + sr * 7) % 11) < 2) {
@@ -4183,8 +4177,9 @@ Min 10 blocks · no maximum
     }
 
     // Fine cell lines ONLY when cells are large enough (zoomed in)
-    if (cell >= 4) {
-      g.strokeStyle = 'rgba(196, 168, 130, 0.4)';
+    // When zoomed out they turn into mud — skip them
+    if (cell >= 3) {
+      g.strokeStyle = 'rgba(196, 168, 130, 0.55)';
       g.lineWidth = 1;
       g.beginPath();
       for (let c = 0; c <= COLS; c++) {
@@ -4198,17 +4193,15 @@ Min 10 blocks · no maximum
       g.stroke();
     }
 
-    // LOD section grid: denser when zoomed in, sparse when cells are tiny
-    // so zooming out stays a clean checker, not a moiré of 1px lines.
-    const stepMaj = cell >= 2 ? SEC : (cell >= 0.8 ? SEC * 5 : SEC * 10);
-    g.strokeStyle = cell >= 3 ? 'rgba(139, 105, 70, 0.55)' : 'rgba(139, 105, 70, 0.35)';
-    g.lineWidth = cell >= 3 ? 1.25 : 1;
+    // Section grid — always on (clean overview)
+    g.strokeStyle = cell >= 3 ? 'rgba(139, 105, 70, 0.65)' : 'rgba(160, 130, 95, 0.7)';
+    g.lineWidth = cell >= 3 ? 1.5 : 1;
     g.beginPath();
-    for (let c = 0; c <= COLS; c += stepMaj) {
+    for (let c = 0; c <= COLS; c += SEC) {
       const x = Math.floor(c * cell) + 0.5;
       g.moveTo(x, 0); g.lineTo(x, sizeH);
     }
-    for (let r = 0; r <= ROWS; r += stepMaj) {
+    for (let r = 0; r <= ROWS; r += SEC) {
       const y = Math.floor(r * cell) + 0.5;
       g.moveTo(0, y); g.lineTo(sizeW, y);
     }
@@ -4304,7 +4297,7 @@ Min 10 blocks · no maximum
     const hairBold = Math.max(hair * 1.6, 2.8 / zNow);
     const hairFrame = Math.max(hair * 1.8, 3 / zNow);
 
-    if (buyMode && visCell >= 6) {
+    if (buyMode && visCell >= 2.5) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
       // Gap inside each cell so tiles read as separate blocks
@@ -4509,10 +4502,10 @@ Min 10 blocks · no maximum
       }
     }
 
-    // Frame in bitmap space (baseW×baseH), never CSS-zoomed sizeW/sizeH
+    // Clear border on ALL sides (top, right, bottom, left)
     ctx.strokeStyle = '#1a1512';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1.5, 1.5, drawW - 3, drawH - 3);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, sizeW - 3, sizeH - 3);
 
     const n = sold.size;
     $('counterText').textContent = n + '/' + TOTAL;

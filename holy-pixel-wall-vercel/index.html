@@ -2101,6 +2101,71 @@
   .hpw-destruct__dot { animation: none !important; opacity: 1; }
 }
 
+/* ============================================================
+   ZOOM-OUT / BROWSER-ZOOM ALIGNMENT
+   Center the wall in leftover space; let chrome grow instead of clip.
+   ============================================================ */
+html {
+  width: 100%;
+  height: 100%;
+}
+body {
+  min-width: 0 !important;
+}
+.hpw-destruct {
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.pixel-header {
+  height: auto !important;
+  min-height: 48px !important;
+  max-height: none !important;
+  overflow: visible !important;
+  align-items: center !important;
+}
+.pixel-brand,
+.pixel-center,
+.pixel-stats {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+.pixel-center {
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+}
+.toolbar {
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+.viewport {
+  display: block !important;
+  position: relative !important;
+}
+#wallWrap {
+  display: block !important;
+  position: relative !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+.stage {
+  position: absolute !important;
+  margin: 0 !important;
+}
+@media (max-width: 900px) {
+  .pixel-header {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+    column-gap: 8px !important;
+    padding: 6px 10px !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -3568,14 +3633,9 @@ Min 10 blocks · no maximum
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    let s;
-    const fit = Math.min(vw / COLS, vh / ROWS);
-    if (phone) {
-      s = fit;
-    } else {
-      // Fill the viewport width so the wall is close, not a small square
-      s = vw / COLS;
-    }
+    // Always contain: whole wall visible and centered at 100% / FIT.
+    // Width-only fit made a tall square that looked misaligned when zoomed out.
+    let s = Math.min(vw / COLS, vh / ROWS);
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
     cell = s;
@@ -3598,7 +3658,6 @@ Min 10 blocks · no maximum
       requestAnimationFrame(() => {
         const wrap = $('wallWrap');
         if (wrap && viewport) {
-          // Center the wall — clean vertical panel in the middle
           viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
           viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
         } else if (viewport) {
@@ -3642,6 +3701,12 @@ Min 10 blocks · no maximum
     } catch (e) { return false; }
   }
   const Z_PAD = 48;
+  let wallOrigin = { x: 0, y: 0 };
+  function getWallOrigin() {
+    return wallOrigin && isFinite(wallOrigin.x) && isFinite(wallOrigin.y)
+      ? wallOrigin
+      : { x: (typeof getZPad === 'function') ? getZPad() : Z_PAD, y: (typeof getZPad === 'function') ? getZPad() : Z_PAD };
+  }
   let zoomRaf = 0;
   let zoomTarget = 1;
   let zoomAnchor = null; // { bx, by, mx, my } in base-pixel space
@@ -3675,24 +3740,35 @@ Min 10 blocks · no maximum
     sizeH = h;
     cell = baseCell * z;
     const pad = (typeof getZPad === 'function') ? getZPad() : Z_PAD;
+    const vpW = (viewport && viewport.clientWidth) || w;
+    const vpH = (viewport && viewport.clientHeight) || h;
+    const boxW = Math.ceil(w);
+    const boxH = Math.ceil(h);
+    // Wrap is at least the viewport so a zoomed-out wall stays centered
+    const wrapW = Math.max(vpW, boxW + pad * 2);
+    const wrapH = Math.max(vpH, boxH + pad * 2);
+    const ox = Math.floor((wrapW - boxW) / 2);
+    const oy = Math.floor((wrapH - boxH) / 2);
+    wallOrigin = { x: ox, y: oy };
 
     if (wrap) {
-      // Content size = wall; padding = scroll margin so stage origin stays at 0,0
-      wrap.style.boxSizing = 'content-box';
-      wrap.style.width = Math.ceil(w) + 'px';
-      wrap.style.height = Math.ceil(h) + 'px';
-      wrap.style.padding = pad + 'px';
+      wrap.style.boxSizing = 'border-box';
+      wrap.style.width = wrapW + 'px';
+      wrap.style.height = wrapH + 'px';
+      wrap.style.padding = '0';
+      wrap.style.margin = '0';
+      wrap.style.position = 'relative';
     }
-    // Stage fills wrap content box — left/top 0 so canvas + media never sit outside
-    stage.style.left = '0';
-    stage.style.top = '0';
+    stage.style.position = 'absolute';
+    stage.style.left = ox + 'px';
+    stage.style.top = oy + 'px';
     stage.style.width = w + 'px';
     stage.style.height = h + 'px';
     stage.style.margin = '0';
     stage.style.padding = '0';
     stage.style.transform = 'none';
     stage.style.overflow = 'hidden';
-    stage.style.position = 'relative';
+    stage.style.position = 'absolute';
 
     canvas.style.position = 'absolute';
     canvas.style.left = '0';
@@ -3786,10 +3862,10 @@ Min 10 blocks · no maximum
     const mx = cx - vr.left;
     const my = cy - vr.top;
     const z = zoom || 1;
-    const pad = (typeof getZPad === 'function') ? getZPad() : Z_PAD;
+    const o = getWallOrigin();
     zoomAnchor = {
-      bx: (viewport.scrollLeft + mx - pad) / z,
-      by: (viewport.scrollTop + my - pad) / z,
+      bx: (viewport.scrollLeft + mx - o.x) / z,
+      by: (viewport.scrollTop + my - o.y) / z,
       mx: mx,
       my: my
     };
@@ -3798,9 +3874,9 @@ Min 10 blocks · no maximum
   function keepAnchor() {
     if (!zoomAnchor) return;
     const z = zoom || 1;
-    const pad = (typeof getZPad === 'function') ? getZPad() : Z_PAD;
-    viewport.scrollLeft = pad + zoomAnchor.bx * z - zoomAnchor.mx;
-    viewport.scrollTop = pad + zoomAnchor.by * z - zoomAnchor.my;
+    const o = getWallOrigin();
+    viewport.scrollLeft = o.x + zoomAnchor.bx * z - zoomAnchor.mx;
+    viewport.scrollTop = o.y + zoomAnchor.by * z - zoomAnchor.my;
     clampScroll();
   }
 
@@ -4103,9 +4179,9 @@ Min 10 blocks · no maximum
     // Map viewport scroll → cell indices (only draw what's on screen)
     // Extra margin so edge/top-right claims never get culled on phone
     try {
-      const pad = (typeof getZPad === 'function') ? getZPad() : ((typeof Z_PAD === 'number') ? Z_PAD : 40);
-      const sl = viewport.scrollLeft - pad;
-      const st = viewport.scrollTop - pad;
+      const o = getWallOrigin();
+      const sl = viewport.scrollLeft - o.x;
+      const st = viewport.scrollTop - o.y;
       const vw = viewport.clientWidth;
       const vh = viewport.clientHeight;
       // At fit zoom the whole wall is on screen — draw everything
@@ -4565,9 +4641,9 @@ Min 10 blocks · no maximum
     if (!r) return;
     const cx = ((r.minC + r.maxC + 1) / 2) * baseCell * zoom;
     const cy = ((r.minR + r.maxR + 1) / 2) * baseCell * zoom;
-    const pad = (typeof Z_PAD === "number") ? Z_PAD : 40;
-    viewport.scrollLeft = Math.max(0, pad + cx - viewport.clientWidth / 2);
-    viewport.scrollTop = Math.max(0, pad + cy - viewport.clientHeight / 2);
+    const o = getWallOrigin();
+    viewport.scrollLeft = Math.max(0, o.x + cx - viewport.clientWidth / 2);
+    viewport.scrollTop = Math.max(0, o.y + cy - viewport.clientHeight / 2);
   }
 
   function showMyClaims() {
@@ -7462,9 +7538,9 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
             const midC = ((r.minC || 0) + (r.maxC || 0)) / 2;
             const midR = ((r.minR || 0) + (r.maxR || 0)) / 2;
             const z = zoom || 1;
-            const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
-            viewport.scrollLeft = Math.max(0, pad + midC * (baseCell * z) - viewport.clientWidth / 2);
-            viewport.scrollTop = Math.max(0, pad + midR * (baseCell * z) - viewport.clientHeight / 2);
+            const o = getWallOrigin();
+            viewport.scrollLeft = Math.max(0, o.x + midC * (baseCell * z) - viewport.clientWidth / 2);
+            viewport.scrollTop = Math.max(0, o.y + midR * (baseCell * z) - viewport.clientHeight / 2);
             $('adminModal').style.display = 'none';
             toast('FOCUSED: ' + (r.name || ''));
           } catch (e) { console.warn(e); }
@@ -7629,9 +7705,9 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
             const midC = ((best.minC || 0) + (best.maxC || 0)) / 2;
             const midR = ((best.minR || 0) + (best.maxR || 0)) / 2;
             const z = zoom || 1;
-            const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
-            viewport.scrollLeft = Math.max(0, pad + midC * (baseCell * z) - viewport.clientWidth / 2);
-            viewport.scrollTop = Math.max(0, pad + midR * (baseCell * z) - viewport.clientHeight / 2);
+            const o = getWallOrigin();
+            viewport.scrollLeft = Math.max(0, o.x + midC * (baseCell * z) - viewport.clientWidth / 2);
+            viewport.scrollTop = Math.max(0, o.y + midR * (baseCell * z) - viewport.clientHeight / 2);
           }
           $('ownersModal').style.display = 'none';
           toast(name, 'ok');
@@ -8498,9 +8574,9 @@ let scrollDrawRaf = 0;
             const midC = ((r.minC || 0) + (r.maxC || 0)) / 2;
             const midR = ((r.minR || 0) + (r.maxR || 0)) / 2;
             const z = zoom || 1;
-            const pad = (typeof Z_PAD === 'number') ? Z_PAD : 48;
-            const x = pad + midC * (baseCell * z);
-            const y = pad + midR * (baseCell * z);
+            const o = getWallOrigin();
+            const x = o.x + midC * (baseCell * z);
+            const y = o.y + midR * (baseCell * z);
             viewport.scrollLeft = Math.max(0, x - viewport.clientWidth / 2);
             viewport.scrollTop = Math.max(0, y - viewport.clientHeight / 2);
             $('adminModal').style.display = 'none';

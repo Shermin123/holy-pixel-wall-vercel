@@ -3625,7 +3625,7 @@ Min 10 blocks · no maximum
   // ===== Smooth zoom (layout-sized, no transform glitch) =====
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 1, Z_MAX = 24;
+  const Z_MIN = 0.35, Z_MAX = 24;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
     try {

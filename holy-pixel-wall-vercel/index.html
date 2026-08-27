@@ -3623,18 +3623,25 @@ Min 10 blocks · no maximum
     }
   }
 
-  function resize(fitReset) {
+  function openWidthZoom() {
+    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
+    if (phone) return 1;
+    const margin = 16;
+    const { vw: rawW } = viewportSize();
+    const vw = Math.max(rawW - margin * 2, 80);
+    if (!baseCell || !isFinite(baseCell) || baseCell <= 0) return 1;
+    // Scale contain-base so the full wall width fills the viewport
+    return zClamp(vw / (COLS * baseCell));
+  }
+
+  function resize(fitReset, viewMode) {
     computeGrid();
-    // Phone: full wall fits in view.
-    // Desktop: clean vertical wall — mostly height-fit, only a slight
-    // bump in size so it reads taller/clearer without extreme stretch.
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
     const margin = phone ? 6 : 16;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
-    // Always contain: whole wall visible and centered at 100% / FIT.
-    // Width-only fit made a tall square that looked misaligned when zoomed out.
+    // Base 100% / FIT = entire wall visible (contain).
     let s = Math.min(vw / COLS, vh / ROWS);
     if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
@@ -3644,8 +3651,10 @@ Min 10 blocks · no maximum
     sizeW = baseW;
     sizeH = baseH;
     if (fitReset) {
-      zoom = 1;
-      zoomTarget = 1;
+      const open = viewMode === 'open' || viewMode === 'width';
+      const z0 = (open && !phone) ? openWidthZoom() : 1;
+      zoom = z0;
+      zoomTarget = z0;
       hqZoom = 1;
       zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
@@ -3659,7 +3668,10 @@ Min 10 blocks · no maximum
         const wrap = $('wallWrap');
         if (wrap && viewport) {
           viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
-          viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
+          // Opening width-fill: pin to top of the wall (matches live site).
+          // FIT (zoom ~1): center the square in the viewport.
+          if ((zoom || 1) > 1.05) viewport.scrollTop = 0;
+          else viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
         } else if (viewport) {
           viewport.scrollLeft = 0;
           viewport.scrollTop = 0;
@@ -8372,7 +8384,7 @@ let scrollDrawRaf = 0;
     try { load(); } catch (e) {}
     try { applyLocalGeomOverrides(); } catch (e) {}
     // Paint the wall immediately — do not wait on the network
-    try { resize(true); } catch (e) { console.warn(e); }
+    try { resize(true, 'open'); } catch (e) { console.warn(e); }
     setBuyMode(false);
     const ok = await pullWall();
     if (!ok && !navigator.onLine) {

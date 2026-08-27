@@ -14,7 +14,7 @@
 <style>
 
   
-  /* CRT / pixel scanline overlay */
+  /* CRT / pixel scanline overlay — hide when zoomed out (turns into mud) */
   body::after {
     content: '';
     position: fixed;
@@ -28,6 +28,10 @@
       rgba(60, 40, 20, 0.04) 2px,
       rgba(60, 40, 20, 0.04) 4px
     );
+  }
+  body.zoomed-out::after,
+  body.zoomed-out::before {
+    display: none;
   }
   /* Soft vignette for depth (still pixel-friendly) */
   body::before {
@@ -3666,6 +3670,10 @@ Min 10 blocks · no maximum
   function layoutAtZoom(z) {
     z = zClamp(z);
     zoom = z;
+    try {
+      document.body.classList.toggle('zoomed-out', z < 1.2);
+      document.body.classList.toggle('zoomed-in', z >= 2);
+    } catch (e) {}
     const wrap = $('wallWrap');
     const w = baseW * z;
     const h = baseH * z;
@@ -3949,6 +3957,8 @@ Min 10 blocks · no maximum
       clip.style.overflow = 'hidden';
       clip.style.position = 'absolute';
       clip.style.pointerEvents = 'none';
+      const screenMin = Math.min(w, h) * (zoom || 1);
+      if (screenMin < 12 || (zoom || 1) < 0.85) return;
 
       let el;
       if (r.mediaType === 'video') {
@@ -4128,7 +4138,7 @@ Min 10 blocks · no maximum
     const bw = baseW || sizeW;
     const bh = baseH || sizeH;
     const bc = baseCell || cell;
-    const key = COLS + 'x' + ROWS + ':' + bw + 'x' + bh + ':' + (bc).toFixed(4);
+    const key = COLS + 'x' + ROWS + ':' + bw + 'x' + bh + ':' + (bc).toFixed(4) + ':paper50';
     if (gridCacheCanvas && gridCacheKey === key) return gridCacheCanvas;
     gridCacheKey = key;
     const off = document.createElement('canvas');
@@ -4142,72 +4152,9 @@ Min 10 blocks · no maximum
 
     const SEC = SECTION;
 
-    // Warm paper
-    g.fillStyle = '#faf7f0';
+    // Flat paper only. All grids are drawn live based on zoom so FIT stays clean.
+    g.fillStyle = '#f3ead9';
     g.fillRect(0, 0, sizeW, sizeH);
-
-    // Soft 10×10 blocks — readable when zoomed out
-    for (let sc = 0; sc < COLS; sc += SEC) {
-      for (let sr = 0; sr < ROWS; sr += SEC) {
-        if (((sc / SEC) + (sr / SEC)) % 2 === 0) {
-          g.fillStyle = '#f0e8dc';
-          g.fillRect(
-            sc * cell, sr * cell,
-            Math.min(SEC, COLS - sc) * cell,
-            Math.min(SEC, ROWS - sr) * cell
-          );
-        }
-      }
-    }
-
-    // Sparse static “pixel dust” on empty paper (cartoon sparkle seeds)
-    // Deterministic so cache stays valid; CSS layer animates perceived twinkle
-    if (cell >= 0.4) {
-      g.fillStyle = 'rgba(212, 160, 23, 0.09)';
-      for (let sc = 3; sc < COLS; sc += 17) {
-        for (let sr = 5; sr < ROWS; sr += 19) {
-          if (((sc * 13 + sr * 7) % 11) < 2) {
-            const px = Math.floor(sc * cell) + Math.max(0, (cell * 0.3) | 0);
-            const py = Math.floor(sr * cell) + Math.max(0, (cell * 0.35) | 0);
-            const s = Math.max(1, Math.min(2, cell * 0.25));
-            g.fillRect(px, py, s, s);
-          }
-        }
-      }
-    }
-
-    // Fine cell lines ONLY when cells are large enough (zoomed in)
-    // When zoomed out they turn into mud — skip them
-    if (cell >= 3) {
-      g.strokeStyle = 'rgba(196, 168, 130, 0.55)';
-      g.lineWidth = 1;
-      g.beginPath();
-      for (let c = 0; c <= COLS; c++) {
-        const x = Math.floor(c * cell) + 0.5;
-        g.moveTo(x, 0); g.lineTo(x, sizeH);
-      }
-      for (let r = 0; r <= ROWS; r++) {
-        const y = Math.floor(r * cell) + 0.5;
-        g.moveTo(0, y); g.lineTo(sizeW, y);
-      }
-      g.stroke();
-    }
-
-    // Section grid — always on (clean overview)
-    g.strokeStyle = cell >= 3 ? 'rgba(139, 105, 70, 0.65)' : 'rgba(160, 130, 95, 0.7)';
-    g.lineWidth = cell >= 3 ? 1.5 : 1;
-    g.beginPath();
-    for (let c = 0; c <= COLS; c += SEC) {
-      const x = Math.floor(c * cell) + 0.5;
-      g.moveTo(x, 0); g.lineTo(x, sizeH);
-    }
-    for (let r = 0; r <= ROWS; r += SEC) {
-      const y = Math.floor(r * cell) + 0.5;
-      g.moveTo(0, y); g.lineTo(sizeW, y);
-    }
-    g.stroke();
-
-    // Frame
     g.strokeStyle = '#5c3d1e';
     g.lineWidth = 2;
     g.strokeRect(1, 1, sizeW - 2, sizeH - 2);
@@ -4232,8 +4179,28 @@ Min 10 blocks · no maximum
     // Visible range in cell indices — account for CSS/layout zoom
     const { c0, r0, c1, r1 } = visibleCellRange();
 
-    // 2) Grid comes from cache — no extra overlapping strokes (stays clean when zooming)
-
+    // 2) Zoom-aware grid — coarse when far, 10×10 only when tiles are actually readable
+    const visCell = (baseCell || drawCell) * (zoom || 1);
+    const visSec = visCell * (SECTION || 10);
+    if (visSec >= 14) {
+      const step = visSec >= 36 ? (SECTION || 10) : (SECTION || 10) * 5;
+      ctx.save();
+      ctx.strokeStyle = visSec >= 36 ? 'rgba(92, 61, 30, 0.22)' : 'rgba(92, 61, 30, 0.14)';
+      ctx.lineWidth = Math.max(0.35, (visSec >= 36 ? 1.1 : 1.4) / Math.max(zoom || 1, 0.2));
+      ctx.beginPath();
+      for (let c = 0; c <= COLS; c += step) {
+        const x = Math.floor(c * drawCell) + 0.5;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, drawH);
+      }
+      for (let r = 0; r <= ROWS; r += step) {
+        const y = Math.floor(r * drawCell) + 0.5;
+        ctx.moveTo(0, y);
+        ctx.lineTo(drawW, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // 3) Claimed regions — skip off-screen, solid rects when possible
     regions.forEach(r => {
@@ -4260,11 +4227,15 @@ Min 10 blocks · no maximum
         ctx.clip();
       }
 
-      // Opaque underlay so the wall grid never shows through the photo
+      const screenW = w * (zoom || 1);
+      const screenH = h * (zoom || 1);
+      const far = (zoom || 1) < 1.15 || Math.min(screenW, screenH) < 14;
+
       ctx.globalAlpha = 1;
-      ctx.fillStyle = '#1a1512';
+      ctx.fillStyle = far ? (r.color || '#c9a227') : '#1a1512';
       ctx.fillRect(x0, y0, w, h);
-      if (regionMediaIsImage(r)) {
+
+      if (!far && regionMediaIsImage(r)) {
         const img = getImg(r.media);
         if (img && img.complete && img.naturalWidth > 0) {
           drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
@@ -4273,31 +4244,26 @@ Min 10 blocks · no maximum
           ctx.fillStyle = r.color || '#c9a227';
           ctx.fillRect(x0, y0, w, h);
         }
-      } else if (!r.media) {
+      } else if (!far && !r.media) {
         ctx.fillStyle = r.color || '#c9a227';
         ctx.fillRect(x0, y0, w, h);
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        for (let c = r.minC; c <= r.maxC; c++)
-          for (let row = r.minR; row <= r.maxR; row++)
-            if ((c + row) % 2 === 0)
-              ctx.fillRect(c * drawCell, row * drawCell, drawCell, drawCell);
       }
-      /* Thin border around each claimed block */
-      ctx.strokeStyle = '#2a2118';
-      ctx.lineWidth = Math.max(1, Math.min(2, drawCell * 0.1));
-      ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+
+      if (!far || Math.min(screenW, screenH) >= 6) {
+        ctx.strokeStyle = far ? 'rgba(42,33,24,0.45)' : '#2a2118';
+        ctx.lineWidth = far ? Math.max(0.6, 1.2 / Math.max(zoom || 1, 0.25)) : Math.max(1, Math.min(2, drawCell * 0.1));
+        ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+      }
       ctx.restore();
     });
 
-    // 4) Buy-mode: each free pixel = one clear tile (easy to aim when zoomed)
-    const visCell = (baseCell || drawCell) * (zoom || 1);
+    // 4) Buy-mode: each free pixel = one clear tile (only when zoomed in enough)
     const zNow = Math.max(zoom || 1, 1);
-    // Line width in canvas units so it stays ~1–2 screen pixels after CSS zoom
     const hair = Math.max(0.08, Math.min(drawCell * 0.14, 2.2 / zNow));
     const hairBold = Math.max(hair * 1.6, 2.8 / zNow);
     const hairFrame = Math.max(hair * 1.8, 3 / zNow);
 
-    if (buyMode && visCell >= 2.5) {
+    if (buyMode && visCell >= 7 && (zoom || 1) >= 1.8) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
       // Gap inside each cell so tiles read as separate blocks

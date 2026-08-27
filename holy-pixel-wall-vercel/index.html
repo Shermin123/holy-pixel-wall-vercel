@@ -4186,11 +4186,11 @@ Min 10 blocks · no maximum
     // 2) Zoom-aware grid — coarse when far, 10×10 only when tiles are actually readable
     const visCell = (baseCell || drawCell) * (zoom || 1);
     const visSec = visCell * (SECTION || 10);
-    if (visSec >= 14) {
-      const step = visSec >= 36 ? (SECTION || 10) : (SECTION || 10) * 5;
+    if (visSec >= 22) {
+      const step = visSec >= 40 ? (SECTION || 10) : (SECTION || 10) * 5;
       ctx.save();
-      ctx.strokeStyle = visSec >= 36 ? 'rgba(92, 61, 30, 0.22)' : 'rgba(92, 61, 30, 0.14)';
-      ctx.lineWidth = Math.max(0.35, (visSec >= 36 ? 1.1 : 1.4) / Math.max(zoom || 1, 0.2));
+      ctx.strokeStyle = visSec >= 40 ? 'rgba(92, 61, 30, 0.22)' : 'rgba(92, 61, 30, 0.14)';
+      ctx.lineWidth = Math.max(0.35, (visSec >= 40 ? 1.1 : 1.4) / Math.max(zoom || 1, 0.2));
       ctx.beginPath();
       for (let c = 0; c <= COLS; c += step) {
         const x = Math.floor(c * drawCell) + 0.5;
@@ -4234,7 +4234,9 @@ Min 10 blocks · no maximum
 
       const screenW = w * (zoom || 1);
       const screenH = h * (zoom || 1);
-      const far = (zoom || 1) < 1.15 || Math.min(screenW, screenH) < 14;
+      // Show the photo whenever this claim is large enough on screen.
+      // Do not blank every claim just because FIT zoom is 1.
+      const far = Math.min(screenW, screenH) < 8;
 
       ctx.globalAlpha = 1;
       ctx.fillStyle = far ? (r.color || '#c9a227') : '#1a1512';

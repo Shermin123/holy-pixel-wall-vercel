@@ -2157,6 +2157,7 @@ body {
 .stage {
   position: absolute !important;
   margin: 0 !important;
+  box-shadow: 0 0 0 2px #2a2118 !important;
 }
 @media (max-width: 900px) {
   .pixel-header {
@@ -3696,16 +3697,15 @@ Min 10 blocks · no maximum
   // ===== Smooth zoom (layout-sized, no transform glitch) =====
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 0.35, Z_MAX = 24;
-  // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
+  // 1 = fit-to-screen (whole wall). Cannot zoom out past that.
+  const Z_MIN = 1, Z_MAX = 24;
   function getZPad() {
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
       const phone = w < 700;
-      // Fit: tiny pad so the wall reads as a clean centered panel
-      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
-      return phone ? 36 : 40;
-    } catch (e) { return 0; }
+      if ((zoom || 1) <= 1.02) return phone ? 4 : 10;
+      return phone ? 24 : 28;
+    } catch (e) { return 8; }
   }
   function isPhoneLayout() {
     try {
@@ -3907,9 +3907,14 @@ Min 10 blocks · no maximum
       zoom = target;
       zoomTarget = target;
       layoutAtZoom(zoom);
-      keepAnchor();
-      zoomAnchor = null;
-      clampScroll();
+      if (zoom <= Z_MIN + 0.001) {
+        zoomAnchor = null;
+        try { centerWallInView(); } catch (e) { clampScroll(); }
+      } else {
+        keepAnchor();
+        zoomAnchor = null;
+        clampScroll();
+      }
       try { positionMediaOverlays(); } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;
@@ -3943,8 +3948,29 @@ Min 10 blocks · no maximum
     } catch (e) {}
 
     const base = isFinite(zoomTarget) ? zoomTarget : (zoom || 1);
-    zoomTarget = zClamp(base * factor);
+    const next = zClamp(base * factor);
+    if (next <= Z_MIN && base <= Z_MIN + 0.002 && factor < 1) {
+      zoomTarget = Z_MIN;
+      zoom = Z_MIN;
+      layoutAtZoom(Z_MIN);
+      try { centerWallInView(); } catch (e) {}
+      return;
+    }
+    zoomTarget = next;
     if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
+  }
+
+  function centerWallInView() {
+    if (!viewport) return;
+    const wrap = $('wallWrap');
+    if (wrap) {
+      viewport.scrollLeft = Math.max(0, (wrap.offsetWidth - viewport.clientWidth) / 2);
+      viewport.scrollTop = Math.max(0, (wrap.offsetHeight - viewport.clientHeight) / 2);
+    } else {
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
+    }
+    clampScroll();
   }
 
   function detectMediaType(src, mime) {

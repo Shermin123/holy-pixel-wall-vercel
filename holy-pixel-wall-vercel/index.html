@@ -3778,10 +3778,9 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // Smooth when zoomed so claim photos stay clear (not see-through pixel mush)
-    const smoothPhotos = (z || 1) > 1.15;
-    canvas.style.imageRendering = smoothPhotos ? 'auto' : 'pixelated';
-    try { stage.style.imageRendering = smoothPhotos ? 'auto' : 'pixelated'; } catch (e) {}
+    // Photos need bilinear CSS scale; the backing store is dense enough to stay sharp
+    canvas.style.imageRendering = 'auto';
+    try { stage.style.imageRendering = 'auto'; } catch (e) {}
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -3809,11 +3808,13 @@ Min 10 blocks · no maximum
   function paintBase(opts) {
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
     opts = opts || {};
-    // Keep the bitmap small — 4k–9k canvases freeze the tab
-    const dpr = opts.fast ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
-    const maxLong = opts.fast ? 1200 : 1800;
+    // Backing store must cover on-screen size × zoom × DPR or claim photos go soft
+    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
+    const dpr = opts.fast ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+    const zNeed = Math.max(1, Math.min(Number(zoom) || 1, 2.4));
+    const maxLong = opts.fast ? 1600 : (phone ? 2600 : 3600);
     const long = Math.max(baseW, baseH) || 1;
-    const scale = Math.min(dpr, maxLong / long);
+    const scale = Math.min(dpr * zNeed, maxLong / long);
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -3857,6 +3858,9 @@ Min 10 blocks · no maximum
 
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
+    zoomTimer = setTimeout(() => {
+      try { paintBase({ fast: false }); } catch (e) {}
+    }, 180);
   }
 
   function anchorAt(clientX, clientY) {

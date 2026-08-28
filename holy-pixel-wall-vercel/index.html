@@ -16,18 +16,8 @@
   
   /* CRT / pixel scanline overlay */
   body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 9998;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(60, 40, 20, 0.04) 2px,
-      rgba(60, 40, 20, 0.04) 4px
-    );
+    display: none;
+    content: none;
   }
   /* Soft vignette for depth (still pixel-friendly) */
   body::before {
@@ -1760,7 +1750,7 @@
    Game Boy × modern indie — warm paper, hard shadows, steps()
    ============================================================ */
 
-/* Soft paper grain + subtle header shimmer (grid, not continuous noise) */
+/* Soft paper grain — no filter animation (filters hitch the whole page) */
 .pixel-header {
   background-image:
     linear-gradient(180deg, #fff8e8 0%, #f0e0c4 100%),
@@ -1769,7 +1759,7 @@
       transparent 0 7px,
       rgba(201, 163, 78, 0.06) 7px 8px
     ) !important;
-  animation: hpwHeaderShimmer 4.8s steps(6) infinite;
+  animation: none !important;
 }
 @keyframes hpwHeaderShimmer {
   0%, 100% { filter: brightness(1); }
@@ -1945,21 +1935,9 @@
 
 /* Viewport subtle idle sparkle layer */
 .viewport::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-  background-image:
-    radial-gradient(1px 1px at 12% 28%, rgba(212, 160, 23, 0.35), transparent),
-    radial-gradient(1px 1px at 68% 42%, rgba(201, 163, 78, 0.28), transparent),
-    radial-gradient(1px 1px at 34% 76%, rgba(240, 193, 75, 0.3), transparent),
-    radial-gradient(1px 1px at 88% 18%, rgba(212, 160, 23, 0.22), transparent),
-    radial-gradient(1px 1px at 52% 58%, rgba(201, 163, 78, 0.25), transparent);
-  background-size: 180px 140px;
-  animation: hpwTwinkle 3.6s steps(4) infinite;
-  opacity: 0.55;
-  mix-blend-mode: multiply;
+  display: none !important;
+  content: none !important;
+  animation: none !important;
 }
 @keyframes hpwTwinkle {
   0%, 100% { opacity: 0.35; }
@@ -3143,6 +3121,11 @@ Min 10 blocks · no maximum
   // Offscreen cache for static grid (rebuild only when size/zoom changes)
   let gridCacheCanvas = null;
   let gridCacheKey = '';
+  let staticWallCanvas = null;
+  let staticWallKey = '';
+  let dragBox = null;
+  let lastSnapKey = '';
+  let floatThrottle = 0;
 
 
   function viewportSize() {
@@ -3343,7 +3326,7 @@ Min 10 blocks · no maximum
   let hoverRegion = null;
   let hoverPulse = 0;
   function tickAnts() {
-    if (reduceMotion) return;
+    if (reduceMotion || dragging) return;
     let need = false;
     if (selected && selected.size) {
       antsOffset = (antsOffset + 1) % 16;
@@ -3361,7 +3344,7 @@ Min 10 blocks · no maximum
     }
   }
   try {
-    antsTimer = setInterval(tickAnts, 180);
+    antsTimer = setInterval(tickAnts, 320);
   } catch (e) {}
 
   function friendlyError(err, fallback) {
@@ -3580,13 +3563,21 @@ Min 10 blocks · no maximum
     return h > 0 ? h + 'H ' + m + 'M LEFT' : m + 'M LEFT';
   }
 
+  let saveTimer = 0;
   function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 400);
+  }
+  function saveNow() {
     try {
       storeSet(STORE, JSON.stringify({
         regions: regions.map(r => {
           const copy = { ...r };
-          if (copy.media && copy.media.startsWith('data:') && copy.media.length > 21000000) {
+          if (copy.media && copy.media.startsWith('data:') && copy.media.length > 250000) {
             copy.media = '';
+          }
+          if (Array.isArray(copy.cells) && copy.cells.length > 4000) {
+            copy.cells = copy.cells.slice(0, 4000);
           }
           return copy;
         })
@@ -3818,12 +3809,11 @@ Min 10 blocks · no maximum
   function paintBase(opts) {
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
     opts = opts || {};
-    // First paint stays light so the wall appears immediately; HQ follows
-    const dpr = Math.min(window.devicePixelRatio || 1, opts.fast ? 1 : 2);
-    const minLong = opts.fast ? 1400 : (isPhoneLayout() ? 2800 : 3200);
-    const long = Math.max(baseW, baseH);
-    const boost = long < minLong ? (minLong / long) : 1;
-    const scale = dpr * Math.min(boost, opts.fast ? 1.5 : 3);
+    // Keep the bitmap small — 4k–9k canvases freeze the tab
+    const dpr = opts.fast ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+    const maxLong = opts.fast ? 1200 : 1800;
+    const long = Math.max(baseW, baseH) || 1;
+    const scale = Math.min(dpr, maxLong / long);
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -3836,7 +3826,6 @@ Min 10 blocks · no maximum
     sizeW = baseW;
     sizeH = baseH;
     hqZoom = 1;
-    gridCacheKey = '';
     try {
       draw();
     } finally {
@@ -3845,13 +3834,16 @@ Min 10 blocks · no maximum
       sizeH = savedH || baseH * (zoom || 1);
     }
     layoutAtZoom(zoom || 1);
-    syncMediaOverlays();
+    try {
+      if (mediaLayer && mediaLayer.childElementCount) positionMediaOverlays();
+      else syncMediaOverlays();
+    } catch (e) {}
     if (opts.fast && !paintHqScheduled) {
       paintHqScheduled = true;
       setTimeout(() => {
         paintHqScheduled = false;
         try { paintBase({ fast: false }); } catch (e) {}
-      }, 80);
+      }, 220);
     }
   }
 
@@ -4029,14 +4021,18 @@ Min 10 blocks · no maximum
 
   function syncMediaOverlays() {
     if (!mediaLayer) return;
-    mediaLayer.innerHTML = '';
+    const keep = new Set();
+    const existing = {};
+    Array.from(mediaLayer.children).forEach(ch => {
+      const id = ch.getAttribute('data-claim');
+      if (id) existing[id] = ch;
+    });
     regions.forEach(r => {
       if (!r.media || r.mediaType === 'image') return;
-      let ownsAny = false;
-      for (let c = r.minC; c <= r.maxC && !ownsAny; c++)
-        for (let row = r.minR; row <= r.maxR; row++)
-          if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
-      if (!ownsAny) return;
+      const rid = String(r.id || r.claimId || '');
+      if (!rid) return;
+      keep.add(rid);
+      if (existing[rid]) return;
 
       const x = r.minC * cell;
       const y = r.minR * cell;
@@ -4049,6 +4045,7 @@ Min 10 blocks · no maximum
       // Clip box = exact claim rectangle (same math as canvas draw)
       const clip = document.createElement('div');
       clip.className = 'media-item';
+      clip.setAttribute('data-claim', rid);
       clip.setAttribute('data-min-c', String(r.minC));
       clip.setAttribute('data-max-c', String(r.maxC));
       clip.setAttribute('data-min-r', String(r.minR));
@@ -4074,7 +4071,7 @@ Min 10 blocks · no maximum
         el.playsInline = true;
         el.setAttribute('playsinline', '');
         el.setAttribute('webkit-playsinline', '');
-        el.preload = 'auto';
+        el.preload = 'metadata';
         try { el.disablePictureInPicture = true; } catch (e) {}
         el.play().catch(() => {});
       } else {
@@ -4100,6 +4097,11 @@ Min 10 blocks · no maximum
       clip.appendChild(el);
       mediaLayer.appendChild(clip);
     });
+    Array.from(mediaLayer.children).forEach(ch => {
+      const id = ch.getAttribute('data-claim');
+      if (id && !keep.has(id)) ch.remove();
+    });
+    try { positionMediaOverlays(); } catch (e) {}
   }
 
   let drawRaf = 0;
@@ -4222,11 +4224,7 @@ Min 10 blocks · no maximum
       const st = viewport.scrollTop - o.y;
       const vw = viewport.clientWidth;
       const vh = viewport.clientHeight;
-      // At fit zoom the whole wall is on screen — draw everything
-      if ((zoom || 1) <= 1.05) {
-        return { c0: 0, r0: 0, c1: COLS - 1, r1: ROWS - 1 };
-      }
-      const margin = 8; // cells of slack so top-right never disappears
+      const margin = 6;
       const c0 = Math.max(0, Math.floor(sl / cell) - margin);
       const r0 = Math.max(0, Math.floor(st / cell) - margin);
       const c1 = Math.min(COLS - 1, Math.ceil((sl + vw) / cell) + margin);
@@ -4270,22 +4268,6 @@ Min 10 blocks · no maximum
             Math.min(SEC, COLS - sc) * cell,
             Math.min(SEC, ROWS - sr) * cell
           );
-        }
-      }
-    }
-
-    // Sparse static “pixel dust” on empty paper (cartoon sparkle seeds)
-    // Deterministic so cache stays valid; CSS layer animates perceived twinkle
-    if (cell >= 0.4) {
-      g.fillStyle = 'rgba(212, 160, 23, 0.09)';
-      for (let sc = 3; sc < COLS; sc += 17) {
-        for (let sr = 5; sr < ROWS; sr += 19) {
-          if (((sc * 13 + sr * 7) % 11) < 2) {
-            const px = Math.floor(sc * cell) + Math.max(0, (cell * 0.3) | 0);
-            const py = Math.floor(sr * cell) + Math.max(0, (cell * 0.35) | 0);
-            const s = Math.max(1, Math.min(2, cell * 0.25));
-            g.fillRect(px, py, s, s);
-          }
         }
       }
     }
@@ -4346,12 +4328,17 @@ Min 10 blocks · no maximum
     // Visible range in cell indices — account for CSS/layout zoom
     const { c0, r0, c1, r1 } = visibleCellRange();
 
-    // 2) Grid comes from cache — no extra overlapping strokes (stays clean when zooming)
-
-
-    // 3) Claimed regions — skip off-screen, solid rects when possible
+    const staticKey = canvas.width + 'x' + canvas.height + ':' + regions.length + ':' + sold.size;
+    const canBlitStatic = dragging && staticWallCanvas && staticWallKey === staticKey
+      && staticWallCanvas.width === canvas.width && staticWallCanvas.height === canvas.height;
+    if (canBlitStatic) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(staticWallCanvas, 0, 0);
+      ctx.restore();
+    } else {
+    // 3) Claimed regions
     regions.forEach(r => {
-      if (r.maxC < c0 || r.minC > c1 || r.maxR < r0 || r.minR > r1) return;
       const x0 = r.minC * drawCell, y0 = r.minR * drawCell;
       const w = (r.maxC - r.minC + 1) * drawCell;
       const h = (r.maxR - r.minR + 1) * drawCell;
@@ -4402,6 +4389,16 @@ Min 10 blocks · no maximum
       ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
       ctx.restore();
     });
+    try {
+      if (!staticWallCanvas) staticWallCanvas = document.createElement('canvas');
+      if (staticWallCanvas.width !== canvas.width || staticWallCanvas.height !== canvas.height) {
+        staticWallCanvas.width = canvas.width;
+        staticWallCanvas.height = canvas.height;
+      }
+      staticWallCanvas.getContext('2d').drawImage(canvas, 0, 0);
+      staticWallKey = staticKey;
+    } catch (e) {}
+    } // end !canBlitStatic
 
     // 4) Buy-mode: each free pixel = one clear tile (easy to aim when zoomed)
     const visCell = (baseCell || drawCell) * (zoom || 1);
@@ -4411,8 +4408,10 @@ Min 10 blocks · no maximum
     const hairBold = Math.max(hair * 1.6, 2.8 / zNow);
     const hairFrame = Math.max(hair * 1.8, 3 / zNow);
 
-    if (buyMode && visCell >= 2.5) {
+    if (buyMode && !dragging && visCell >= 8) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
+      const tiles = (gc1 - gc0 + 1) * (gr1 - gr0 + 1);
+      if (tiles <= 8000) {
       ctx.save();
       // Gap inside each cell so tiles read as separate blocks
       const inset = visCell >= 10 ? Math.max(0.6, drawCell * 0.08) : (visCell >= 5 ? Math.max(0.4, drawCell * 0.05) : 0);
@@ -4433,49 +4432,10 @@ Min 10 blocks · no maximum
           } else {
             ctx.fillRect(x, y, drawCell, drawCell);
           }
-          // Dark outline — each square is one selectable pixel
-          ctx.strokeStyle = visCell >= 12
-            ? 'rgba(42, 33, 24, 0.85)'
-            : (visCell >= 6 ? 'rgba(42, 33, 24, 0.65)' : 'rgba(42, 33, 24, 0.4)');
-          ctx.lineWidth = hair;
-          ctx.strokeRect(
-            Math.floor(x) + 0.5,
-            Math.floor(y) + 0.5,
-            Math.max(0, drawCell - 1),
-            Math.max(0, drawCell - 1)
-          );
-        }
-      }
-
-      // 10×10 section borders (gold) — orientation only, still skip owned cells
-      if (visCell >= 4) {
-        const sec = SECTION || 10;
-        ctx.strokeStyle = 'rgba(139, 90, 43, 0.55)';
-        ctx.lineWidth = hairBold;
-        for (let c = Math.ceil(gc0 / sec) * sec; c <= gc1; c += sec) {
-          for (let r = gr0; r <= gr1; r++) {
-            if (sold.has(c + ',' + r) && sold.has((c - 1) + ',' + r)) continue;
-            if (c <= 0 || c >= COLS) continue;
-            const x = Math.floor(c * drawCell) + 0.5;
-            ctx.beginPath();
-            ctx.moveTo(x, r * drawCell);
-            ctx.lineTo(x, (r + 1) * drawCell);
-            ctx.stroke();
-          }
-        }
-        for (let r = Math.ceil(gr0 / sec) * sec; r <= gr1; r += sec) {
-          for (let c = gc0; c <= gc1; c++) {
-            if (sold.has(c + ',' + r) && sold.has(c + ',' + (r - 1))) continue;
-            if (r <= 0 || r >= ROWS) continue;
-            const y = Math.floor(r * drawCell) + 0.5;
-            ctx.beginPath();
-            ctx.moveTo(c * drawCell, y);
-            ctx.lineTo((c + 1) * drawCell, y);
-            ctx.stroke();
-          }
         }
       }
       ctx.restore();
+      }
     }
 
     // 4b) Hover pulse on owned claim (2-step soft outline)
@@ -4499,46 +4459,29 @@ Min 10 blocks · no maximum
     }
 
     // 5) Selection — gold glass fill + crisp thin pixel borders
-    if (selected.size) {
+    const selBox = (dragging && dragBox) ? dragBox : null;
+    if (selBox || selected.size) {
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
-      const freeKeys = [];
-      selected.forEach(k => {
-        if (sold.has(k) && !(adminMode && editingRegion && typeof cellOwnedByEditing === 'function' && cellOwnedByEditing(k))) return;
-        const parts = k.split(',');
-        const c = +parts[0], r = +parts[1];
-        if (!Number.isFinite(c) || !Number.isFinite(r)) return;
-        freeKeys.push([c, r]);
-        if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
-        if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
-      });
-      if (freeKeys.length && sMaxC >= sMinC) {
+      if (selBox) {
+        sMinC = selBox.minC; sMaxC = selBox.maxC; sMinR = selBox.minR; sMaxR = selBox.maxR;
+      } else {
+        selected.forEach(k => {
+          const parts = k.split(',');
+          const c = +parts[0], r = +parts[1];
+          if (!Number.isFinite(c) || !Number.isFinite(r)) return;
+          if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
+          if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
+        });
+      }
+      if (sMaxC >= sMinC) {
         const bx = sMinC * drawCell;
         const by = sMinR * drawCell;
         const bw = (sMaxC - sMinC + 1) * drawCell;
         const bh = (sMaxR - sMinR + 1) * drawCell;
 
         ctx.save();
-        // Zoomed out: solid gold block so selection stays visible
-        // Zoomed in: each selected pixel is a clear gold tile
-        if (visCell < 2.2) {
-          ctx.fillStyle = 'rgba(212, 160, 23, 0.6)';
-          ctx.fillRect(bx, by, bw, bh);
-        } else {
-          const pad = visCell >= 8 ? Math.max(0.5, drawCell * 0.06) : 0;
-          freeKeys.forEach(([c, r]) => {
-            const x = c * drawCell, y = r * drawCell;
-            ctx.fillStyle = '#f0c14b';
-            ctx.fillRect(x + pad, y + pad, Math.max(0, drawCell - pad * 2), Math.max(0, drawCell - pad * 2));
-            ctx.strokeStyle = '#5c3d1e';
-            ctx.lineWidth = Math.max(hair, 0.12);
-            ctx.strokeRect(
-              Math.floor(x) + 0.5,
-              Math.floor(y) + 0.5,
-              Math.max(0, drawCell - 1),
-              Math.max(0, drawCell - 1)
-            );
-          });
-        }
+        ctx.fillStyle = 'rgba(240, 193, 75, 0.45)';
+        ctx.fillRect(bx, by, bw, bh);
         // Outer frame — always visible at any zoom
         const dashA = Math.max(3, 6 / zNow);
         const dashB = Math.max(2, 4 / zNow);
@@ -4935,7 +4878,18 @@ Min 10 blocks · no maximum
     return { minC, maxC, minR, maxR };
   }
 
-  function applyDrag() {
+  function regionHitsBox(c0, c1, r0, r1) {
+    for (let i = 0; i < regions.length; i++) {
+      const r = regions[i];
+      if (!r) continue;
+      if (adminMode && editingRegion && (r === editingRegion || r.id === editingRegion.id)) continue;
+      if (r.maxC < c0 || r.minC > c1 || r.maxR < r0 || r.minR > r1) continue;
+      return r;
+    }
+    return null;
+  }
+
+  function applyDrag(finalize) {
     if (!Number.isFinite(startC) || !Number.isFinite(curC)) return;
     let minC = Math.max(0, Math.min(startC, curC));
     let maxC = Math.min(COLS - 1, Math.max(startC, curC));
@@ -4946,7 +4900,8 @@ Min 10 blocks · no maximum
     const aC = startC, aR = startR;
     if (!cellSelectable(aC, aR)) {
       selected = new Set();
-      try { draw(); } catch (err) {}
+      dragBox = null;
+      scheduleDraw();
       try { updateFloat(); } catch (err) {}
       return;
     }
@@ -4960,6 +4915,40 @@ Min 10 blocks · no maximum
       maxC = Math.min(COLS - 1, Math.floor(maxC / sec) * sec + sec - 1);
       maxR = Math.min(ROWS - 1, Math.floor(maxR / sec) * sec + sec - 1);
     }
+
+    const snapKey = minC + ',' + minR + ',' + maxC + ',' + maxR + ':' + !!finalize;
+    if (!finalize && snapKey === lastSnapKey) return;
+    lastSnapKey = snapKey;
+
+    // Live drag: cheap preview only (no per-pixel set / sliver flood)
+    if (!finalize) {
+      let hit = regionHitsBox(minC, maxC, minR, maxR);
+      let guard = 0;
+      while (hit && guard++ < 40) {
+        if (hit.minC <= maxC && hit.minC > aC) maxC = hit.minC - 1;
+        else if (hit.maxC >= minC && hit.maxC < aC) minC = hit.maxC + 1;
+        else if (hit.minR <= maxR && hit.minR > aR) maxR = hit.minR - 1;
+        else if (hit.maxR >= minR && hit.maxR < aR) minR = hit.maxR + 1;
+        else break;
+        if (minC > maxC || minR > maxR) break;
+        hit = regionHitsBox(minC, maxC, minR, maxR);
+      }
+      if (minC > maxC || minR > maxR) {
+        dragBox = null;
+        scheduleDraw();
+        return;
+      }
+      dragBox = { minC, maxC, minR, maxR };
+      const n = (maxC - minC + 1) * (maxR - minR + 1);
+      try {
+        if ($('selCount')) $('selCount').textContent = n + ' pixels';
+        if ($('selPrice')) $('selPrice').textContent = '$' + (n * price()).toFixed(2);
+        if (floatBar) floatBar.classList.add('visible');
+      } catch (e) {}
+      scheduleDraw();
+      return;
+    }
+    dragBox = null;
 
     function findForeignInRect(c0, c1, r0, r1) {
       for (let c = c0; c <= c1; c++)
@@ -5031,7 +5020,7 @@ Min 10 blocks · no maximum
         ? ('<strong>' + next.size + ' PIXELS</strong>Resize · cannot cover other claims')
         : ('<strong>' + next.size + ' PIXELS</strong>$' + price().toFixed(2) + ' each · total $' + (next.size * price()).toFixed(2));
     }
-    try { draw(); } catch (err) { console.warn(err); }
+    try { scheduleDraw(); } catch (err) { console.warn(err); }
     try { updateFloat(); } catch (err) { console.warn(err); }
   }
 
@@ -5090,6 +5079,8 @@ Min 10 blocks · no maximum
     }
     dragging = true;
     didDrag = false;
+    lastSnapKey = '';
+    dragBox = null;
     if (startOnEditingClaim) {
       const er = editingRegion;
       selected = new Set();
@@ -5240,14 +5231,14 @@ Min 10 blocks · no maximum
   function onUp() {
     if (!dragging) return;
     dragging = false;
-    // Tap without move: leave previous selection intact
     if (selectAwaitingMove) {
       selectAwaitingMove = false;
+      dragBox = null;
       try { updateFloat(); } catch (err) {}
-      try { draw(); } catch (err) {}
+      try { scheduleDraw(); } catch (err) {}
       return;
     }
-    // Keep didDrag true until next click tick so canvas click ignores this gesture
+    try { applyDrag(true); } catch (err) {}
     if (selected.size) {
       pushSelectHistory();
       setTimeout(() => { didDrag = false; }, 0);
@@ -5255,7 +5246,7 @@ Min 10 blocks · no maximum
       didDrag = false;
     }
     try { updateFloat(); } catch (err) {}
-    try { draw(); } catch (err) {}
+    try { scheduleDraw(); } catch (err) {}
   }
 
   canvas.addEventListener('mousedown', onDown);
@@ -8237,8 +8228,7 @@ let scrollDrawRaf = 0;
     if (scrollDrawRaf) return;
     scrollDrawRaf = requestAnimationFrame(() => {
       scrollDrawRaf = 0;
-      // Fine grid + claims use visible range — cheap when grid is cached
-      if (cell >= 1.15) scheduleDraw();
+      if (buyMode || (selected && selected.size)) scheduleDraw();
     });
   }, { passive: true });
   let resizeTimer = 0;
@@ -8419,7 +8409,7 @@ let scrollDrawRaf = 0;
     try { resize(false); } catch (e) {}
     requestAnimationFrame(() => { try { layoutAtZoom(zoom || 1); draw(); } catch (e) {} });
     setTimeout(() => { try { resize(false); } catch (e) {} }, 400);
-    setInterval(pullWall, 15000);
+    setInterval(pullWall, 45000);
 
     // Back from Stripe success
     const params = new URLSearchParams(location.search);

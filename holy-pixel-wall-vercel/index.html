@@ -3772,7 +3772,6 @@ canvas.height = Math.max(1, Math.round(baseH * scale));
 
 ctx.setTransform(scale, 0, 0, scale, 0, 0);
 ctx.imageSmoothingEnabled = false;
-    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high'; } catch (e) {}
     // draw() uses logical size baseW×baseH via cell=baseCell temporarily
     const savedCell = cell;
     const savedW = sizeW, savedH = sizeH;
@@ -3790,12 +3789,15 @@ ctx.imageSmoothingEnabled = false;
     layoutAtZoom(zoom || 1);
     syncMediaOverlays();
     if (opts.fast && !paintHqScheduled) {
-      paintHqScheduled = true;
-      setTimeout(() => {
-        paintHqScheduled = false;
-        try { paintBase({ fast: false }); } catch (e) {}
-      }, 200);
-    }
+  paintHqScheduled = true;
+
+  requestAnimationFrame(() => {
+    paintHqScheduled = false;
+    try {
+      paintBase({ fast: false });
+    } catch (e) {}
+  });
+}
   }
 
   function applyZoomHQ() {

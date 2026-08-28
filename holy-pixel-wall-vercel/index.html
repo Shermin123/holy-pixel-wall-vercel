@@ -2109,16 +2109,20 @@
 }
 .toolbar { height: auto !important; overflow: visible !important; }
 .viewport {
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
+  display: block !important;
+  overflow: auto !important;
 }
 #wallWrap {
-  flex: 0 0 auto !important;
-  margin: 0 auto !important;
+  display: block !important;
   position: relative !important;
+  margin: 0 !important;
+  background: transparent !important;
 }
-.stage { position: absolute !important; margin: 0 !important; }
+.stage {
+  position: absolute !important;
+  display: block !important;
+  margin: 0 !important;
+}
 .viewport::after { display: none !important; animation: none !important; }
 body::after { display: none !important; }
 
@@ -3583,10 +3587,10 @@ Min 10 blocks · no maximum
     }
   }
 
-  function resize(fitReset, viewMode) {
+  function resize(fitReset) {
     computeGrid();
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const margin = phone ? 8 : 20;
+    const margin = phone ? 10 : 24;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
@@ -3599,12 +3603,8 @@ Min 10 blocks · no maximum
     sizeW = baseW;
     sizeH = baseH;
     if (fitReset) {
-      let z0 = 1;
-      if ((viewMode === 'open' || viewMode === 'width') && !phone) {
-        z0 = zClamp((vw / COLS) / baseCell);
-      }
-      zoom = z0;
-      zoomTarget = z0;
+      zoom = 1;
+      zoomTarget = 1;
       hqZoom = 1;
       zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
@@ -3615,7 +3615,7 @@ Min 10 blocks · no maximum
     try { syncMediaOverlays(); } catch (e) {}
     if (fitReset) {
       requestAnimationFrame(() => {
-        try { centerWallInView(zoom > 1.05 ? 'top' : 'center'); } catch (e) {}
+        try { centerWallInView(); } catch (e) {}
         try { positionMediaOverlays(); } catch (e) {}
         try { draw(); } catch (e) {}
       });
@@ -3628,13 +3628,14 @@ Min 10 blocks · no maximum
 
 
 
-  function centerWallInView(mode) {
+  function centerWallInView() {
     if (!viewport) return;
-    const wrap = $('wallWrap');
-    const extraX = wrap ? Math.max(0, wrap.offsetWidth - viewport.clientWidth) : 0;
-    const extraY = wrap ? Math.max(0, wrap.offsetHeight - viewport.clientHeight) : 0;
-    viewport.scrollLeft = extraX / 2;
-    viewport.scrollTop = (mode === 'top') ? 0 : extraY / 2;
+    const o = getWallOrigin();
+    const w = (baseW || 0) * (zoom || 1);
+    const h = (baseH || 0) * (zoom || 1);
+    viewport.scrollLeft = Math.max(0, o.x + w / 2 - viewport.clientWidth / 2);
+    viewport.scrollTop = Math.max(0, o.y + h / 2 - viewport.clientHeight / 2);
+    clampScroll();
   }
 
   function layoutWall() {
@@ -3645,7 +3646,7 @@ Min 10 blocks · no maximum
   // ===== Smooth zoom (layout-sized, no transform glitch) =====
   // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
   // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 0.35, Z_MAX = 24;
+  const Z_MIN = 1, Z_MAX = 24;
   // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
     try {
@@ -3698,12 +3699,17 @@ Min 10 blocks · no maximum
     sizeW = w;
     sizeH = h;
     cell = baseCell * z;
-    const pad = (z <= 1.05) ? 8 : 16;
     const boxW = Math.ceil(w);
     const boxH = Math.ceil(h);
-    const wrapW = boxW + pad * 2;
-    const wrapH = boxH + pad * 2;
-    wallOrigin = { x: pad, y: pad };
+    const vpW = (viewport && viewport.clientWidth) || boxW;
+    const vpH = (viewport && viewport.clientHeight) || boxH;
+    // Scrollport is exactly the wall when zoomed in, exactly the viewport when fitted.
+    // Origin centers the wall when it is smaller than the view — no CSS margins.
+    const wrapW = Math.max(vpW, boxW);
+    const wrapH = Math.max(vpH, boxH);
+    const ox = Math.floor((wrapW - boxW) / 2);
+    const oy = Math.floor((wrapH - boxH) / 2);
+    wallOrigin = { x: ox, y: oy };
 
     if (wrap) {
       wrap.style.boxSizing = 'border-box';
@@ -3714,8 +3720,8 @@ Min 10 blocks · no maximum
       wrap.style.position = 'relative';
     }
     stage.style.position = 'absolute';
-    stage.style.left = pad + 'px';
-    stage.style.top = pad + 'px';
+    stage.style.left = ox + 'px';
+    stage.style.top = oy + 'px';
     stage.style.width = w + 'px';
     stage.style.height = h + 'px';
     stage.style.margin = '0';
@@ -3846,9 +3852,14 @@ Min 10 blocks · no maximum
       zoom = target;
       zoomTarget = target;
       layoutAtZoom(zoom);
-      keepAnchor();
-      zoomAnchor = null;
-      clampScroll();
+      if (zoom <= Z_MIN + 0.001) {
+        zoomAnchor = null;
+        centerWallInView();
+      } else {
+        keepAnchor();
+        zoomAnchor = null;
+        clampScroll();
+      }
       try { positionMediaOverlays(); } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       return;

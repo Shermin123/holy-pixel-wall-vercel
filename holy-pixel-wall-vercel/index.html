@@ -2136,6 +2136,17 @@ body {
   position: absolute !important;
   margin: 0 !important;
   box-shadow: 0 0 0 2px #2a2118 !important;
+  image-rendering: auto !important;
+}
+.stage canvas {
+  image-rendering: auto !important;
+  image-rendering: -webkit-optimize-contrast;
+}
+.media-layer .media-item,
+.media-layer .media-item img,
+.media-layer .media-item video {
+  image-rendering: auto !important;
+  -ms-interpolation-mode: bicubic;
 }
 @media (max-width: 900px) {
   .pixel-header {
@@ -3110,9 +3121,9 @@ Min 10 blocks · no maximum
   let devMode = false;
   let spaceHeld = false;
   let panning = false, panLastX = 0, panLastY = 0;
-  const SECTION = 10; // big block = 10×10 pixels
+  const SECTION = 2; // fine snap — selection follows the drag
   const MIN_BUY = 10;
-  const SLIVER_MAX = 9; // leftover corridors this wide get swallowed into the buy
+  const SLIVER_MAX = 0; // do not auto-grow the selection box
   const MAX_BUY = 999999; // effectively unlimited
   let sizeW = 600, sizeH = 600, cell = 6;
   let baseW = 600, baseH = 600, baseCell = 6;
@@ -3778,9 +3789,13 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // Photos need bilinear CSS scale; the backing store is dense enough to stay sharp
-    canvas.style.imageRendering = 'auto';
-    try { stage.style.imageRendering = 'auto'; } catch (e) {}
+    // Close-up: nearest-neighbor so each wall pixel stays a hard square
+    const sharpPx = (z || 1) > 1.15;
+    canvas.style.imageRendering = sharpPx ? 'pixelated' : 'auto';
+    try {
+      canvas.style.imageRendering = sharpPx ? 'pixelated' : 'auto';
+      stage.style.imageRendering = sharpPx ? 'pixelated' : 'auto';
+    } catch (e) {}
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -3811,8 +3826,8 @@ Min 10 blocks · no maximum
     // Backing store must cover on-screen size × zoom × DPR or claim photos go soft
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
     const dpr = opts.fast ? 1 : Math.min(window.devicePixelRatio || 1, 2);
-    const zNeed = Math.max(1, Math.min(Number(zoom) || 1, 2.4));
-    const maxLong = opts.fast ? 1600 : (phone ? 2600 : 3600);
+    const zNeed = Math.max(1, Math.min(Number(zoom) || 1, 8));
+    const maxLong = opts.fast ? 1600 : (phone ? 2800 : 4096);
     const long = Math.max(baseW, baseH) || 1;
     const scale = Math.min(dpr * zNeed, maxLong / long);
     canvas.width = Math.max(1, Math.round(baseW * scale));
@@ -3913,6 +3928,7 @@ Min 10 blocks · no maximum
       }
       try { positionMediaOverlays(); } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
+      try { scheduleZoomHQ(); } catch (e) {}
       return;
     }
     // Ease toward target; larger steps when far for responsive zoom
@@ -4167,15 +4183,10 @@ Min 10 blocks · no maximum
     }
     const img = new Image();
     img.decoding = 'async';
-    try { img.loading = 'eager'; } catch (e) {}
-    // Do NOT set crossOrigin by default — many hosts block CORS and the
-    // image never loads (blank preview). Wall display does not need export.
+    try { img.loading = 'lazy'; } catch (e) {}
     img.onload = () => {
       img._hpwBroken = false;
-      try {
-        if (img.decode) img.decode().then(() => scheduleDraw()).catch(() => scheduleDraw());
-        else scheduleDraw();
-      } catch (e) { try { scheduleDraw(); } catch (e2) {} }
+      try { scheduleDraw(); } catch (e) {}
       try { if (typeof updateBlockPreview === 'function') updateBlockPreview(); } catch (e) {}
     };
     img.onerror = () => {
@@ -4411,6 +4422,56 @@ Min 10 blocks · no maximum
     const hair = Math.max(0.08, Math.min(drawCell * 0.14, 2.2 / zNow));
     const hairBold = Math.max(hair * 1.6, 2.8 / zNow);
     const hairFrame = Math.max(hair * 1.8, 3 / zNow);
+
+    // Close-up: draw every wall pixel as its own square
+    if (!dragging && visCell >= 3.2) {
+      const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
+      const tiles = (gc1 - gc0 + 1) * (gr1 - gr0 + 1);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      if (visCell >= 7 && tiles <= 12000) {
+        const gap = visCell >= 14 ? Math.max(0.35, drawCell * 0.08) : Math.max(0.15, drawCell * 0.05);
+        for (let c = gc0; c <= gc1; c++) {
+          for (let r = gr0; r <= gr1; r++) {
+            if (sold.has(c + ',' + r)) continue;
+            const x = c * drawCell;
+            const y = r * drawCell;
+            ctx.fillStyle = ((c + r) & 1) ? '#fffdf8' : '#efe0c4';
+            ctx.fillRect(x + gap, y + gap, Math.max(0, drawCell - gap * 2), Math.max(0, drawCell - gap * 2));
+          }
+        }
+      }
+      ctx.beginPath();
+      ctx.strokeStyle = visCell >= 10 ? 'rgba(42, 33, 24, 0.55)' : 'rgba(92, 61, 30, 0.35)';
+      ctx.lineWidth = Math.max(hair * 0.7, drawCell * 0.04);
+      for (let c = gc0; c <= gc1 + 1; c++) {
+        const x = Math.floor(c * drawCell) + 0.5;
+        ctx.moveTo(x, gr0 * drawCell);
+        ctx.lineTo(x, (gr1 + 1) * drawCell);
+      }
+      for (let r = gr0; r <= gr1 + 1; r++) {
+        const y = Math.floor(r * drawCell) + 0.5;
+        ctx.moveTo(gc0 * drawCell, y);
+        ctx.lineTo((gc1 + 1) * drawCell, y);
+      }
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(92, 61, 30, 0.7)';
+      ctx.lineWidth = Math.max(hairBold, drawCell * 0.08);
+      const sec = SECTION || 10;
+      for (let c = Math.ceil(gc0 / sec) * sec; c <= gc1 + 1; c += sec) {
+        const x = Math.floor(c * drawCell) + 0.5;
+        ctx.moveTo(x, gr0 * drawCell);
+        ctx.lineTo(x, (gr1 + 1) * drawCell);
+      }
+      for (let r = Math.ceil(gr0 / sec) * sec; r <= gr1 + 1; r += sec) {
+        const y = Math.floor(r * drawCell) + 0.5;
+        ctx.moveTo(gc0 * drawCell, y);
+        ctx.lineTo((gc1 + 1) * drawCell, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (buyMode && !dragging && visCell >= 8) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
@@ -4910,10 +4971,10 @@ Min 10 blocks · no maximum
       return;
     }
 
-    // Public buy: snap to 10×10 tiles so leftover strips are not created
+    // Keep the box tight to the drag. Only snap to 2×2 so edges stay clean.
     const snapTiles = !(adminMode && editingRegion);
     if (snapTiles) {
-      const sec = SECTION || 10;
+      const sec = SECTION || 2;
       minC = Math.floor(minC / sec) * sec;
       minR = Math.floor(minR / sec) * sec;
       maxC = Math.min(COLS - 1, Math.floor(maxC / sec) * sec + sec - 1);
@@ -4993,17 +5054,7 @@ Min 10 blocks · no maximum
       return;
     }
 
-    // Public buy: take whole free 10×10 tiles, then eat leftover slivers/pockets
-    if (snapTiles) {
-      const tiled = snapToFreeTiles(minC, maxC, minR, maxR, aC, aR);
-      if (tiled) {
-        minC = tiled.minC; maxC = tiled.maxC; minR = tiled.minR; maxR = tiled.maxR;
-      }
-      const grown = swallowSlivers({ minC, maxC, minR, maxR });
-      minC = grown.minC; maxC = grown.maxC; minR = grown.minR; maxR = grown.maxR;
-      const sealed = sealDeadZones({ minC, maxC, minR, maxR });
-      minC = sealed.minC; maxC = sealed.maxC; minR = sealed.minR; maxR = sealed.maxR;
-    }
+    // Do not expand into neighbouring tiles or slivers — box stays what you drew.
 
     const next = new Set();
     for (let c = minC; c <= maxC; c++) {
@@ -6375,20 +6426,12 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         reader.readAsDataURL(file);
         return;
       }
-      // Small PNG/WebP: keep lossless original
-      if ((type === 'image/png' || type === 'image/webp') && file.size <= 4e6) {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
-        reader.onerror = () => reject(new Error('read'));
-        reader.readAsDataURL(file);
-        return;
-      }
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
         try {
-          // High-res ceiling — photos stay clear on the wall
-          const maxSide = 5120;
+          // Small enough to upload and paint quickly; still sharp on a pixel block
+          const maxSide = 1280;
           let w = img.naturalWidth || img.width;
           let h = img.naturalHeight || img.height;
           if (!w || !h) { URL.revokeObjectURL(url); reject(new Error('bad image')); return; }
@@ -6402,20 +6445,11 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
           c.height = h;
           const cx = c.getContext('2d');
           cx.imageSmoothingEnabled = true;
-          if (cx.imageSmoothingQuality) cx.imageSmoothingQuality = 'high';
+          if (cx.imageSmoothingQuality) cx.imageSmoothingQuality = 'medium';
           cx.drawImage(img, 0, 0, w, h);
           URL.revokeObjectURL(url);
-          let out;
-          if (type === 'image/png') {
-            out = c.toDataURL('image/png');
-            // Only fall back to JPEG if PNG is huge
-            if (out.length > 10e6) out = c.toDataURL('image/jpeg', 0.96);
-          } else if (type === 'image/webp') {
-            out = c.toDataURL('image/webp', 0.96);
-            if (!out || out.length < 100) out = c.toDataURL('image/jpeg', 0.96);
-          } else {
-            out = c.toDataURL('image/jpeg', 0.96);
-          }
+          let out = c.toDataURL('image/jpeg', 0.82);
+          if (!out || out.length < 80) out = c.toDataURL('image/png');
           resolve(out);
         } catch (err) {
           try { URL.revokeObjectURL(url); } catch (e) {}
@@ -6452,7 +6486,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         toast('IMAGE TOO LARGE (MAX 25MB)', 'error');
         return;
       }
-      toast(isVideo ? 'LOADING VIDEO…' : (isGif ? 'LOADING GIF…' : 'LOADING HIGH-QUALITY PHOTO…'));
+      toast(isVideo ? 'LOADING VIDEO…' : (isGif ? 'LOADING GIF…' : 'LOADING PHOTO…'));
       if (isVideo) {
         const reader = new FileReader();
         reader.onload = e => {
@@ -6475,7 +6509,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
           try {
             const mediaType = (type === 'image/gif' || name.endsWith('.gif')) ? 'gif' : 'image';
             setPending(dataUrl, mediaType);
-            toast(mediaType === 'gif' ? 'GIF READY — animated' : 'PHOTO READY — high quality', 'ok');
+            toast(mediaType === 'gif' ? 'GIF READY — animated' : 'PHOTO READY', 'ok');
           } catch (err) {
             toast('Could not load photo', 'error');
           }
@@ -8232,7 +8266,8 @@ let scrollDrawRaf = 0;
     if (scrollDrawRaf) return;
     scrollDrawRaf = requestAnimationFrame(() => {
       scrollDrawRaf = 0;
-      if (buyMode || (selected && selected.size)) scheduleDraw();
+      const screenCell = (baseCell || 1) * (zoom || 1);
+      if (buyMode || (selected && selected.size) || screenCell >= 3) scheduleDraw();
     });
   }, { passive: true });
   let resizeTimer = 0;

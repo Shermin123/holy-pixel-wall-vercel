@@ -623,8 +623,7 @@
     padding: 0;
     transform-origin: 0 0;
     overflow: hidden;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
+    image-rendering: auto;
     backface-visibility: hidden;
   }
 
@@ -636,10 +635,8 @@
     margin: 0;
     padding: 0;
     background: #faf7f0;
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
-    -ms-interpolation-mode: nearest-neighbor;
+    image-rendering: auto;
+    -ms-interpolation-mode: bicubic;
   }
 
   .media-layer {
@@ -3734,10 +3731,8 @@ Min 10 blocks · no maximum
     canvas.style.top = '0';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // Zoomed in: crisp cells. Zoomed out: smoother overview.
-    const sharp = ((baseCell || 1) * (z || 1)) >= 3.5;
-    canvas.style.imageRendering = sharp ? 'pixelated' : 'auto';
-    try { stage.style.imageRendering = sharp ? 'pixelated' : 'auto'; } catch (e) {}
+    canvas.style.imageRendering = 'auto';
+    try { stage.style.imageRendering = 'auto'; } catch (e) {}
 
     // Media layer must match stage exactly (phone was clipping GIFs outside)
     if (mediaLayer) {
@@ -3766,15 +3761,17 @@ Min 10 blocks · no maximum
     if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
     opts = opts || {};
     // First paint stays light so the wall appears immediately; HQ follows
-    const dpr = opts.fast ? 1 : Math.min(window.devicePixelRatio || 1, 1.75);
-    const maxLong = opts.fast ? 1400 : 2200;
+    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
+    const dpr = opts.fast ? 1 : Math.min(window.devicePixelRatio || 1, phone ? 2 : 2.5);
+    const maxLong = opts.fast ? 1600 : (phone ? 3200 : 4096);
     const long = Math.max(baseW, baseH) || 1;
-    const scale = Math.min(dpr * Math.min(Math.max(zoom || 1, 1), 3), maxLong / long);
+    const zNeed = Math.max(1, Math.min(Number(zoom) || 1, 6));
+    const scale = Math.min(dpr * zNeed, maxLong / long);
     canvas.width = Math.max(1, Math.round(baseW * scale));
     canvas.height = Math.max(1, Math.round(baseH * scale));
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    // Nearest-neighbor — sharp pixels when CSS-zoomed
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high'; } catch (e) {}
     // draw() uses logical size baseW×baseH via cell=baseCell temporarily
     const savedCell = cell;
     const savedW = sizeW, savedH = sizeH;
@@ -3810,6 +3807,9 @@ Min 10 blocks · no maximum
 
   function scheduleZoomHQ() {
     clearTimeout(zoomTimer);
+    zoomTimer = setTimeout(() => {
+      try { paintBase({ fast: false }); } catch (e) {}
+    }, 160);
   }
 
   function anchorAt(clientX, clientY) {
@@ -3862,6 +3862,7 @@ Min 10 blocks · no maximum
       }
       try { positionMediaOverlays(); } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
+      try { scheduleZoomHQ(); } catch (e) {}
       return;
     }
     // Ease toward target; larger steps when far for responsive zoom

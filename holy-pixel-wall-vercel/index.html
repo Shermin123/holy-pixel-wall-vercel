@@ -3686,75 +3686,69 @@ Min 10 blocks · no maximum
   }
 
   function layoutAtZoom(z) {
-    z = zClamp(z);
-    zoom = z;
-    const wrap = $('wallWrap');
-    const w = baseW * z;
-    const h = baseH * z;
-    if (!isFinite(w) || !isFinite(h) || w < 1 || h < 1) return;
+  z = zClamp(z);
+  zoom = z;
 
-    sizeW = w;
-    sizeH = h;
-    cell = baseCell * z;
-    const boxW = Math.ceil(w);
-    const boxH = Math.ceil(h);
-    const vpW = (viewport && viewport.clientWidth) || boxW;
-    const vpH = (viewport && viewport.clientHeight) || boxH;
-    // Scrollport is exactly the wall when zoomed in, exactly the viewport when fitted.
-    // Origin centers the wall when it is smaller than the view — no CSS margins.
-    const wrapW = Math.max(vpW, boxW);
-    const wrapH = Math.max(vpH, boxH);
-    const ox = Math.floor((wrapW - boxW) / 2);
-    const oy = Math.floor((wrapH - boxH) / 2);
-    wallOrigin = { x: ox, y: oy };
+  const wrap = $('wallWrap');
+  if (!wrap || !stage || !canvas) return;
 
-    if (wrap) {
-      wrap.style.boxSizing = 'border-box';
-      wrap.style.width = wrapW + 'px';
-      wrap.style.height = wrapH + 'px';
-      wrap.style.padding = '0';
-      wrap.style.margin = '0';
-      wrap.style.position = 'relative';
-    }
-    stage.style.position = 'absolute';
-    stage.style.left = ox + 'px';
-    stage.style.top = oy + 'px';
-    stage.style.width = w + 'px';
-    stage.style.height = h + 'px';
-    stage.style.margin = '0';
-    stage.style.padding = '0';
-    stage.style.transform = 'none';
-    stage.style.overflow = 'hidden';
+  const w = Math.max(1, Math.round(baseW * z));
+  const h = Math.max(1, Math.round(baseH * z));
 
-    canvas.style.position = 'absolute';
-    canvas.style.left = '0';
-    canvas.style.top = '0';
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
-    canvas.style.imageRendering = 'auto';
-    try { stage.style.imageRendering = 'auto'; } catch (e) {}
+  sizeW = w;
+  sizeH = h;
+  cell = baseCell * z;
 
-    // Media layer must match stage exactly (phone was clipping GIFs outside)
-    if (mediaLayer) {
-      mediaLayer.style.position = 'absolute';
-      mediaLayer.style.left = '0';
-      mediaLayer.style.top = '0';
-      mediaLayer.style.width = w + 'px';
-      mediaLayer.style.height = h + 'px';
-      mediaLayer.style.overflow = 'hidden';
-      mediaLayer.style.pointerEvents = 'none';
-    }
+  const vpW = viewport ? viewport.clientWidth : w;
+  const vpH = viewport ? viewport.clientHeight : h;
 
-    if ($('zoomLvl')) $('zoomLvl').textContent = Math.round(z * 100) + '%';
-    try { positionMediaOverlays(); } catch (e) {}
-    // Keep GIF/video clips locked to the same cells as the canvas while zooming
-    try {
-      if (mediaLayer) {
-        mediaLayer.style.width = w + 'px';
-        mediaLayer.style.height = h + 'px';
-      }
-    } catch (e) {}
+  const ox = Math.max(0, Math.floor((vpW - w) / 2));
+  const oy = Math.max(0, Math.floor((vpH - h) / 2));
+
+  wallOrigin = { x: ox, y: oy };
+
+  wrap.style.position = 'relative';
+  wrap.style.boxSizing = 'border-box';
+  wrap.style.width = Math.max(vpW, w) + 'px';
+  wrap.style.height = Math.max(vpH, h) + 'px';
+  wrap.style.padding = '0';
+  wrap.style.margin = '0';
+
+  stage.style.position = 'absolute';
+  stage.style.left = ox + 'px';
+  stage.style.top = oy + 'px';
+  stage.style.width = w + 'px';
+  stage.style.height = h + 'px';
+  stage.style.margin = '0';
+  stage.style.padding = '0';
+  stage.style.transform = 'none';
+  stage.style.overflow = 'hidden';
+
+  canvas.style.position = 'absolute';
+  canvas.style.left = '0';
+  canvas.style.top = '0';
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.style.imageRendering = 'pixelated';
+
+  if (mediaLayer) {
+    mediaLayer.style.position = 'absolute';
+    mediaLayer.style.left = '0';
+    mediaLayer.style.top = '0';
+    mediaLayer.style.width = w + 'px';
+    mediaLayer.style.height = h + 'px';
+    mediaLayer.style.overflow = 'hidden';
+    mediaLayer.style.pointerEvents = 'none';
   }
+
+  if ($('zoomLvl')) {
+    $('zoomLvl').textContent = Math.round(z * 100) + '%';
+  }
+
+  try {
+    positionMediaOverlays();
+  } catch (e) {}
+}
 
   let paintHqScheduled = false;
   function paintBase(opts) {
@@ -3762,15 +3756,22 @@ Min 10 blocks · no maximum
     opts = opts || {};
     // First paint stays light so the wall appears immediately; HQ follows
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const dpr = opts.fast ? 1 : Math.min(window.devicePixelRatio || 1, phone ? 2 : 2.5);
-    const maxLong = opts.fast ? 1600 : (phone ? 3200 : 4096);
-    const long = Math.max(baseW, baseH) || 1;
-    const zNeed = Math.max(1, Math.min(Number(zoom) || 1, 6));
-    const scale = Math.min(dpr * zNeed, maxLong / long);
-    canvas.width = Math.max(1, Math.round(baseW * scale));
-    canvas.height = Math.max(1, Math.round(baseH * scale));
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = true;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+const zNow = Math.max(1, Number(zoom) || 1);
+
+const maxLong = phone ? 8192 : 12000;
+const long = Math.max(baseW, baseH) || 1;
+
+const scale = Math.min(
+  dpr * zNow,
+  maxLong / long
+);
+
+canvas.width = Math.max(1, Math.round(baseW * scale));
+canvas.height = Math.max(1, Math.round(baseH * scale));
+
+ctx.setTransform(scale, 0, 0, scale, 0, 0);
+ctx.imageSmoothingEnabled = false;
     try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high'; } catch (e) {}
     // draw() uses logical size baseW×baseH via cell=baseCell temporarily
     const savedCell = cell;
@@ -4419,11 +4420,9 @@ Min 10 blocks · no maximum
       ctx.restore();
     }
 
-    if (buyMode && visCell >= 8) {
+    if (buyMode && visCell >= 2) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
-      if ((gc1 - gc0 + 1) * (gr1 - gr0 + 1) > 9000) {
-        /* skip per-tile fill when too many cells are on screen */
-      } else {
+      
       ctx.save();
       // Gap inside each cell so tiles read as separate blocks
       const inset = visCell >= 10 ? Math.max(0.6, drawCell * 0.08) : (visCell >= 5 ? Math.max(0.4, drawCell * 0.05) : 0);
@@ -4487,7 +4486,7 @@ Min 10 blocks · no maximum
         }
       }
       ctx.restore();
-      }
+      
     }
 
     // 4b) Hover pulse on owned claim (2-step soft outline)

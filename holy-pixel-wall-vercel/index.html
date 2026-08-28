@@ -4091,11 +4091,14 @@ Min 10 blocks · no maximum
     // image never loads (blank preview). Wall display does not need export.
     img.onload = () => {
       img._hpwBroken = false;
+      const kick = () => {
+        try { flushImagesSoon(); } catch (e) {}
+        try { if (typeof updateBlockPreview === 'function') updateBlockPreview(); } catch (e) {}
+      };
       try {
-        if (img.decode) img.decode().then(() => scheduleDraw()).catch(() => scheduleDraw());
-        else scheduleDraw();
-      } catch (e) { try { scheduleDraw(); } catch (e2) {} }
-      try { if (typeof updateBlockPreview === 'function') updateBlockPreview(); } catch (e) {}
+        if (img.decode) img.decode().then(kick).catch(kick);
+        else kick();
+      } catch (e) { kick(); }
     };
     img.onerror = () => {
       img._hpwBroken = true;
@@ -4104,6 +4107,50 @@ Min 10 blocks · no maximum
     try { img.src = src; } catch (e) { return null; }
     imgCache.set(src, img);
     return img;
+  }
+
+  let imgBatchTimer = 0;
+  function flushImagesSoon() {
+    clearTimeout(imgBatchTimer);
+    imgBatchTimer = setTimeout(() => {
+      try { staticWallKey = ''; } catch (e) {}
+      try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
+    }, 90);
+  }
+
+  function preloadRegionImages(done) {
+    const seen = new Set();
+    const srcs = [];
+    regions.forEach(r => {
+      if (!r || !r.media || r.mediaType === 'video') return;
+      if (r.mediaType && r.mediaType !== 'image' && r.mediaType !== 'gif') return;
+      if (seen.has(r.media)) return;
+      seen.add(r.media);
+      srcs.push(r.media);
+    });
+    if (!srcs.length) { if (done) done(); return; }
+    let left = srcs.length;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      left -= 1;
+      if (left > 0) return;
+      finished = true;
+      if (done) done();
+    };
+    setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      if (done) done();
+    }, 2800);
+    srcs.forEach(src => {
+      const img = getImg(src);
+      if (img && img.complete && img.naturalWidth) finish();
+      else if (img) {
+        img.addEventListener('load', finish, { once: true });
+        img.addEventListener('error', finish, { once: true });
+      } else finish();
+    });
   }
 
   function drawFit(c, img, x, y, w, h, mode) {
@@ -4314,7 +4361,7 @@ Min 10 blocks · no maximum
         if (img && img.complete && img.naturalWidth > 0) {
           drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
         } else if (img) {
-          img.onload = () => { try { scheduleDraw(); } catch (e) {} };
+          img.onload = () => { try { flushImagesSoon(); } catch (e) {} };
           ctx.fillStyle = r.color || '#c9a227';
           ctx.fillRect(x0, y0, w, h);
         }
@@ -8382,10 +8429,14 @@ let scrollDrawRaf = 0;
       try { applyCropCacheToRegions(); } catch (e) {}
       try { applyLocalGeomOverrides(); } catch (e) {}
       try { save(); } catch (e) {}
+      try { preloadRegionImages(() => {
+        try { staticWallKey = ''; } catch (e) {}
+        try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
+      }); } catch (e) {}
       if (expanded) {
         try { resize(false); } catch (e) {}
       } else {
-        try { draw(); } catch (e) {}
+        try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       }
       try { syncMediaOverlays(); } catch (e) {}
       return true;
@@ -8401,6 +8452,7 @@ let scrollDrawRaf = 0;
     try { loadLocalGeomOverrides(); } catch (e) {}
     try { load(); } catch (e) {}
     try { applyLocalGeomOverrides(); } catch (e) {}
+    try { preloadRegionImages(); } catch (e) {}
     // Paint the wall immediately — do not wait on the network
     try { resize(true, 'open'); } catch (e) { console.warn(e); }
     setBuyMode(false);

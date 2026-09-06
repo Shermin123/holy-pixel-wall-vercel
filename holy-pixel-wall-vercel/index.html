@@ -3313,7 +3313,7 @@ Min 10 blocks · no maximum
       hoverPulse = (hoverPulse + 1) % 2;
       need = true;
     }
-    if (need) {
+    if (need && !zoomRaf) {
       try {
         if (typeof scheduleDraw === 'function') scheduleDraw();
         else if (typeof draw === 'function') draw();
@@ -3717,36 +3717,34 @@ Min 10 blocks · no maximum
   stage.style.position = 'absolute';
   stage.style.left = ox + 'px';
   stage.style.top = oy + 'px';
-  stage.style.width = w + 'px';
-  stage.style.height = h + 'px';
+  stage.style.width = Math.round(baseW) + 'px';
+  stage.style.height = Math.round(baseH) + 'px';
   stage.style.margin = '0';
   stage.style.padding = '0';
-  stage.style.transform = 'none';
+  stage.style.transformOrigin = '0 0';
+  stage.style.transform = 'scale(' + z + ')';
+  stage.style.willChange = 'transform';
   stage.style.overflow = 'hidden';
 
   canvas.style.position = 'absolute';
   canvas.style.left = '0';
   canvas.style.top = '0';
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
+  canvas.style.width = Math.round(baseW) + 'px';
+  canvas.style.height = Math.round(baseH) + 'px';
   canvas.style.imageRendering = 'auto';
 
   if (mediaLayer) {
     mediaLayer.style.position = 'absolute';
     mediaLayer.style.left = '0';
     mediaLayer.style.top = '0';
-    mediaLayer.style.width = w + 'px';
-    mediaLayer.style.height = h + 'px';
+    mediaLayer.style.width = Math.round(baseW) + 'px';
+    mediaLayer.style.height = Math.round(baseH) + 'px';
     mediaLayer.style.overflow = 'hidden';
     mediaLayer.style.pointerEvents = 'none';
   }
 
   if ($('zoomLvl')) {
     $('zoomLvl').textContent = Math.round(z * 100) + '%';
-  }
-
-  if (!zoomRaf) {
-    try { positionMediaOverlays(); } catch (e) {}
   }
 }
 
@@ -3761,8 +3759,7 @@ Min 10 blocks · no maximum
     const long = Math.max(baseW, baseH) || 1;
     // After zoom settles, add a little extra resolution so photos stay clear.
     // Never scale the bitmap by full zoom (that is what made pinch lag).
-    const zBoost = Math.min(Math.max(zoom || 1, 1), phone ? 1.85 : 2.25);
-    const scale = Math.min(dpr * zBoost, maxLong / long);
+    const scale = Math.min(dpr, maxLong / long);
 
     const nextW = Math.max(1, Math.round(baseW * scale));
     const nextH = Math.max(1, Math.round(baseH * scale));
@@ -3826,10 +3823,7 @@ Min 10 blocks · no maximum
   }
 
   function scheduleZoomHQ() {
-    clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(() => {
-      try { paintBase({ fast: false }); } catch (e) {}
-    }, 160);
+    // Zoom is CSS transform only. Do not rebuild the canvas after pinch.
   }
 
   function anchorAt(clientX, clientY) {
@@ -3933,7 +3927,7 @@ Min 10 blocks · no maximum
     const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
     if (!clips.length) return;
     // Use current layout cell (baseCell * zoom) so overlays track canvas exactly
-    const c = (typeof cell === 'number' && cell > 0) ? cell : ((baseCell || 1) * (zoom || 1));
+    const c = baseCell || 1;
     clips.forEach(clip => {
       const minC = +clip.getAttribute('data-min-c');
       const maxC = +clip.getAttribute('data-max-c');
@@ -3980,10 +3974,11 @@ Min 10 blocks · no maximum
           if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
       if (!ownsAny) return;
 
-      const x = r.minC * cell;
-      const y = r.minR * cell;
-      const w = (r.maxC - r.minC + 1) * cell;
-      const h = (r.maxR - r.minR + 1) * cell;
+      const unit = baseCell || cell;
+      const x = r.minC * unit;
+      const y = r.minR * unit;
+      const w = (r.maxC - r.minC + 1) * unit;
+      const h = (r.maxR - r.minR + 1) * unit;
       const scale = Math.max(1, Number(r.cropScale) || 1);
       const fx = r.cropX != null ? Number(r.cropX) : 0.5;
       const fy = r.cropY != null ? Number(r.cropY) : 0.5;
@@ -7946,7 +7941,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       $('toolSelect')?.classList.add('tool-active');
       $('toolDrag')?.classList.remove('tool-active');
       toast('ZOOM IN · each square = 1 pixel · drag to select · $' + price().toFixed(2) + ' each');
-      try { draw(); } catch (e) {}
+      try { scheduleDraw(); } catch (e) {}
     } else {
       toolMode = 'drag';
       $('toolSelect')?.classList.remove('tool-active');
@@ -7956,7 +7951,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         selected.clear();
       }
       try { updateFloat(); } catch (e) {}
-      try { draw(); } catch (e) {}
+      try { scheduleDraw(); } catch (e) {}
       toast('VIEW MODE');
     }
   }

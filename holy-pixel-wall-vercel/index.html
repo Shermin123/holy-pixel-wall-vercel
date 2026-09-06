@@ -2123,15 +2123,6 @@
 .viewport::after { display: none !important; animation: none !important; }
 body::after { display: none !important; }
 
-
-/* Performance: isolate the interactive wall from the rest of the page. */
-.viewport { contain: layout; }
-.stage { contain: layout paint; }
-.media-layer { contain: strict; }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
-}
-
 </style>
 </head>
 <body>
@@ -3091,6 +3082,7 @@ Min 10 blocks · no maximum
   let lastSnapKey = '';
   let dragBox = null;
   let staticWallCanvas = null;
+  let staticWallKey = '';
   let dragging = false, deselect = false, additiveSelect = false, didDrag = false;
   let startC = 0, startR = 0, curC = 0, curR = 0;
   let dragBaseline = new Set(); // selection before this drag started
@@ -3111,17 +3103,6 @@ Min 10 blocks · no maximum
   // Offscreen cache for static grid (rebuild only when size/zoom changes)
   let gridCacheCanvas = null;
   let gridCacheKey = '';
-
-  // Rendering state: the expensive wall layer is rebuilt only when wall data,
-  // geometry, or an image changes. Interaction frames only draw lightweight overlays.
-  let wallVersion = 1;
-  let staticWallKey = '';
-  let lastCounterText = '';
-  let lastProgressWidth = '';
-  let mediaOverlayKey = '';
-  let wallPollTimer = 0;
-  let wallPullInFlight = false;
-  let wallPullQueued = false;
 
 
   function viewportSize() {
@@ -3316,11 +3297,32 @@ Min 10 blocks · no maximum
     setTimeout(() => btn.classList.remove('tool-flash'), 240);
   }, true);
 
-  // Dynamic animation was intentionally removed: continuous 180ms canvas redraws
-  // made the wall feel sluggish, especially on phones. Selection/hover frames are static.
+  // Marching ants offset for selection border (stepped)
   let antsOffset = 0;
+  let antsTimer = 0;
   let hoverRegion = null;
   let hoverPulse = 0;
+  function tickAnts() {
+    if (reduceMotion) return;
+    let need = false;
+    if (selected && selected.size) {
+      antsOffset = (antsOffset + 1) % 16;
+      need = true;
+    }
+    if (hoverRegion) {
+      hoverPulse = (hoverPulse + 1) % 2;
+      need = true;
+    }
+    if (need && !zoomRaf) {
+      try {
+        if (typeof scheduleDraw === 'function') scheduleDraw();
+        else if (typeof draw === 'function') draw();
+      } catch (e) {}
+    }
+  }
+  try {
+    antsTimer = setInterval(tickAnts, 180);
+  } catch (e) {}
 
   function friendlyError(err, fallback) {
     const raw = err && (err.message || err.error) ? String(err.message || err.error) : String(err || '');
@@ -3684,69 +3686,71 @@ Min 10 blocks · no maximum
   }
 
   function layoutAtZoom(z) {
-    z = zClamp(z);
-    zoom = z;
+  z = zClamp(z);
+  zoom = z;
 
-    const wrap = $('wallWrap');
-    if (!wrap || !stage || !canvas || !viewport) return;
+  const wrap = $('wallWrap');
+  if (!wrap || !stage || !canvas) return;
 
-    // Keep the scrollable spacer at the EXACT visual size of the transformed wall.
-    // CSS transforms alone do not reliably create scrollable space in every browser,
-    // especially Safari. The wrapper is therefore the source of truth for scrolling.
-    const wallW = Math.max(1, Math.round(baseW * z));
-    const wallH = Math.max(1, Math.round(baseH * z));
-    const vpW = Math.max(1, viewport.clientWidth);
-    const vpH = Math.max(1, viewport.clientHeight);
+  const w = Math.max(1, Math.round(baseW * z));
+  const h = Math.max(1, Math.round(baseH * z));
 
-    sizeW = wallW;
-    sizeH = wallH;
-    cell = baseCell * z;
+  sizeW = w;
+  sizeH = h;
+  cell = baseCell * z;
 
-    const ox = Math.max(0, Math.floor((vpW - wallW) / 2));
-    const oy = Math.max(0, Math.floor((vpH - wallH) / 2));
-    wallOrigin = { x: ox, y: oy };
+  const vpW = viewport ? viewport.clientWidth : w;
+  const vpH = viewport ? viewport.clientHeight : h;
 
-    // Spacer includes the wall plus the centering space. This guarantees that
-    // scrollLeft/scrollTop always have room to move at high zoom levels.
-    wrap.style.position = 'relative';
-    wrap.style.boxSizing = 'border-box';
-    wrap.style.width = Math.max(vpW, wallW) + 'px';
-    wrap.style.height = Math.max(vpH, wallH) + 'px';
-    wrap.style.padding = '0';
-    wrap.style.margin = '0';
+  const ox = Math.max(0, Math.floor((vpW - w) / 2));
+  const oy = Math.max(0, Math.floor((vpH - h) / 2));
 
-    stage.style.position = 'absolute';
-    stage.style.left = ox + 'px';
-    stage.style.top = oy + 'px';
-    stage.style.width = Math.round(baseW) + 'px';
-    stage.style.height = Math.round(baseH) + 'px';
-    stage.style.margin = '0';
-    stage.style.padding = '0';
-    stage.style.transformOrigin = '0 0';
-    stage.style.transform = `translateZ(0) scale(${z})`;
-    stage.style.willChange = 'transform';
-    stage.style.overflow = 'hidden';
+  wallOrigin = { x: ox, y: oy };
 
-    canvas.style.position = 'absolute';
-    canvas.style.left = '0';
-    canvas.style.top = '0';
-    canvas.style.width = Math.round(baseW) + 'px';
-    canvas.style.height = Math.round(baseH) + 'px';
-    canvas.style.imageRendering = 'auto';
+  wrap.style.position = 'relative';
+  wrap.style.boxSizing = 'border-box';
+  wrap.style.width = Math.max(vpW, w) + 'px';
+  wrap.style.height = Math.max(vpH, h) + 'px';
+  wrap.style.padding = '0';
+  wrap.style.margin = '0';
 
-    if (mediaLayer) {
-      mediaLayer.style.position = 'absolute';
-      mediaLayer.style.left = '0';
-      mediaLayer.style.top = '0';
-      mediaLayer.style.width = Math.round(baseW) + 'px';
-      mediaLayer.style.height = Math.round(baseH) + 'px';
-      mediaLayer.style.overflow = 'hidden';
-      mediaLayer.style.pointerEvents = 'none';
-    }
+  // IMPORTANT: use real layout dimensions for zoom, not CSS transform.
+  // Transformed elements do not reliably contribute to scrollWidth/scrollHeight
+  // across Safari/Chrome, which caused the wall to become unscrollable or clip at
+  // higher zoom levels.
+  stage.style.position = 'absolute';
+  stage.style.left = ox + 'px';
+  stage.style.top = oy + 'px';
+  stage.style.width = w + 'px';
+  stage.style.height = h + 'px';
+  stage.style.margin = '0';
+  stage.style.padding = '0';
+  stage.style.transformOrigin = '0 0';
+  stage.style.transform = 'none';
+  stage.style.willChange = 'auto';
+  stage.style.overflow = 'hidden';
 
-    const zoomLabel = $('zoomLvl');
-    if (zoomLabel) zoomLabel.textContent = Math.round(z * 100) + '%';
+  canvas.style.position = 'absolute';
+  canvas.style.left = '0';
+  canvas.style.top = '0';
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.style.imageRendering = 'auto';
+
+  if (mediaLayer) {
+    mediaLayer.style.position = 'absolute';
+    mediaLayer.style.left = '0';
+    mediaLayer.style.top = '0';
+    mediaLayer.style.width = Math.round(baseW) + 'px';
+    mediaLayer.style.height = Math.round(baseH) + 'px';
+    mediaLayer.style.overflow = 'hidden';
+    mediaLayer.style.pointerEvents = 'none';
   }
+
+  if ($('zoomLvl')) {
+    $('zoomLvl').textContent = Math.round(z * 100) + '%';
+  }
+}
 
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
@@ -3851,7 +3855,7 @@ Min 10 blocks · no maximum
     const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
     if (!clips.length) return;
     // Use current layout cell (baseCell * zoom) so overlays track canvas exactly
-    const c = baseCell || 1;
+    const c = (baseCell || 1) * (zoom || 1);
     clips.forEach(clip => {
       const minC = +clip.getAttribute('data-min-c');
       const maxC = +clip.getAttribute('data-max-c');
@@ -3886,57 +3890,44 @@ Min 10 blocks · no maximum
       }
     });
   }
-  function getMediaOverlayKey() {
-    return regions.map(r => {
-      if (!r || !r.media || r.mediaType === 'image') return '';
-      return [r.id || r.claimId || '', r.mediaType || '', r.media || '', r.minC, r.maxC, r.minR, r.maxR,
-        r.cropScale || 1, r.cropX ?? 0.5, r.cropY ?? 0.5, r.fit || 'cover'].join('|');
-    }).filter(Boolean).join('§');
-  }
 
-  function syncMediaOverlays(force = false) {
+  function syncMediaOverlays() {
     if (!mediaLayer) return;
-    const key = getMediaOverlayKey();
-    if (!force && key === mediaOverlayKey) {
-      positionMediaOverlays();
-      return;
-    }
-    mediaOverlayKey = key;
-    mediaLayer.replaceChildren();
+    mediaLayer.innerHTML = '';
     regions.forEach(r => {
-      if (!r || !r.media || r.mediaType === 'image') return;
+      if (!r.media || r.mediaType === 'image') return;
       let ownsAny = false;
-      // Use the region's own cell list when available. This avoids scanning a large bounding box.
-      if (Array.isArray(r.cells) && r.cells.length) {
-        ownsAny = r.cells.some(k => sold.get(k) === r);
-      } else {
-        for (let c = r.minC; c <= r.maxC && !ownsAny; c++) {
-          for (let row = r.minR; row <= r.maxR; row++) {
-            if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
-          }
-        }
-      }
+      for (let c = r.minC; c <= r.maxC && !ownsAny; c++)
+        for (let row = r.minR; row <= r.maxR; row++)
+          if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
       if (!ownsAny) return;
 
-      const unit = baseCell || cell || 1;
+      const unit = (baseCell || cell) * (zoom || 1);
       const x = r.minC * unit;
       const y = r.minR * unit;
-      const w = Math.max(1, (r.maxC - r.minC + 1) * unit);
-      const h = Math.max(1, (r.maxR - r.minR + 1) * unit);
+      const w = (r.maxC - r.minC + 1) * unit;
+      const h = (r.maxR - r.minR + 1) * unit;
       const scale = Math.max(1, Number(r.cropScale) || 1);
-      const fx = Math.max(0, Math.min(1, r.cropX != null ? Number(r.cropX) : 0.5));
-      const fy = Math.max(0, Math.min(1, r.cropY != null ? Number(r.cropY) : 0.5));
+      const fx = r.cropX != null ? Number(r.cropX) : 0.5;
+      const fy = r.cropY != null ? Number(r.cropY) : 0.5;
 
+      // Clip box = exact claim rectangle (same math as canvas draw)
       const clip = document.createElement('div');
       clip.className = 'media-item';
-      clip.dataset.minC = r.minC;
-      clip.dataset.maxC = r.maxC;
-      clip.dataset.minR = r.minR;
-      clip.dataset.maxR = r.maxR;
-      clip.dataset.cropScale = scale;
-      clip.dataset.cropX = fx;
-      clip.dataset.cropY = fy;
-      clip.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;overflow:hidden;pointer-events:none;`;
+      clip.setAttribute('data-min-c', String(r.minC));
+      clip.setAttribute('data-max-c', String(r.maxC));
+      clip.setAttribute('data-min-r', String(r.minR));
+      clip.setAttribute('data-max-r', String(r.maxR));
+      clip.setAttribute('data-crop-scale', String(scale));
+      clip.setAttribute('data-crop-x', String(fx));
+      clip.setAttribute('data-crop-y', String(fy));
+      clip.style.left = x + 'px';
+      clip.style.top = y + 'px';
+      clip.style.width = w + 'px';
+      clip.style.height = h + 'px';
+      clip.style.overflow = 'hidden';
+      clip.style.position = 'absolute';
+      clip.style.pointerEvents = 'none';
 
       let el;
       if (r.mediaType === 'video') {
@@ -3946,32 +3937,37 @@ Min 10 blocks · no maximum
         el.loop = true;
         el.autoplay = true;
         el.playsInline = true;
-        el.preload = 'metadata';
         el.setAttribute('playsinline', '');
         el.setAttribute('webkit-playsinline', '');
-        try { el.disablePictureInPicture = true; } catch (_) {}
+        el.preload = 'auto';
+        try { el.disablePictureInPicture = true; } catch (e) {}
         el.play().catch(() => {});
       } else {
         el = document.createElement('img');
         el.src = r.media;
         el.alt = r.name || '';
         el.decoding = 'async';
-        el.loading = 'lazy';
       }
       el.style.position = 'absolute';
       el.style.objectFit = r.fit || 'cover';
-      el.style.objectPosition = `${fx * 100}% ${fy * 100}%`;
+      el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
       el.style.pointerEvents = 'none';
       el.style.margin = '0';
       el.style.padding = '0';
-      el.style.border = '0';
+      el.style.border = 'none';
+      const mw = w * scale;
+      const mh = h * scale;
+      el.style.width = mw + 'px';
+      el.style.height = mh + 'px';
+      el.style.left = ((w - mw) * fx) + 'px';
+      el.style.top = ((h - mh) * fy) + 'px';
+
       clip.appendChild(el);
       mediaLayer.appendChild(clip);
     });
-    positionMediaOverlays();
   }
 
-let drawRaf = 0;
+  let drawRaf = 0;
   function scheduleDraw() {
     if (drawRaf) return;
     drawRaf = requestAnimationFrame(() => {
@@ -4057,7 +4053,7 @@ let drawRaf = 0;
   function flushImagesSoon() {
     clearTimeout(imgBatchTimer);
     imgBatchTimer = setTimeout(() => {
-      try { staticWallKey = ''; wallVersion++; } catch (e) {}
+      try { staticWallKey = ''; } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
     }, 90);
   }
@@ -4245,255 +4241,312 @@ let drawRaf = 0;
     gridCacheCanvas = off;
     return off;
   }
-  function getStaticWallKey() {
-    return [wallVersion, canvas.width, canvas.height, baseW, baseH, baseCell, regions.length, sold.size].join(':');
-  }
 
-  function renderStaticWall() {
+  function draw() {
+    if (!ctx || !baseW || !baseH || !baseCell) return;
+    // Canvas buffer is always base resolution; CSS scales it for zoom
     const drawCell = baseCell;
     const drawW = baseW;
     const drawH = baseH;
-    const grid = rebuildGridCache();
-
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(grid, 0, 0, canvas.width, canvas.height);
-    ctx.restore();
-
-    // The grid cache and the backing canvas may have a DPR scale. Draw claims in
-    // logical base coordinates, then let the backing scale handle rasterization.
-    const dprScale = canvas.width / Math.max(1, drawW);
-    ctx.save();
-    ctx.setTransform(dprScale, 0, 0, dprScale, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'medium'; } catch (_) {}
+    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'medium'; } catch (e) {}
 
-    for (const r of regions) {
-      if (!r || r.maxC == null || r.maxR == null) continue;
-      const x0 = r.minC * drawCell;
-      const y0 = r.minR * drawCell;
-      const w = Math.max(drawCell, (r.maxC - r.minC + 1) * drawCell);
-      const h = Math.max(drawCell, (r.maxR - r.minR + 1) * drawCell);
+    // 1) Blit cached checker + section grid (fast)
+    const grid = rebuildGridCache();
+    ctx.drawImage(grid, 0, 0, drawW, drawH);
+
+    const vis = drawCell;
+    // Visible range in cell indices — account for CSS/layout zoom
+    const { c0, r0, c1, r1 } = visibleCellRange();
+
+    const staticKey = canvas.width + 'x' + canvas.height + ':' + regions.length + ':' + sold.size;
+    const canBlit = dragging && staticWallCanvas && staticWallKey === staticKey
+      && staticWallCanvas.width === canvas.width;
+    if (canBlit) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(staticWallCanvas, 0, 0);
+      ctx.restore();
+    } else {
+    // 3) Claimed regions — skip off-screen, solid rects when possible
+    regions.forEach(r => {
+      if (r.maxC < c0 || r.minC > c1 || r.maxR < r0 || r.minR > r1) return;
+      const x0 = r.minC * drawCell, y0 = r.minR * drawCell;
+      const w = (r.maxC - r.minC + 1) * drawCell;
+      const h = (r.maxR - r.minR + 1) * drawCell;
       const expected = (r.maxC - r.minC + 1) * (r.maxR - r.minR + 1);
-      const solid = !Array.isArray(r.cells) || r.cells.length === expected || Number(r.pixels) === expected;
+      const solid = !r.cells || r.cells.length === expected || r.pixels === expected;
 
       ctx.save();
-      if (!solid && Array.isArray(r.cells) && r.cells.length) {
+      if (!solid) {
         ctx.beginPath();
         let any = false;
-        for (const k of r.cells) {
-          if (sold.get(k) !== r) continue;
-          const p = String(k).split(',');
-          const c = Number(p[0]), row = Number(p[1]);
-          if (!Number.isFinite(c) || !Number.isFinite(row)) continue;
-          ctx.rect(c * drawCell, row * drawCell, drawCell, drawCell);
-          any = true;
+        for (let c = r.minC; c <= r.maxC; c++) {
+          for (let row = r.minR; row <= r.maxR; row++) {
+            if (sold.get(c + ',' + row) === r) {
+              ctx.rect(c * drawCell, row * drawCell, drawCell, drawCell);
+              any = true;
+            }
+          }
         }
-        if (!any) { ctx.restore(); continue; }
+        if (!any) { ctx.restore(); return; }
         ctx.clip();
       }
 
+      // Opaque underlay so the wall grid never shows through the photo
+      ctx.globalAlpha = 1;
       ctx.fillStyle = '#1a1512';
       ctx.fillRect(x0, y0, w, h);
-
       if (regionMediaIsImage(r)) {
         const img = getImg(r.media);
         if (img && img.complete && img.naturalWidth > 0) {
-          drawCoverCrop(ctx, img, x0, y0, w, h,
-            Number(r.cropScale) || 1,
-            r.cropX != null ? Number(r.cropX) : 0.5,
-            r.cropY != null ? Number(r.cropY) : 0.5);
-        } else {
+          drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
+        } else if (img) {
+          img.onload = () => { try { flushImagesSoon(); } catch (e) {} };
           ctx.fillStyle = r.color || '#c9a227';
           ctx.fillRect(x0, y0, w, h);
         }
       } else if (!r.media) {
         ctx.fillStyle = r.color || '#c9a227';
         ctx.fillRect(x0, y0, w, h);
-        if (drawCell >= 1) {
-          ctx.fillStyle = 'rgba(255,255,255,0.12)';
-          if (solid) {
-            for (let c = r.minC; c <= r.maxC; c++) {
-              for (let row = r.minR; row <= r.maxR; row++) {
-                if (((c + row) & 1) === 0) ctx.fillRect(c * drawCell, row * drawCell, drawCell, drawCell);
-              }
-            }
-          } else {
-            for (const k of (r.cells || [])) {
-              if (sold.get(k) !== r) continue;
-              const p = String(k).split(',');
-              const c = Number(p[0]), row = Number(p[1]);
-              if (((c + row) & 1) === 0) ctx.fillRect(c * drawCell, row * drawCell, drawCell, drawCell);
-            }
-          }
-        }
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        for (let c = r.minC; c <= r.maxC; c++)
+          for (let row = r.minR; row <= r.maxR; row++)
+            if ((c + row) % 2 === 0)
+              ctx.fillRect(c * drawCell, row * drawCell, drawCell, drawCell);
       }
-
+      /* Thin border around each claimed block */
       ctx.strokeStyle = '#2a2118';
       ctx.lineWidth = Math.max(1, Math.min(2, drawCell * 0.1));
-      ctx.strokeRect(x0 + 0.5, y0 + 0.5, Math.max(0, w - 1), Math.max(0, h - 1));
+      ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+      ctx.restore();
+    });
+    try {
+      if (!staticWallCanvas) staticWallCanvas = document.createElement('canvas');
+      if (staticWallCanvas.width !== canvas.width || staticWallCanvas.height !== canvas.height) {
+        staticWallCanvas.width = canvas.width;
+        staticWallCanvas.height = canvas.height;
+      }
+      staticWallCanvas.getContext('2d').drawImage(canvas, 0, 0);
+      staticWallKey = staticKey;
+    } catch (e) {}
+    }
+
+    // 4) Buy-mode: each free pixel = one clear tile (easy to aim when zoomed)
+    const visCell = (baseCell || drawCell) * (zoom || 1);
+    const zNow = Math.max(zoom || 1, 1);
+    // Line width in canvas units so it stays ~1–2 screen pixels after CSS zoom
+    const hair = Math.max(0.08, Math.min(drawCell * 0.14, 2.2 / zNow));
+    const hairBold = Math.max(hair * 1.6, 2.8 / zNow);
+    const hairFrame = Math.max(hair * 1.8, 3 / zNow);
+
+    if (!dragging && !zoomRaf && visCell >= 8) {
+      const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(92, 61, 30, 0.4)';
+      ctx.lineWidth = Math.max(hair * 0.65, drawCell * 0.035);
+      for (let c = gc0; c <= gc1 + 1; c++) {
+        const x = Math.floor(c * drawCell) + 0.5;
+        ctx.moveTo(x, gr0 * drawCell);
+        ctx.lineTo(x, (gr1 + 1) * drawCell);
+      }
+      for (let r = gr0; r <= gr1 + 1; r++) {
+        const y = Math.floor(r * drawCell) + 0.5;
+        ctx.moveTo(gc0 * drawCell, y);
+        ctx.lineTo((gc1 + 1) * drawCell, y);
+      }
+      ctx.stroke();
       ctx.restore();
     }
 
-    ctx.restore();
-    staticWallKey = getStaticWallKey();
-    if (!staticWallCanvas) staticWallCanvas = document.createElement('canvas');
-    if (staticWallCanvas.width !== canvas.width || staticWallCanvas.height !== canvas.height) {
-      staticWallCanvas.width = canvas.width;
-      staticWallCanvas.height = canvas.height;
-    }
-    const sc = staticWallCanvas.getContext('2d');
-    sc.clearRect(0, 0, staticWallCanvas.width, staticWallCanvas.height);
-    sc.drawImage(canvas, 0, 0);
-  }
-
-  function draw() {
-    if (!ctx || !canvas || !baseW || !baseH || !baseCell) return;
-
-    const staticKey = getStaticWallKey();
-    if (!staticWallCanvas || staticWallKey !== staticKey) renderStaticWall();
-
-    // Restore the cached static layer in one GPU-friendly blit.
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(staticWallCanvas, 0, 0);
-    ctx.restore();
-
-    const scale = canvas.width / Math.max(1, baseW);
-    ctx.save();
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-
-    const drawCell = baseCell;
-    const visCell = drawCell * (zoom || 1);
-    const zNow = Math.max(zoom || 1, 1);
-    const { c0, r0, c1, r1 } = visibleCellRange();
-
-    // Lightweight buy-mode grid. Never fill every free pixel at overview zoom.
     if (buyMode && !dragging && !zoomRaf && visCell >= 12) {
-      const count = Math.max(0, (c1 - c0 + 1) * (r1 - r0 + 1));
-      if (count <= 12000) {
-        const inset = visCell >= 16 ? Math.max(0.5, drawCell * 0.07) : 0;
-        ctx.fillStyle = '#f5e6b8';
-        for (let c = c0; c <= c1; c++) {
-          for (let r = r0; r <= r1; r++) {
-            if (sold.has(c + ',' + r)) continue;
-            const x = c * drawCell, y = r * drawCell;
-            if (((c + r) & 1) === 0) ctx.fillRect(x + inset, y + inset, Math.max(0, drawCell - inset * 2), Math.max(0, drawCell - inset * 2));
+      const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
+      const cells = (gc1 - gc0 + 1) * (gr1 - gr0 + 1);
+      if (cells > 18000) {
+        // Too many tiles on screen — section lines only
+      } else {
+      ctx.save();
+      const inset = visCell >= 16 ? Math.max(0.5, drawCell * 0.07) : 0;
+
+      for (let c = gc0; c <= gc1; c++) {
+        for (let r = gr0; r <= gr1; r++) {
+          if (sold.has(c + ',' + r)) continue;
+          const x = c * drawCell;
+          const y = r * drawCell;
+          ctx.fillStyle = ((c + r) & 1) ? '#fffdf8' : '#f5e6b8';
+          if (inset > 0) {
+            ctx.fillRect(x + inset, y + inset, Math.max(0, drawCell - inset * 2), Math.max(0, drawCell - inset * 2));
+          } else {
+            ctx.fillRect(x, y, drawCell, drawCell);
           }
         }
-        ctx.strokeStyle = 'rgba(92,61,30,0.42)';
-        ctx.lineWidth = Math.max(0.08, Math.min(drawCell * 0.12, 2 / zNow));
-        ctx.beginPath();
-        for (let c = c0; c <= c1 + 1; c++) {
-          const x = Math.floor(c * drawCell) + 0.5;
-          ctx.moveTo(x, r0 * drawCell); ctx.lineTo(x, (r1 + 1) * drawCell);
+      }
+
+      // 10×10 section borders (gold) — orientation only, still skip owned cells
+      if (visCell >= 4) {
+        const sec = SECTION || 10;
+        ctx.strokeStyle = 'rgba(139, 90, 43, 0.55)';
+        ctx.lineWidth = hairBold;
+        for (let c = Math.ceil(gc0 / sec) * sec; c <= gc1; c += sec) {
+          for (let r = gr0; r <= gr1; r++) {
+            if (sold.has(c + ',' + r) && sold.has((c - 1) + ',' + r)) continue;
+            if (c <= 0 || c >= COLS) continue;
+            const x = Math.floor(c * drawCell) + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(x, r * drawCell);
+            ctx.lineTo(x, (r + 1) * drawCell);
+            ctx.stroke();
+          }
         }
-        for (let r = r0; r <= r1 + 1; r++) {
-          const y = Math.floor(r * drawCell) + 0.5;
-          ctx.moveTo(c0 * drawCell, y); ctx.lineTo((c1 + 1) * drawCell, y);
+        for (let r = Math.ceil(gr0 / sec) * sec; r <= gr1; r += sec) {
+          for (let c = gc0; c <= gc1; c++) {
+            if (sold.has(c + ',' + r) && sold.has(c + ',' + (r - 1))) continue;
+            if (r <= 0 || r >= ROWS) continue;
+            const y = Math.floor(r * drawCell) + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(c * drawCell, y);
+            ctx.lineTo((c + 1) * drawCell, y);
+            ctx.stroke();
+          }
         }
-        ctx.stroke();
       }
-    } else if (!dragging && visCell >= 8) {
-      ctx.strokeStyle = 'rgba(92,61,30,0.38)';
-      ctx.lineWidth = Math.max(0.08, Math.min(drawCell * 0.08, 1.5 / zNow));
-      ctx.beginPath();
-      for (let c = c0; c <= c1 + 1; c++) {
-        const x = Math.floor(c * drawCell) + 0.5;
-        ctx.moveTo(x, r0 * drawCell); ctx.lineTo(x, (r1 + 1) * drawCell);
+      ctx.restore();
       }
-      for (let r = r0; r <= r1 + 1; r++) {
-        const y = Math.floor(r * drawCell) + 0.5;
-        ctx.moveTo(c0 * drawCell, y); ctx.lineTo((c1 + 1) * drawCell, y);
-      }
-      ctx.stroke();
     }
 
-    if (hoverRegion && !dragging && hoverRegion.maxC >= c0 && hoverRegion.minC <= c1 && hoverRegion.maxR >= r0 && hoverRegion.minR <= r1) {
+    // 4b) Hover pulse on owned claim (2-step soft outline)
+    if (hoverRegion && !dragging) {
       const hr = hoverRegion;
-      const hx = hr.minC * drawCell, hy = hr.minR * drawCell;
-      const hw = (hr.maxC - hr.minC + 1) * drawCell;
-      const hh = (hr.maxR - hr.minR + 1) * drawCell;
-      ctx.strokeStyle = 'rgba(212,160,23,0.9)';
-      ctx.lineWidth = Math.max(1.2, 3 / zNow);
-      ctx.strokeRect(hx + 0.5, hy + 0.5, Math.max(0, hw - 1), Math.max(0, hh - 1));
+      if (hr.maxC >= c0 && hr.minC <= c1 && hr.maxR >= r0 && hr.minR <= r1) {
+        const hx = hr.minC * drawCell, hy = hr.minR * drawCell;
+        const hw = (hr.maxC - hr.minC + 1) * drawCell;
+        const hh = (hr.maxR - hr.minR + 1) * drawCell;
+        const pulse = (typeof hoverPulse === 'number' ? hoverPulse : 0);
+        ctx.save();
+        ctx.strokeStyle = pulse ? 'rgba(212, 160, 23, 0.95)' : 'rgba(212, 160, 23, 0.45)';
+        ctx.lineWidth = Math.max(1.2, hairFrame * 1.2);
+        ctx.setLineDash([]);
+        ctx.strokeRect(hx + 0.5, hy + 0.5, Math.max(0, hw - 1), Math.max(0, hh - 1));
+        ctx.strokeStyle = pulse ? 'rgba(255, 248, 220, 0.55)' : 'rgba(255, 248, 220, 0.2)';
+        ctx.lineWidth = hair;
+        ctx.strokeRect(hx + 2.5, hy + 2.5, Math.max(0, hw - 5), Math.max(0, hh - 5));
+        ctx.restore();
+      }
     }
 
-    const liveBox = dragging && dragBox ? dragBox : null;
+    // 5) Selection — one gold rect while dragging (fast)
+    const liveBox = (dragging && dragBox) ? dragBox : null;
     if (liveBox || selected.size) {
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
       if (liveBox) {
-        ({ minC: sMinC, maxC: sMaxC, minR: sMinR, maxR: sMaxR } = liveBox);
+        sMinC = liveBox.minC; sMaxC = liveBox.maxC; sMinR = liveBox.minR; sMaxR = liveBox.maxR;
       } else {
         selected.forEach(k => {
-          const comma = k.indexOf(',');
-          const c = Number(k.slice(0, comma));
-          const r = Number(k.slice(comma + 1));
-          if (c < sMinC) sMinC = c;
-          if (c > sMaxC) sMaxC = c;
-          if (r < sMinR) sMinR = r;
-          if (r > sMaxR) sMaxR = r;
+          const parts = k.split(',');
+          const c = +parts[0], r = +parts[1];
+          if (!Number.isFinite(c) || !Number.isFinite(r)) return;
+          if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
+          if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
         });
       }
-      if (sMaxC >= sMinC && sMaxR >= sMinR) {
-        const bx = sMinC * drawCell, by = sMinR * drawCell;
-        const bw = (sMaxC - sMinC + 1) * drawCell, bh = (sMaxR - sMinR + 1) * drawCell;
-        ctx.fillStyle = 'rgba(240,193,75,0.38)';
+      if (sMaxC >= sMinC) {
+        const bx = sMinC * drawCell;
+        const by = sMinR * drawCell;
+        const bw = (sMaxC - sMinC + 1) * drawCell;
+        const bh = (sMaxR - sMinR + 1) * drawCell;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(240, 193, 75, 0.42)';
         ctx.fillRect(bx, by, bw, bh);
-        const frameW = Math.max(1.5, 3 / zNow);
+        // Outer frame — always visible at any zoom
+        const dashA = Math.max(3, 6 / zNow);
+        const dashB = Math.max(2, 4 / zNow);
+        const frameW = Math.max(1.5, hairFrame + (visCell < 2 ? 2 : 0.5));
         ctx.strokeStyle = '#2a2118';
         ctx.lineWidth = frameW;
         ctx.setLineDash([]);
         ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1));
         ctx.strokeStyle = '#f0c14b';
         ctx.lineWidth = Math.max(1.2, frameW * 0.9);
-        ctx.setLineDash([Math.max(3, 6 / zNow), Math.max(2, 4 / zNow)]);
+        ctx.setLineDash([dashA, dashB]);
+        ctx.lineDashOffset = -(typeof antsOffset === 'number' ? antsOffset : 0);
         ctx.strokeRect(bx + 1.5, by + 1.5, Math.max(0, bw - 3), Math.max(0, bh - 3));
         ctx.setLineDash([]);
+        ctx.restore();
       }
     }
 
-    // Live image preview during a pending claim.
+    // 6) Drag preview — skipped when dragBox already drawn
+    if (false && dragging && Number.isFinite(startC) && Number.isFinite(curC)) {
+      const minC = Math.min(startC, curC), maxC = Math.max(startC, curC);
+      const minR = Math.min(startR, curR), maxR = Math.max(startR, curR);
+      const dx = minC * drawCell, dy = minR * drawCell;
+      const dw = (maxC - minC + 1) * drawCell, dh = (maxR - minR + 1) * drawCell;
+      ctx.save();
+      ctx.fillStyle = 'rgba(212, 160, 23, 0.18)';
+      ctx.fillRect(dx, dy, dw, dh);
+      if (visCell >= 2.5) {
+        ctx.strokeStyle = 'rgba(139, 90, 43, 0.65)';
+        ctx.lineWidth = hair;
+        ctx.beginPath();
+        for (let c = minC; c <= maxC + 1; c++) {
+          const x = Math.floor(c * drawCell) + 0.5;
+          ctx.moveTo(x, dy); ctx.lineTo(x, dy + dh);
+        }
+        for (let r = minR; r <= maxR + 1; r++) {
+          const y = Math.floor(r * drawCell) + 0.5;
+          ctx.moveTo(dx, y); ctx.lineTo(dx + dw, y);
+        }
+        ctx.stroke();
+      }
+      const dashA = Math.max(3, 6 / zNow);
+      const dashB = Math.max(2, 4 / zNow);
+      ctx.strokeStyle = 'rgba(92, 61, 30, 0.95)';
+      ctx.lineWidth = hairFrame;
+      ctx.setLineDash([dashA, dashB]);
+      ctx.lineDashOffset = -(typeof antsOffset === 'number' ? antsOffset : 0);
+      ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(0, dw - 1), Math.max(0, dh - 1));
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // Live preview: show how image will look on selection before claim
     if (selected.size && pendingMedia && pendingType !== 'video') {
       let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
       selected.forEach(k => {
         if (sold.has(k)) return;
-        const comma = k.indexOf(',');
-        const c = Number(k.slice(0, comma)), r = Number(k.slice(comma + 1));
+        const [c, r] = k.split(',').map(Number);
         minC = Math.min(minC, c); maxC = Math.max(maxC, c);
         minR = Math.min(minR, r); maxR = Math.max(maxR, r);
       });
-      if (maxC >= minC && maxR >= minR) {
+      if (maxC >= minC) {
         const x = minC * drawCell, y = minR * drawCell;
         const w = (maxC - minC + 1) * drawCell, h = (maxR - minR + 1) * drawCell;
         const img = getImg(pendingMedia);
+        ctx.save();
+        ctx.globalAlpha = 1;
         ctx.fillStyle = '#1a1512';
         ctx.fillRect(x, y, w, h);
-        if (img && img.complete && img.naturalWidth) drawCoverCrop(ctx, img, x, y, w, h, crop.scale, crop.x, crop.y);
+        if (img && img.complete) drawCoverCrop(ctx, img, x, y, w, h, crop.scale, crop.x, crop.y);
         ctx.strokeStyle = '#1a1512';
         ctx.lineWidth = 2;
-        ctx.strokeRect(x + 1, y + 1, Math.max(0, w - 2), Math.max(0, h - 2));
+        ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        ctx.restore();
       }
     }
 
+    // Clear border on ALL sides (top, right, bottom, left)
     ctx.strokeStyle = '#1a1512';
-    ctx.lineWidth = 3 / scale;
-    ctx.strokeRect(1.5, 1.5, Math.max(0, baseW - 3), Math.max(0, baseH - 3));
-    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, sizeW - 3, sizeH - 3);
 
     const n = sold.size;
-    const counter = n + '/' + TOTAL;
-    const progress = Math.min(100, (n / Math.max(1, TOTAL)) * 100).toFixed(2) + '%';
-    const counterEl = $('counterText');
-    if (counterEl && counter !== lastCounterText) { counterEl.textContent = counter; lastCounterText = counter; }
-    const progressEl = $('progressFill');
-    if (progressEl && progress !== lastProgressWidth) { progressEl.style.width = progress; lastProgressWidth = progress; }
+    $('counterText').textContent = n + '/' + TOTAL;
+    $('progressFill').style.width = (n / TOTAL * 100) + '%';
   }
 
-function pos(e) {
+  function pos(e) {
     try {
       const rect = canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) return { c: 0, r: 0 };
@@ -5335,6 +5388,18 @@ function pos(e) {
     if ($('payTotalLine')) $('payTotalLine').textContent = 'TOTAL: $' + q.amount.toFixed(2);
   }
 
+
+  
+  function openAdmin() {
+    const modal = $('adminModal');
+    if (!modal) return;
+    if (adminMode) { enterAdminMode(); return; }
+    try {
+      const saved = storeGet('hpw_admin_key');
+      if (saved && $('adminKeyInput')) $('adminKeyInput').value = saved;
+    } catch (e) {}
+    modal.style.display = 'flex';
+  }
 
   function enterAdminMode() {
     const input = document.getElementById('adminKeyInput');
@@ -8005,12 +8070,12 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     lastMouseY = e.clientY;
   }, { passive: true });
   if ($('zoomIn')) $('zoomIn').onclick = () => {
-    bumpZoom(0.25, lastMouseX ?? (viewport.getBoundingClientRect().left + viewport.clientWidth / 2), lastMouseY ?? (viewport.getBoundingClientRect().top + viewport.clientHeight / 2));
-    try { positionMediaOverlays(); updateFloat(); scheduleDraw(); } catch (e) {}
+    bumpZoom(0.25, lastMouseX, lastMouseY);
+    try { updateFloat(); scheduleDraw(); } catch (e) {}
   };
   if ($('zoomOut')) $('zoomOut').onclick = () => {
-    bumpZoom(-0.25, lastMouseX ?? (viewport.getBoundingClientRect().left + viewport.clientWidth / 2), lastMouseY ?? (viewport.getBoundingClientRect().top + viewport.clientHeight / 2));
-    try { positionMediaOverlays(); updateFloat(); scheduleDraw(); } catch (e) {}
+    bumpZoom(-0.25, lastMouseX, lastMouseY);
+    try { updateFloat(); scheduleDraw(); } catch (e) {}
   };
   if ($('zoomFit')) $('zoomFit').onclick = () => {
     // Keep current pixel selection when fitting the wall
@@ -8133,7 +8198,10 @@ let scrollDrawRaf = 0;
     }, 120);
   }
   window.addEventListener('resize', () => scheduleMobileResize(false));
-  window.addEventListener('orientationchange', () => scheduleMobileResize(true));
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => scheduleMobileResize(true), 250);
+    setTimeout(() => scheduleMobileResize(true), 600);
+  });
   try {
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', () => scheduleMobileResize(false));
@@ -8230,110 +8298,68 @@ let scrollDrawRaf = 0;
   }
 
   try { loadLocalGeomOverrides(); } catch (e) {}
-  function regionSignature(list) {
-    return list.map(r => {
-      if (!r) return '';
-      return [r.id || r.claimId || '', r.pixels || (r.cells && r.cells.length) || 0,
-        r.minC, r.maxC, r.minR, r.maxR, r.name || '', r.mediaType || '', r.media || '',
-        r.cropScale || 1, r.cropX ?? 0.5, r.cropY ?? 0.5, r.paid ?? ''].join('|');
-    }).join('§');
-  }
 
   async function pullWall() {
-    if (wallPullInFlight) {
-      wallPullQueued = true;
-      return false;
-    }
-    wallPullInFlight = true;
     try {
+      if (window.__hpwPaintedOnce) { /* keep wall visible; no blocking splash */ }
       const data = await apiFetch('/api/wall', { timeout: 15000 }, 'Wall sync');
-      applyServerGrid(data);
-
-      const nextRegions = [];
-      const nextSold = new Map();
+      try { applyServerGrid(data); } catch (e) {}
+      regions = [];
+      sold.clear();
       let maxCSeen = 0, maxRSeen = 0;
-
-      for (const raw of (data.regions || [])) {
+      (data.regions || []).forEach(r => {
         try {
-          if (!raw || expired(raw)) continue;
-          const r = raw;
-          if ((r.minC == null || r.maxC == null) && Array.isArray(r.cells) && r.cells.length) {
-            let minC = COLS, maxC = -1, minR = ROWS, maxR = -1;
-            for (const k of r.cells) {
+          if (!r || expired(r)) return;
+          if ((r.minC == null || r.maxC == null) && r.cells && r.cells.length) {
+            let minC = COLS, maxC = 0, minR = ROWS, maxR = 0;
+            r.cells.forEach(k => {
               const p = String(k).split(',');
-              const c = Number(p[0]), row = Number(p[1]);
-              if (!Number.isFinite(c) || !Number.isFinite(row)) continue;
-              minC = Math.min(minC, c); maxC = Math.max(maxC, c);
-              minR = Math.min(minR, row); maxR = Math.max(maxR, row);
+              const c = +p[0], row = +p[1];
+              if (!isFinite(c) || !isFinite(row)) return;
+              if (c < minC) minC = c; if (c > maxC) maxC = c;
+              if (row < minR) minR = row; if (row > maxR) maxR = row;
+            });
+            if (maxC >= minC) {
+              r.minC = minC; r.maxC = maxC; r.minR = minR; r.maxR = maxR;
             }
-            if (maxC >= minC) { r.minC = minC; r.maxC = maxC; r.minR = minR; r.maxR = maxR; }
           }
-          if (r.maxC != null) maxCSeen = Math.max(maxCSeen, Number(r.maxC) || 0);
-          if (r.maxR != null) maxRSeen = Math.max(maxRSeen, Number(r.maxR) || 0);
-          nextRegions.push(r);
-          for (const k of (r.cells || [])) nextSold.set(k, r);
-        } catch (_) {}
-      }
-
-      const oldSig = regionSignature(regions);
-      const newSig = regionSignature(nextRegions);
-      const gridChanged = maxCSeen >= COLS || maxRSeen >= ROWS;
-      regions = nextRegions;
-      sold = nextSold;
-
-      if (gridChanged) {
+          if (r.maxC != null && r.maxC > maxCSeen) maxCSeen = r.maxC;
+          if (r.maxR != null && r.maxR > maxRSeen) maxRSeen = r.maxR;
+          regions.push(r);
+          (r.cells || []).forEach(k => sold.set(k, r));
+        } catch (err) { /* skip bad region */ }
+      });
+      let expanded = false;
+      if (maxCSeen >= COLS || maxRSeen >= ROWS) {
         COLS = Math.max(COLS, Math.ceil((maxCSeen + 1) / 10) * 10);
         ROWS = Math.max(ROWS, Math.ceil((maxRSeen + 1) / 10) * 10);
         TOTAL = COLS * ROWS;
-        resize(false);
-      } else if (oldSig !== newSig) {
-        wallVersion++;
-        staticWallKey = '';
-        scheduleDraw();
+        expanded = true;
       }
-
-      applyCropCacheToRegions();
-      applyLocalGeomOverrides();
-      try { save(); } catch (_) {}
-      const changed = oldSig !== newSig || gridChanged;
-      syncMediaOverlays(changed);
-      if (changed) {
-        preloadRegionImages(() => { wallVersion++; staticWallKey = ''; scheduleDraw(); });
+      try { applyCropCacheToRegions(); } catch (e) {}
+      try { applyLocalGeomOverrides(); } catch (e) {}
+      try { save(); } catch (e) {}
+      try { preloadRegionImages(() => {
+        try { staticWallKey = ''; } catch (e) {}
+        try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
+      }); } catch (e) {}
+      if (expanded) {
+        try { resize(false); } catch (e) {}
+      } else {
+        try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       }
+      try { syncMediaOverlays(); } catch (e) {}
       return true;
-    } catch (_) {
+    } catch (e) {
+      // Expected when API is offline / static host — use local data quietly
       return false;
     } finally {
-      wallPullInFlight = false;
-      setHpwLoader(false);
-      if (wallPullQueued) {
-        wallPullQueued = false;
-        setTimeout(() => pullWall(), 0);
-      }
+      try { setHpwLoader(false); } catch (e) {}
     }
   }
 
-  function scheduleWallPolling() {
-    clearTimeout(wallPollTimer);
-    const delay = document.hidden ? 60000 : (navigator.onLine ? 30000 : 60000);
-    wallPollTimer = setTimeout(async () => {
-      await pullWall();
-      scheduleWallPolling();
-    }, delay);
-  }
-
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      pullWall();
-      scheduleWallPolling();
-    } else {
-      scheduleWallPolling();
-    }
-  });
-  window.addEventListener('online', () => { pullWall(); scheduleWallPolling(); });
-  window.addEventListener('offline', scheduleWallPolling);
-
-(async () => {
+  (async () => {
+    try { loadLocalGeomOverrides(); } catch (e) {}
     try { load(); } catch (e) {}
     try { applyLocalGeomOverrides(); } catch (e) {}
     try { preloadRegionImages(); } catch (e) {}
@@ -8347,7 +8373,7 @@ let scrollDrawRaf = 0;
     try { resize(false); } catch (e) {}
     requestAnimationFrame(() => { try { layoutAtZoom(zoom || 1); draw(); } catch (e) {} });
     setTimeout(() => { try { resize(false); } catch (e) {} }, 400);
-    scheduleWallPolling();
+    setInterval(pullWall, 15000);
 
     // Back from Stripe success
     const params = new URLSearchParams(location.search);

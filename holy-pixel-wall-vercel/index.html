@@ -45,6 +45,8 @@
 
   
 
+  
+
 
   :root {
     --bg: #faf6ee;
@@ -291,6 +293,8 @@
   }
   /* ========== end TOP BAR ========== */
 
+
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -407,9 +411,13 @@
     color: #146b28;
     animation: countPop 2s steps(2) infinite;
   }
+  
+  
 
   @keyframes pixelBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.3; } }
-
+  
+  
+  
   @keyframes countPop {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.06); }
@@ -706,6 +714,8 @@
   .btn-claim:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 #3d2b1a; }
   .btn-claim:active { transform: translate(2px,2px); box-shadow: none; }
 
+  
+  
   .mascot:hover { transform: scale(1.1); }
   .mascot svg { width: 40px; height: 40px; }
 
@@ -1539,6 +1549,8 @@
 
 
 
+
+
 .hpw-chip {
   display: inline-block;
   font-family: 'Press Start 2P', monospace;
@@ -1569,6 +1581,8 @@
 }
 .hpw-seo-box[hidden] { display: none !important; }
 .hpw-seo-box strong { color: #2a2118; }
+
+
 
 
 
@@ -2620,6 +2634,8 @@ Min 10 blocks · no maximum
     }
   } catch (e) {}
 
+  
+  
   function countryFlag(code) {
     if (!code || code === 'OTHER') return '🌍';
     code = String(code).toUpperCase();
@@ -3150,6 +3166,8 @@ Min 10 blocks · no maximum
     } catch (e) {}
   }
 
+  
+
   function toast(msg, kind) {
     if (!toastEl) return;
     toastEl.textContent = String(msg || '');
@@ -3601,6 +3619,10 @@ Min 10 blocks · no maximum
 
 
 
+
+
+
+
   function centerWallInView() {
     if (!viewport) return;
     const o = getWallOrigin();
@@ -3752,6 +3774,9 @@ Min 10 blocks · no maximum
     try { positionMediaOverlays(); } catch (e) {}
   }
 
+  function applyZoomHQ() { paintBase(); }
+  function applyZoomSmooth() { layoutAtZoom(zoom); }
+  function scheduleZoomHQ() {}
 
   function anchorAt(clientX, clientY) {
     const vr = viewport.getBoundingClientRect();
@@ -6521,6 +6546,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     });
   }
 
+
+
   // Payment method UI
   let payMethod = 'card';
   let editingRegion = null;
@@ -7137,6 +7164,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       toast('SOME CLAIMS EXPIRED');
     }
   }, 30000);
+
+  
 
   if ($('helpBtn')) $('helpBtn').onclick = () => { $('helpModal').style.display = 'flex'; };
   if ($('helpClose')) $('helpClose').onclick = () => { $('helpModal').style.display = 'none'; };
@@ -7970,91 +7999,57 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
 
   viewport.addEventListener('contextmenu', e => { e.preventDefault(); });
 
-  // ===== Clean zoom controller =====
-  // One source of truth for buttons, mouse wheel, trackpad pinch and Safari gestures.
   let lastMouseX = null, lastMouseY = null;
-  let wheelEndTimer = 0;
-  let safariGestureStartZoom = 1;
-
-  function zoomAt(nextZoom, clientX, clientY) {
-    if (!viewport) return;
-    const rect = viewport.getBoundingClientRect();
-    const x = Number.isFinite(clientX) ? clientX : rect.left + rect.width / 2;
-    const y = Number.isFinite(clientY) ? clientY : rect.top + rect.height / 2;
-
-    // Capture the exact wall point under the pointer before changing layout.
-    const oldZoom = zoom || 1;
-    const oldOrigin = getWallOrigin();
-    const mx = x - rect.left;
-    const my = y - rect.top;
-    const wallX = (viewport.scrollLeft + mx - oldOrigin.x) / oldZoom;
-    const wallY = (viewport.scrollTop + my - oldOrigin.y) / oldZoom;
-
-    layoutAtZoom(zClamp(nextZoom));
-
-    const newOrigin = getWallOrigin();
-    viewport.scrollLeft = newOrigin.x + wallX * zoom - mx;
-    viewport.scrollTop = newOrigin.y + wallY * zoom - my;
-    clampScroll();
-    try { positionMediaOverlays(); } catch (_) {}
-    try { updateFloat(); } catch (_) {}
-    try { scheduleDraw(); } catch (_) {}
-  }
-
-  function zoomBy(factor, clientX, clientY) {
-    if (!Number.isFinite(factor) || factor <= 0) return;
-    zoomAt((zoom || 1) * factor, clientX, clientY);
-  }
-
   viewport.addEventListener('mousemove', e => {
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
   }, { passive: true });
-
-  if ($('zoomIn')) $('zoomIn').onclick = () => zoomBy(1.25, lastMouseX, lastMouseY);
-  if ($('zoomOut')) $('zoomOut').onclick = () => zoomBy(0.8, lastMouseX, lastMouseY);
-  if ($('zoomFit')) $('zoomFit').onclick = () => {
-    zoom = 1;
-    zoomTarget = 1;
-    layoutAtZoom(1);
-    centerWallInView();
-    try { updateFloat(); scheduleDraw(); } catch (_) {}
+  if ($('zoomIn')) $('zoomIn').onclick = () => {
+    bumpZoom(0.25, lastMouseX ?? (viewport.getBoundingClientRect().left + viewport.clientWidth / 2), lastMouseY ?? (viewport.getBoundingClientRect().top + viewport.clientHeight / 2));
+    try { positionMediaOverlays(); updateFloat(); scheduleDraw(); } catch (e) {}
   };
-
-  // Ctrl/⌘ + wheel and native trackpad pinch zoom. Plain wheel pans.
+  if ($('zoomOut')) $('zoomOut').onclick = () => {
+    bumpZoom(-0.25, lastMouseX ?? (viewport.getBoundingClientRect().left + viewport.clientWidth / 2), lastMouseY ?? (viewport.getBoundingClientRect().top + viewport.clientHeight / 2));
+    try { positionMediaOverlays(); updateFloat(); scheduleDraw(); } catch (e) {}
+  };
+  if ($('zoomFit')) $('zoomFit').onclick = () => {
+    // Keep current pixel selection when fitting the wall
+    resize(true);
+    try { updateFloat(); scheduleDraw(); } catch (e) {}
+    toast(selected.size ? ('FULL WALL · ' + selected.size + ' PX selected') : 'FULL WALL', 'ok');
+  };
+  // Navigation: scroll/trackpad = pan · pinch or Ctrl+wheel = zoom toward cursor
   viewport.addEventListener('wheel', e => {
     e.preventDefault();
     e.stopPropagation();
-
     if (e.ctrlKey || e.metaKey) {
-      const sensitivity = e.deltaMode === 1 ? 0.025 : 0.0025;
-      const factor = Math.exp(-e.deltaY * sensitivity);
-      zoomBy(Math.max(0.85, Math.min(1.18, factor)), e.clientX, e.clientY);
-      clearTimeout(wheelEndTimer);
-      wheelEndTimer = setTimeout(() => { zoomAnchor = null; }, 120);
-      return;
+      let delta = -e.deltaY * 0.004;
+      if (e.deltaMode === 1) delta *= 0.1;
+      delta = Math.max(-0.28, Math.min(0.28, delta));
+      bumpZoom(delta, e.clientX, e.clientY, true);
+    } else {
+      // Two-finger scroll / mouse wheel → pan
+      const speed = e.deltaMode === 1 ? 24 : 1;
+      viewport.scrollLeft += (e.deltaX || 0) * speed;
+      viewport.scrollTop += (e.deltaY || 0) * speed;
     }
-
-    const speed = e.deltaMode === 1 ? 24 : 1;
-    viewport.scrollLeft += (e.deltaX || 0) * speed;
-    viewport.scrollTop += (e.deltaY || 0) * speed;
   }, { passive: false });
 
-  // Safari gesture API: use absolute gesture scale, not a fake delta.
+  // Safari gesture events (older Mac trackpad API)
+  let gestureStartZoom = 1;
   viewport.addEventListener('gesturestart', e => {
     e.preventDefault();
-    safariGestureStartZoom = zoom || 1;
+    gestureStartZoom = zoom;
   }, { passive: false });
-
   viewport.addEventListener('gesturechange', e => {
     e.preventDefault();
-    zoomAt(safariGestureStartZoom * e.scale, e.clientX || lastMouseX, e.clientY || lastMouseY);
+    const target = Math.max(Z_MIN, Math.min(Z_MAX, gestureStartZoom * e.scale));
+    const delta = target - zoom;
+    if (Math.abs(delta) > 0.001) {
+      bumpZoom(delta, e.clientX || lastMouseX, e.clientY || lastMouseY, true);
+    }
   }, { passive: false });
-
-  viewport.addEventListener('gestureend', e => {
-    e.preventDefault();
-    zoomAnchor = null;
-  }, { passive: false });
+  viewport.addEventListener('gestureend', e => { e.preventDefault(); }, { passive: false });
 
   // Touch: 1-finger pan (drag mode) · 2-finger pan + pinch zoom
   viewport.addEventListener('touchstart', e => {

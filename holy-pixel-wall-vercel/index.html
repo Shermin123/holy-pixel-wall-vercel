@@ -2116,7 +2116,7 @@
   background: transparent !important;
 }
 .stage {
-  position: absolute !important;
+  position: relative !important;
   display: block !important;
   margin: 0 !important;
 }
@@ -3707,22 +3707,25 @@ Min 10 blocks · no maximum
 
   wallOrigin = { x: ox, y: oy };
 
+  // Use a real layout-sized zoom surface.  Do not use CSS transforms here:
+  // transformed overflow is inconsistent between Safari/Chrome and can make
+  // the wall or its media layer vanish from the scrollable area.
   wrap.style.position = 'relative';
   wrap.style.boxSizing = 'border-box';
   wrap.style.width = Math.max(vpW, w) + 'px';
   wrap.style.height = Math.max(vpH, h) + 'px';
   wrap.style.padding = '0';
   wrap.style.margin = '0';
+  wrap.style.display = 'flex';
+  wrap.style.alignItems = w < vpW && h < vpH ? 'center' : 'flex-start';
+  wrap.style.justifyContent = w < vpW && h < vpH ? 'center' : 'flex-start';
 
-  // IMPORTANT: use real layout dimensions for zoom, not CSS transform.
-  // Transformed elements do not reliably contribute to scrollWidth/scrollHeight
-  // across Safari/Chrome, which caused the wall to become unscrollable or clip at
-  // higher zoom levels.
-  stage.style.position = 'absolute';
-  stage.style.left = ox + 'px';
-  stage.style.top = oy + 'px';
+  stage.style.position = 'relative';
+  stage.style.left = '0';
+  stage.style.top = '0';
   stage.style.width = w + 'px';
   stage.style.height = h + 'px';
+  stage.style.flex = '0 0 ' + w + 'px';
   stage.style.margin = '0';
   stage.style.padding = '0';
   stage.style.transformOrigin = '0 0';
@@ -3840,6 +3843,7 @@ Min 10 blocks · no maximum
       centerWallInView();
     }
 
+    try { syncMediaOverlays(); } catch (e) {}
     try { scheduleDraw(); } catch (e) {}
   }
 

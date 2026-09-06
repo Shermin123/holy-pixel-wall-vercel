@@ -5216,19 +5216,18 @@ Min 10 blocks · no maximum
     if (!dragging) return;
     dragging = false;
     if (selectAwaitingMove) {
-      // A simple click selects exactly ONE pixel.  Do not treat a click as
-      // a rectangle selection.  Shift-click adds/removes a single pixel.
+      // SINGLE-PIXEL MODE: every click targets exactly one pixel.
+      // Clicking another free pixel ADDS it to the current selection.
+      // Clicking an already-selected pixel removes only that pixel.
+      // This makes arbitrary individual-pixel selection possible; there is
+      // no 10x10 snapping and no need to hold Shift.
       selectAwaitingMove = false;
       dragBox = null;
       const key = startC + ',' + startR;
       if (cellSelectable(startC, startR)) {
         pushSelectHistory();
-        if (eShiftDown) {
-          if (selected.has(key)) selected.delete(key);
-          else selected.add(key);
-        } else {
-          selected = new Set([key]);
-        }
+        if (selected.has(key)) selected.delete(key);
+        else selected.add(key);
       }
       try { updateFloat(); } catch (err) {}
       try { scheduleDraw(); } catch (err) {}
@@ -5353,12 +5352,9 @@ Min 10 blocks · no maximum
     e.preventDefault();
     e.stopPropagation();
     didDrag = true; // suppress following click
-    // Shift+double-click still selects a 10×10 free block in buy mode
-    if (e.shiftKey && buyMode && !spaceHeld) {
-      const p = pos(e);
-      selectBigBlock(p.c, p.r, false);
-      return;
-    }
+    // Buy mode is strictly per-pixel. Double-click must not switch to a
+    // 10×10 block selection; individual pixels are handled by onDown/onUp.
+    if (buyMode && !spaceHeld) return;
     // Phones: double-tap is common while zooming — do not toggle buy mode
     // (that was clearing the selection). Desktop only toggles BUY ↔ VIEW.
     const touchUI = (window.matchMedia && window.matchMedia('(hover: none)').matches) ||

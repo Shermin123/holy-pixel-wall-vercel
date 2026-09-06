@@ -5012,6 +5012,7 @@ Min 10 blocks · no maximum
 
   let suppressSelectUntil = 0; // after pinch, ignore stray taps that wipe selection
   let selectAwaitingMove = false; // don't replace selection until the drag moves a cell
+  let eShiftDown = false; // shift-click toggles one pixel
 
   function onDown(e) {
     if (!buyMode) return; // VIEW ONLY - no selecting
@@ -5064,6 +5065,7 @@ Min 10 blocks · no maximum
     }
     startC = curC = p.c;
     startR = curR = p.r;
+    eShiftDown = !!e.shiftKey;
     additiveSelect = false;
     deselect = false;
     dragBaseline = new Set(selected);
@@ -5191,8 +5193,20 @@ Min 10 blocks · no maximum
     if (!dragging) return;
     dragging = false;
     if (selectAwaitingMove) {
+      // A simple click selects exactly ONE pixel.  Do not treat a click as
+      // a rectangle selection.  Shift-click adds/removes a single pixel.
       selectAwaitingMove = false;
       dragBox = null;
+      const key = startC + ',' + startR;
+      if (cellSelectable(startC, startR)) {
+        pushSelectHistory();
+        if (eShiftDown) {
+          if (selected.has(key)) selected.delete(key);
+          else selected.add(key);
+        } else {
+          selected = new Set([key]);
+        }
+      }
       try { updateFloat(); } catch (err) {}
       try { scheduleDraw(); } catch (err) {}
       return;

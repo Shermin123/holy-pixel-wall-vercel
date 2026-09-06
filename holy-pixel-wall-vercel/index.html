@@ -3807,33 +3807,52 @@ Min 10 blocks · no maximum
     clampScroll();
   }
 
+  // ===== Clean zoom engine =====
+  // One source of truth: zoom is a layout scale (not a CSS transform).
+  // The point under the cursor/finger stays fixed while zooming.
   function applyZoomNow(next, clientX, clientY) {
-    const z = zClamp(next);
-    if (!zoomAnchor) anchorAt(clientX, clientY);
-    zoom = z;
-    zoomTarget = z;
-    layoutAtZoom(z);
-    if (z <= Z_MIN + 0.001) {
+    const oldZoom = zoom || 1;
+    const newZoom = zClamp(next);
+    if (!isFinite(newZoom) || newZoom === oldZoom) return;
+
+    const vr = viewport.getBoundingClientRect();
+    const cx = (clientX != null && isFinite(clientX)) ? clientX : vr.left + vr.width * 0.5;
+    const cy = (clientY != null && isFinite(clientY)) ? clientY : vr.top + vr.height * 0.5;
+    const mx = cx - vr.left;
+    const my = cy - vr.top;
+    const o = getWallOrigin();
+
+    // Store the wall coordinate currently under the pointer.
+    const bx = (viewport.scrollLeft + mx - o.x) / oldZoom;
+    const by = (viewport.scrollTop + my - o.y) / oldZoom;
+
+    zoom = newZoom;
+    zoomTarget = newZoom;
+    layoutAtZoom(newZoom);
+
+    const no = getWallOrigin();
+    viewport.scrollLeft = no.x + bx * newZoom - mx;
+    viewport.scrollTop = no.y + by * newZoom - my;
+    clampScroll();
+
+    if (newZoom <= Z_MIN + 0.001) {
       zoomAnchor = null;
       centerWallInView();
-    } else {
-      keepAnchor();
     }
+
+    try { scheduleDraw(); } catch (e) {}
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
-    const factor = continuous
-      ? Math.exp(Math.max(-0.35, Math.min(0.35, d)))
-      : (d > 0 ? 1.25 : 0.8);
-    if (!isFinite(factor) || factor <= 0) return;
-    if (clientX != null && isFinite(clientX)) {
-      if (!zoomAnchor) anchorAt(clientX, clientY);
-      else {
-        const vr = viewport.getBoundingClientRect();
-        zoomAnchor.mx = clientX - vr.left;
-        zoomAnchor.my = clientY - vr.top;
-      }
+    let factor;
+    if (continuous) {
+      // Continuous inputs are logarithmic so zoom speed is identical in/out.
+      const delta = Math.max(-0.35, Math.min(0.35, Number(d) || 0));
+      factor = Math.exp(delta);
+    } else {
+      factor = d > 0 ? 1.25 : 0.8;
     }
+    if (!isFinite(factor) || factor <= 0) return;
     applyZoomNow((zoom || 1) * factor, clientX, clientY);
   }
 
@@ -8097,21 +8116,25 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     try { updateFloat(); scheduleDraw(); } catch (e) {}
     toast(selected.size ? ('FULL WALL · ' + selected.size + ' PX selected') : 'FULL WALL', 'ok');
   };
-  // Navigation: scroll/trackpad = pan · pinch or Ctrl+wheel = zoom toward cursor
+  // Navigation:
+  // - BUY PIXELS: wheel / trackpad pinch = zoom, Shift+wheel = pan
+  // - VIEW WALL: wheel = pan, Ctrl/Cmd+wheel = zoom
   viewport.addEventListener('wheel', e => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.ctrlKey || e.metaKey) {
+
+    const zoomInput = e.ctrlKey || e.metaKey || buyMode;
+    if (zoomInput && !e.shiftKey) {
       let delta = -e.deltaY * 0.004;
       if (e.deltaMode === 1) delta *= 0.1;
       delta = Math.max(-0.28, Math.min(0.28, delta));
       bumpZoom(delta, e.clientX, e.clientY, true);
-    } else {
-      // Two-finger scroll / mouse wheel → pan
-      const speed = e.deltaMode === 1 ? 24 : 1;
-      viewport.scrollLeft += (e.deltaX || 0) * speed;
-      viewport.scrollTop += (e.deltaY || 0) * speed;
+      return;
     }
+
+    const speed = e.deltaMode === 1 ? 24 : 1;
+    viewport.scrollLeft += (e.deltaX || 0) * speed;
+    viewport.scrollTop += (e.deltaY || 0) * speed;
   }, { passive: false });
 
   // Safari gesture events (older Mac trackpad API)
@@ -8123,7 +8146,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   viewport.addEventListener('gesturechange', e => {
     e.preventDefault();
     const target = Math.max(Z_MIN, Math.min(Z_MAX, gestureStartZoom * e.scale));
-    const delta = target - zoom;
+    const current = Math.max(Z_MIN, Math.min(Z_MAX, zoom || 1));
+    const delta = Math.log(target / current);
     if (Math.abs(delta) > 0.001) {
       bumpZoom(delta, e.clientX || lastMouseX, e.clientY || lastMouseY, true);
     }
@@ -8165,7 +8189,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       if (lastPinch > 0) {
         const ratio = dist / lastPinch;
         if (Math.abs(ratio - 1) > 0.008) {
-          bumpZoom((ratio - 1) * zoom, midX, midY, true);
+          bumpZoom(Math.log(ratio), midX, midY, true);
         }
       }
       lastPinch = dist;

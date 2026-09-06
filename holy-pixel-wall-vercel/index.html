@@ -3606,7 +3606,7 @@ Min 10 blocks · no maximum
       zoomAnchor = null;
       if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
     }
-    paintBase({ fast: !window.__hpwPaintedOnce });
+    paintBase();
     window.__hpwPaintedOnce = true;
     layoutAtZoom(zoom || 1);
     try { syncMediaOverlays(); } catch (e) {}
@@ -3748,83 +3748,35 @@ Min 10 blocks · no maximum
   }
 }
 
-  let paintHqScheduled = false;
-  function paintBase(opts) {
-    if (!baseW || !baseH || !isFinite(baseW) || !isFinite(baseH)) return;
-    opts = opts || {};
-    // Bitmap stays at a capped base size. Zoom is CSS only — that is what keeps pinch smooth.
-    const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const dpr = Math.min(window.devicePixelRatio || 1, phone ? 1.75 : 2);
-    const maxLong = phone ? 5120 : 8192;
-    const long = Math.max(baseW, baseH) || 1;
-    // After zoom settles, add a little extra resolution so photos stay clear.
-    // Never scale the bitmap by full zoom (that is what made pinch lag).
-    const scale = Math.min(dpr, maxLong / long);
-
+  function paintBase() {
+    if (!baseW || !baseH || !canvas || !ctx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cap = 4096;
+    const scale = Math.min(dpr, cap / Math.max(baseW, baseH, 1));
     const nextW = Math.max(1, Math.round(baseW * scale));
     const nextH = Math.max(1, Math.round(baseH * scale));
-    if (canvas.width === nextW && canvas.height === nextH && !opts.force) {
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      ctx.imageSmoothingEnabled = true;
-      try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'medium'; } catch (e) {}
-      const savedCell0 = cell, savedW0 = sizeW, savedH0 = sizeH;
-      cell = baseCell; sizeW = baseW; sizeH = baseH;
-      try { draw(); } finally {
-        cell = savedCell0 || baseCell * (zoom || 1);
-        sizeW = savedW0 || baseW * (zoom || 1);
-        sizeH = savedH0 || baseH * (zoom || 1);
-      }
-      layoutAtZoom(zoom || 1);
-      if (!opts.fast) { try { positionMediaOverlays(); } catch (e) {} }
-      return;
+    if (canvas.width !== nextW || canvas.height !== nextH) {
+      canvas.width = nextW;
+      canvas.height = nextH;
     }
-    canvas.width = nextW;
-    canvas.height = nextH;
-
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'medium'; } catch (e) {}
-    // draw() uses logical size baseW×baseH via cell=baseCell temporarily
-    const savedCell = cell;
-    const savedW = sizeW, savedH = sizeH;
+    const savedCell = cell, savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
     sizeH = baseH;
-    hqZoom = 1;
-    try {
-      draw();
-    } finally {
+    try { draw(); } finally {
       cell = savedCell || baseCell * (zoom || 1);
       sizeW = savedW || baseW * (zoom || 1);
       sizeH = savedH || baseH * (zoom || 1);
     }
     layoutAtZoom(zoom || 1);
-    if (!opts.fast) {
-      try { positionMediaOverlays(); } catch (e) {}
-    }
-    if (opts.fast && !paintHqScheduled) {
-  paintHqScheduled = true;
-
-  requestAnimationFrame(() => {
-    paintHqScheduled = false;
-    try {
-      paintBase({ fast: false });
-    } catch (e) {}
-  });
-}
+    try { positionMediaOverlays(); } catch (e) {}
   }
 
-  function applyZoomHQ() {
-    paintBase();
-  }
-
-  function applyZoomSmooth() {
-    layoutAtZoom(zoom);
-  }
-
-  function scheduleZoomHQ() {
-    // Zoom is CSS transform only. Do not rebuild the canvas after pinch.
-  }
+  function applyZoomHQ() { paintBase(); }
+  function applyZoomSmooth() { layoutAtZoom(zoom); }
+  function scheduleZoomHQ() {}
 
   function anchorAt(clientX, clientY) {
     const vr = viewport.getBoundingClientRect();
@@ -3851,62 +3803,34 @@ Min 10 blocks · no maximum
     clampScroll();
   }
 
-  function zoomFrame() {
-    zoomRaf = 0;
-    const target = zClamp(zoomTarget);
-    if (!isFinite(target) || !isFinite(zoom)) {
-      zoom = Z_MIN;
-      zoomTarget = Z_MIN;
-      layoutAtZoom(zoom);
-      clampScroll();
-      return;
+  function applyZoomNow(next, clientX, clientY) {
+    const z = zClamp(next);
+    if (!zoomAnchor) anchorAt(clientX, clientY);
+    zoom = z;
+    zoomTarget = z;
+    layoutAtZoom(z);
+    if (z <= Z_MIN + 0.001) {
+      zoomAnchor = null;
+      centerWallInView();
+    } else {
+      keepAnchor();
     }
-    const diff = target - zoom;
-    if (Math.abs(diff) < 0.003) {
-      zoom = target;
-      zoomTarget = target;
-      layoutAtZoom(zoom);
-      if (zoom <= Z_MIN + 0.001) {
-        zoomAnchor = null;
-        centerWallInView();
-      } else {
-        keepAnchor();
-        zoomAnchor = null;
-        clampScroll();
-      }
-      try { positionMediaOverlays(); } catch (e) {}
-      return;
-    }
-    // Follow the finger — CSS size only, no canvas redraw
-    zoom = target;
-    layoutAtZoom(zoom);
-    keepAnchor();
-    zoomRaf = requestAnimationFrame(zoomFrame);
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
-    let factor;
-    if (continuous) {
-      const clamped = Math.max(-0.35, Math.min(0.35, d));
-      factor = Math.exp(clamped);
-    } else {
-      // Button / key: ~25% steps, stable
-      factor = d > 0 ? 1.25 : 0.8;
-    }
+    const factor = continuous
+      ? Math.exp(Math.max(-0.35, Math.min(0.35, d)))
+      : (d > 0 ? 1.25 : 0.8);
     if (!isFinite(factor) || factor <= 0) return;
-
-    try {
+    if (clientX != null && isFinite(clientX)) {
       if (!zoomAnchor) anchorAt(clientX, clientY);
-      else if (clientX != null && isFinite(clientX)) {
+      else {
         const vr = viewport.getBoundingClientRect();
         zoomAnchor.mx = clientX - vr.left;
         zoomAnchor.my = clientY - vr.top;
       }
-    } catch (e) {}
-
-    const base = isFinite(zoomTarget) ? zoomTarget : (zoom || 1);
-    zoomTarget = zClamp(base * factor);
-    if (!zoomRaf) zoomRaf = requestAnimationFrame(zoomFrame);
+    }
+    applyZoomNow((zoom || 1) * factor, clientX, clientY);
   }
 
   function detectMediaType(src, mime) {

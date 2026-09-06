@@ -3729,7 +3729,7 @@ Min 10 blocks · no maximum
   canvas.style.top = '0';
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
-  canvas.style.imageRendering = 'pixelated';
+  canvas.style.imageRendering = 'auto';
 
   if (mediaLayer) {
     mediaLayer.style.position = 'absolute';
@@ -3756,16 +3756,37 @@ Min 10 blocks · no maximum
     opts = opts || {};
     // Bitmap stays at a capped base size. Zoom is CSS only — that is what keeps pinch smooth.
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const dpr = Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2);
-    const maxLong = phone ? 4096 : 6144;
+    const dpr = Math.min(window.devicePixelRatio || 1, phone ? 1.75 : 2);
+    const maxLong = phone ? 5120 : 8192;
     const long = Math.max(baseW, baseH) || 1;
-    const scale = Math.min(dpr, maxLong / long);
+    // After zoom settles, add a little extra resolution so photos stay clear.
+    // Never scale the bitmap by full zoom (that is what made pinch lag).
+    const zBoost = Math.min(Math.max(zoom || 1, 1), phone ? 1.85 : 2.25);
+    const scale = Math.min(dpr * zBoost, maxLong / long);
 
-    canvas.width = Math.max(1, Math.round(baseW * scale));
-    canvas.height = Math.max(1, Math.round(baseH * scale));
+    const nextW = Math.max(1, Math.round(baseW * scale));
+    const nextH = Math.max(1, Math.round(baseH * scale));
+    if (canvas.width === nextW && canvas.height === nextH && !opts.force) {
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'medium'; } catch (e) {}
+      const savedCell0 = cell, savedW0 = sizeW, savedH0 = sizeH;
+      cell = baseCell; sizeW = baseW; sizeH = baseH;
+      try { draw(); } finally {
+        cell = savedCell0 || baseCell * (zoom || 1);
+        sizeW = savedW0 || baseW * (zoom || 1);
+        sizeH = savedH0 || baseH * (zoom || 1);
+      }
+      layoutAtZoom(zoom || 1);
+      if (!opts.fast) { try { positionMediaOverlays(); } catch (e) {} }
+      return;
+    }
+    canvas.width = nextW;
+    canvas.height = nextH;
 
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'medium'; } catch (e) {}
     // draw() uses logical size baseW×baseH via cell=baseCell temporarily
     const savedCell = cell;
     const savedW = sizeW, savedH = sizeH;
@@ -3781,7 +3802,9 @@ Min 10 blocks · no maximum
       sizeH = savedH || baseH * (zoom || 1);
     }
     layoutAtZoom(zoom || 1);
-    syncMediaOverlays();
+    if (!opts.fast) {
+      try { positionMediaOverlays(); } catch (e) {}
+    }
     if (opts.fast && !paintHqScheduled) {
   paintHqScheduled = true;
 
@@ -4302,7 +4325,8 @@ Min 10 blocks · no maximum
     const drawCell = baseCell;
     const drawW = baseW;
     const drawH = baseH;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'medium'; } catch (e) {}
 
     // 1) Blit cached checker + section grid (fast)
     const grid = rebuildGridCache();
@@ -4950,15 +4974,8 @@ Min 10 blocks · no maximum
       return;
     }
 
-    // Public buy: snap to 10×10 tiles so leftover strips are not created
-    const snapTiles = !(adminMode && editingRegion);
-    if (snapTiles) {
-      const sec = SECTION || 10;
-      minC = Math.floor(minC / sec) * sec;
-      minR = Math.floor(minR / sec) * sec;
-      maxC = Math.min(COLS - 1, Math.floor(maxC / sec) * sec + sec - 1);
-      maxR = Math.min(ROWS - 1, Math.floor(maxR / sec) * sec + sec - 1);
-    }
+    // Per-pixel rectangles. Do not snap to 10×10 (that blocked single-pixel select).
+    const snapTiles = false;
 
     const snapKey = minC + ':' + minR + ':' + maxC + ':' + maxR + ':' + !!finalize;
     if (snapKey === lastSnapKey) return;
@@ -5028,16 +5045,9 @@ Min 10 blocks · no maximum
       return;
     }
 
-    // Public buy: take whole free 10×10 tiles, then eat leftover slivers/pockets
-    if (snapTiles) {
-      const tiled = snapToFreeTiles(minC, maxC, minR, maxR, aC, aR);
-      if (tiled) {
-        minC = tiled.minC; maxC = tiled.maxC; minR = tiled.minR; maxR = tiled.maxR;
-      }
+    if (!(adminMode && editingRegion)) {
       const grown = swallowSlivers({ minC, maxC, minR, maxR });
       minC = grown.minC; maxC = grown.maxC; minR = grown.minR; maxR = grown.maxR;
-      const sealed = sealDeadZones({ minC, maxC, minR, maxR });
-      minC = sealed.minC; maxC = sealed.maxC; minR = sealed.minR; maxR = sealed.maxR;
     }
 
     const next = new Set();

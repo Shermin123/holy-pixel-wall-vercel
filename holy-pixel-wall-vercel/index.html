@@ -2125,7 +2125,7 @@ body::after { display: none !important; }
 
 
 /* Performance: isolate the interactive wall from the rest of the page. */
-.viewport { contain: layout paint; }
+.viewport { contain: layout; }
 .stage { contain: layout paint; }
 .media-layer { contain: strict; }
 @media (prefers-reduced-motion: reduce) {
@@ -3684,67 +3684,69 @@ Min 10 blocks · no maximum
   }
 
   function layoutAtZoom(z) {
-  z = zClamp(z);
-  zoom = z;
+    z = zClamp(z);
+    zoom = z;
 
-  const wrap = $('wallWrap');
-  if (!wrap || !stage || !canvas) return;
+    const wrap = $('wallWrap');
+    if (!wrap || !stage || !canvas || !viewport) return;
 
-  const w = Math.max(1, Math.round(baseW * z));
-  const h = Math.max(1, Math.round(baseH * z));
+    // Keep the scrollable spacer at the EXACT visual size of the transformed wall.
+    // CSS transforms alone do not reliably create scrollable space in every browser,
+    // especially Safari. The wrapper is therefore the source of truth for scrolling.
+    const wallW = Math.max(1, Math.round(baseW * z));
+    const wallH = Math.max(1, Math.round(baseH * z));
+    const vpW = Math.max(1, viewport.clientWidth);
+    const vpH = Math.max(1, viewport.clientHeight);
 
-  sizeW = w;
-  sizeH = h;
-  cell = baseCell * z;
+    sizeW = wallW;
+    sizeH = wallH;
+    cell = baseCell * z;
 
-  const vpW = viewport ? viewport.clientWidth : w;
-  const vpH = viewport ? viewport.clientHeight : h;
+    const ox = Math.max(0, Math.floor((vpW - wallW) / 2));
+    const oy = Math.max(0, Math.floor((vpH - wallH) / 2));
+    wallOrigin = { x: ox, y: oy };
 
-  const ox = Math.max(0, Math.floor((vpW - w) / 2));
-  const oy = Math.max(0, Math.floor((vpH - h) / 2));
+    // Spacer includes the wall plus the centering space. This guarantees that
+    // scrollLeft/scrollTop always have room to move at high zoom levels.
+    wrap.style.position = 'relative';
+    wrap.style.boxSizing = 'border-box';
+    wrap.style.width = Math.max(vpW, wallW) + 'px';
+    wrap.style.height = Math.max(vpH, wallH) + 'px';
+    wrap.style.padding = '0';
+    wrap.style.margin = '0';
 
-  wallOrigin = { x: ox, y: oy };
+    stage.style.position = 'absolute';
+    stage.style.left = ox + 'px';
+    stage.style.top = oy + 'px';
+    stage.style.width = Math.round(baseW) + 'px';
+    stage.style.height = Math.round(baseH) + 'px';
+    stage.style.margin = '0';
+    stage.style.padding = '0';
+    stage.style.transformOrigin = '0 0';
+    stage.style.transform = `translateZ(0) scale(${z})`;
+    stage.style.willChange = 'transform';
+    stage.style.overflow = 'hidden';
 
-  wrap.style.position = 'relative';
-  wrap.style.boxSizing = 'border-box';
-  wrap.style.width = Math.max(vpW, w) + 'px';
-  wrap.style.height = Math.max(vpH, h) + 'px';
-  wrap.style.padding = '0';
-  wrap.style.margin = '0';
+    canvas.style.position = 'absolute';
+    canvas.style.left = '0';
+    canvas.style.top = '0';
+    canvas.style.width = Math.round(baseW) + 'px';
+    canvas.style.height = Math.round(baseH) + 'px';
+    canvas.style.imageRendering = 'auto';
 
-  stage.style.position = 'absolute';
-  stage.style.left = ox + 'px';
-  stage.style.top = oy + 'px';
-  stage.style.width = Math.round(baseW) + 'px';
-  stage.style.height = Math.round(baseH) + 'px';
-  stage.style.margin = '0';
-  stage.style.padding = '0';
-  stage.style.transformOrigin = '0 0';
-  stage.style.transform = 'scale(' + z + ')';
-  stage.style.willChange = 'transform';
-  stage.style.overflow = 'hidden';
+    if (mediaLayer) {
+      mediaLayer.style.position = 'absolute';
+      mediaLayer.style.left = '0';
+      mediaLayer.style.top = '0';
+      mediaLayer.style.width = Math.round(baseW) + 'px';
+      mediaLayer.style.height = Math.round(baseH) + 'px';
+      mediaLayer.style.overflow = 'hidden';
+      mediaLayer.style.pointerEvents = 'none';
+    }
 
-  canvas.style.position = 'absolute';
-  canvas.style.left = '0';
-  canvas.style.top = '0';
-  canvas.style.width = Math.round(baseW) + 'px';
-  canvas.style.height = Math.round(baseH) + 'px';
-  canvas.style.imageRendering = 'auto';
-
-  if (mediaLayer) {
-    mediaLayer.style.position = 'absolute';
-    mediaLayer.style.left = '0';
-    mediaLayer.style.top = '0';
-    mediaLayer.style.width = Math.round(baseW) + 'px';
-    mediaLayer.style.height = Math.round(baseH) + 'px';
-    mediaLayer.style.overflow = 'hidden';
-    mediaLayer.style.pointerEvents = 'none';
+    const zoomLabel = $('zoomLvl');
+    if (zoomLabel) zoomLabel.textContent = Math.round(z * 100) + '%';
   }
-
-  if ($('zoomLvl')) {
-    $('zoomLvl').textContent = Math.round(z * 100) + '%';
-  }
-}
 
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
@@ -8003,12 +8005,12 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     lastMouseY = e.clientY;
   }, { passive: true });
   if ($('zoomIn')) $('zoomIn').onclick = () => {
-    bumpZoom(0.25, lastMouseX, lastMouseY);
-    try { updateFloat(); scheduleDraw(); } catch (e) {}
+    bumpZoom(0.25, lastMouseX ?? (viewport.getBoundingClientRect().left + viewport.clientWidth / 2), lastMouseY ?? (viewport.getBoundingClientRect().top + viewport.clientHeight / 2));
+    try { positionMediaOverlays(); updateFloat(); scheduleDraw(); } catch (e) {}
   };
   if ($('zoomOut')) $('zoomOut').onclick = () => {
-    bumpZoom(-0.25, lastMouseX, lastMouseY);
-    try { updateFloat(); scheduleDraw(); } catch (e) {}
+    bumpZoom(-0.25, lastMouseX ?? (viewport.getBoundingClientRect().left + viewport.clientWidth / 2), lastMouseY ?? (viewport.getBoundingClientRect().top + viewport.clientHeight / 2));
+    try { positionMediaOverlays(); updateFloat(); scheduleDraw(); } catch (e) {}
   };
   if ($('zoomFit')) $('zoomFit').onclick = () => {
     // Keep current pixel selection when fitting the wall

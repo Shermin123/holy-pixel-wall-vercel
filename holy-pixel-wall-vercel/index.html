@@ -2437,9 +2437,9 @@ body::after { display: none !important; }
       <p style="margin-bottom:12px;padding:10px 12px;background:#fff8e8;border:2px solid #c9a34e;color:var(--dark)">
         <strong>Why this exists.</strong> Holy Pixel Wall is a small project to help raise money for university fees and education costs. Every pixel you buy supports that goal.
       </p>
-      <p style="margin-bottom:10px"><strong style="color:var(--dark)">1.</strong> Click any free pixel to select it. Drag to select a rectangle. Click again to deselect.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--dark)">1.</strong> Drag to select free pixels.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">2.</strong> Add your name and a photo, GIF, or video (tap to upload). Optional link & description.</p>
-      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.50 / pixel for 6 months, or $1 / pixel for 1 year. Minimum purchase is 1 pixel.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--dark)">3.</strong> Pay $0.50 / pixel for 6 months, or $1 / pixel for 1 year.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">4.</strong> Your pixels stay locked — others cannot take them until time ends.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--dark)">Hover</strong> any claim to see the owner name and description.</p>
       <p style="margin-top:12px;font-size:0.9rem"><strong style="color:var(--dark)">Photo tip:</strong> Use a clear JPG, PNG, GIF, or MP4/WebM. Photos stay high quality; GIFs and videos play on your block.</p>
@@ -2448,12 +2448,12 @@ body::after { display: none !important; }
     <div class="modal-foot">
       <div style="text-align:left;font-size:0.95rem;color:var(--muted);margin:0 18px 12px;line-height:1.45">
 <strong style="color:var(--dark)">SHORTCUTS</strong><br>
-Click = one pixel · Drag = rectangle · Double-click = toggle buy/view<br>
+Drag = rectangle · Double-click = toggle buy/view · Shift+double-click = 10×10<br>
 Scroll = pan · Pinch / Ctrl+wheel = zoom<br>
 Space+drag or DRAG tool = pan<br>
 Ctrl+Z = undo · Esc = clear · Enter = claim<br>
 Arrows = pan · +/− = zoom · 0 = fit<br>
-Min 1 pixel · max 1,000,000
+Min 10 blocks · no maximum
 </div>
 <button class="btn btn-pri" id="helpClose">GOT IT</button>
     </div>
@@ -3065,8 +3065,8 @@ Min 1 pixel · max 1,000,000
   const tip = $('tip');
   const toastEl = $('toast');
 
-  // Fixed 1,000,000-pixel wall (1000×1000). Every cell is independently selectable.
-  let COLS = 1000, ROWS = 1000, TOTAL = 1000000;
+  // Adaptive grid: ~500,000 pixels — shape follows screen, snapped to 10
+  let COLS = 1000, ROWS = 500, TOTAL = 500000;
   let selected = new Set();
   const selectHistory = [];
   const MAX_HISTORY = 20;
@@ -3092,10 +3092,10 @@ Min 1 pixel · max 1,000,000
   let devMode = false;
   let spaceHeld = false;
   let panning = false, panLastX = 0, panLastY = 0;
-  const SECTION = 10; // visual guide only — not used for selection
-  const MIN_BUY = 1; // every individual pixel can be selected and claimed
-  const SLIVER_MAX = 0; // do not auto-expand selection into neighboring pixels
-  const MAX_BUY = 1000000;
+  const SECTION = 10; // big block = 10×10 pixels
+  const MIN_BUY = 10;
+  const SLIVER_MAX = 9; // leftover corridors this wide get swallowed into the buy
+  const MAX_BUY = 999999; // effectively unlimited
   let sizeW = 600, sizeH = 600, cell = 6;
   let baseW = 600, baseH = 600, baseCell = 6;
   let zoom = 1, hqZoom = 1, zoomTimer = null;
@@ -3587,18 +3587,18 @@ Min 1 pixel · max 1,000,000
   function resize(fitReset) {
     computeGrid();
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const margin = phone ? 8 : 16;
+    const margin = phone ? 10 : 24;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
     let s = Math.min(vw / COLS, vh / ROWS);
-    if (!isFinite(s) || s < 0.15) s = 0.15;
+    if (!isFinite(s) || s < 0.2) s = 0.2;
     baseCell = s;
-    cell = s * (zoom || 1);
+    cell = s;
     baseW = COLS * s;
     baseH = ROWS * s;
-    sizeW = baseW * (zoom || 1);
-    sizeH = baseH * (zoom || 1);
+    sizeW = baseW;
+    sizeH = baseH;
     if (fitReset) {
       zoom = 1;
       zoomTarget = 1;
@@ -3609,11 +3609,12 @@ Min 1 pixel · max 1,000,000
     paintBase();
     window.__hpwPaintedOnce = true;
     layoutAtZoom(zoom || 1);
-    try { positionMediaOverlays(); } catch (e) {}
+    try { syncMediaOverlays(); } catch (e) {}
     if (fitReset) {
       requestAnimationFrame(() => {
         try { centerWallInView(); } catch (e) {}
         try { positionMediaOverlays(); } catch (e) {}
+        try { draw(); } catch (e) {}
       });
     }
   }
@@ -3639,47 +3640,43 @@ Min 1 pixel · max 1,000,000
     if (typeof layoutAtZoom === 'function') layoutAtZoom(zoom || 1);
   }
 
-  // ===== Smooth zoom =====
-  // Stage stays at base size; CSS transform scales it. Wrap is the scroll
-  // surface so pan/zoom stay aligned and the wall never jumps.
-  const Z_MIN = 1;
-  function maxZoomLevel() {
-    // Zoom until one pixel is ~40 CSS px so you can aim a single cell.
-    const targetCell = 40;
-    const z = targetCell / Math.max(0.15, baseCell || 0.5);
-    return Math.max(16, Math.min(64, z));
-  }
+  // ===== Smooth zoom (layout-sized, no transform glitch) =====
+  // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
+  // Wrap size always matches what you see — nothing jumps off-screen.
+  const Z_MIN = 1, Z_MAX = 24;
+  // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
   function getZPad() {
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
       const phone = w < 700;
-      return phone ? 24 : 32;
-    } catch (e) { return 24; }
+      // Fit: tiny pad so the wall reads as a clean centered panel
+      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
+      return phone ? 36 : 40;
+    } catch (e) { return 0; }
   }
   function isPhoneLayout() {
     try {
       return ((viewport && viewport.clientWidth) || window.innerWidth || 800) < 700;
     } catch (e) { return false; }
   }
-  let wallOrigin = { x: 24, y: 24 };
+  const Z_PAD = 48;
+  let wallOrigin = { x: 8, y: 8 };
   function getWallOrigin() {
-    return wallOrigin && isFinite(wallOrigin.x) ? wallOrigin : { x: 24, y: 24 };
+    return wallOrigin && isFinite(wallOrigin.x) ? wallOrigin : { x: 8, y: 8 };
   }
   let zoomRaf = 0;
   let zoomTarget = 1;
-  let zoomAnchor = null;
+  let zoomAnchor = null; // { bx, by, mx, my } in base-pixel space
 
   function zClamp(z) {
     z = Number(z);
-    const zMax = maxZoomLevel();
     if (!isFinite(z) || z <= 0) return Z_MIN;
     if (z < Z_MIN) return Z_MIN;
-    if (z > zMax) return zMax;
+    if (z > Z_MAX) return Z_MAX;
     return z;
   }
 
   function clampScroll() {
-    if (!viewport) return;
     const maxX = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
     const maxY = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
     if (viewport.scrollLeft < 0) viewport.scrollLeft = 0;
@@ -3689,62 +3686,67 @@ Min 1 pixel · max 1,000,000
   }
 
   function layoutAtZoom(z) {
-    z = zClamp(z);
-    zoom = z;
+  z = zClamp(z);
+  zoom = z;
 
-    const wrap = $('wallWrap');
-    if (!wrap || !stage || !canvas) return;
+  const wrap = $('wallWrap');
+  if (!wrap || !stage || !canvas) return;
 
-    const pad = getZPad();
-    const w = Math.max(1, baseW * z);
-    const h = Math.max(1, baseH * z);
+  const w = Math.max(1, Math.round(baseW * z));
+  const h = Math.max(1, Math.round(baseH * z));
 
-    sizeW = w;
-    sizeH = h;
-    cell = baseCell * z;
-    wallOrigin = { x: pad, y: pad };
+  sizeW = w;
+  sizeH = h;
+  cell = baseCell * z;
 
-    wrap.style.position = 'relative';
-    wrap.style.boxSizing = 'content-box';
-    wrap.style.width = (w + pad * 2) + 'px';
-    wrap.style.height = (h + pad * 2) + 'px';
-    wrap.style.padding = '0';
-    wrap.style.margin = '0';
-    wrap.style.display = 'block';
+  const vpW = viewport ? viewport.clientWidth : w;
+  const vpH = viewport ? viewport.clientHeight : h;
 
-    stage.style.position = 'absolute';
-    stage.style.left = pad + 'px';
-    stage.style.top = pad + 'px';
-    stage.style.width = baseW + 'px';
-    stage.style.height = baseH + 'px';
-    stage.style.margin = '0';
-    stage.style.padding = '0';
-    stage.style.transformOrigin = '0 0';
-    stage.style.transform = 'scale(' + z + ')';
-    stage.style.willChange = 'transform';
-    stage.style.overflow = 'hidden';
+  const ox = Math.max(0, Math.floor((vpW - w) / 2));
+  const oy = Math.max(0, Math.floor((vpH - h) / 2));
 
-    canvas.style.position = 'absolute';
-    canvas.style.left = '0';
-    canvas.style.top = '0';
-    canvas.style.width = baseW + 'px';
-    canvas.style.height = baseH + 'px';
-    canvas.style.imageRendering = z > 2.5 ? 'pixelated' : 'auto';
+  wallOrigin = { x: ox, y: oy };
 
-    if (mediaLayer) {
-      mediaLayer.style.position = 'absolute';
-      mediaLayer.style.left = '0';
-      mediaLayer.style.top = '0';
-      mediaLayer.style.width = baseW + 'px';
-      mediaLayer.style.height = baseH + 'px';
-      mediaLayer.style.overflow = 'hidden';
-      mediaLayer.style.pointerEvents = 'none';
-    }
+  wrap.style.position = 'relative';
+  wrap.style.boxSizing = 'border-box';
+  wrap.style.width = Math.max(vpW, w) + 'px';
+  wrap.style.height = Math.max(vpH, h) + 'px';
+  wrap.style.padding = '0';
+  wrap.style.margin = '0';
 
-    if ($('zoomLvl')) {
-      $('zoomLvl').textContent = Math.round(z * 100) + '%';
-    }
+  stage.style.position = 'absolute';
+  stage.style.left = ox + 'px';
+  stage.style.top = oy + 'px';
+  stage.style.width = Math.round(baseW) + 'px';
+  stage.style.height = Math.round(baseH) + 'px';
+  stage.style.margin = '0';
+  stage.style.padding = '0';
+  stage.style.transformOrigin = '0 0';
+  stage.style.transform = 'scale(' + z + ')';
+  stage.style.willChange = 'transform';
+  stage.style.overflow = 'hidden';
+
+  canvas.style.position = 'absolute';
+  canvas.style.left = '0';
+  canvas.style.top = '0';
+  canvas.style.width = Math.round(baseW) + 'px';
+  canvas.style.height = Math.round(baseH) + 'px';
+  canvas.style.imageRendering = 'auto';
+
+  if (mediaLayer) {
+    mediaLayer.style.position = 'absolute';
+    mediaLayer.style.left = '0';
+    mediaLayer.style.top = '0';
+    mediaLayer.style.width = Math.round(baseW) + 'px';
+    mediaLayer.style.height = Math.round(baseH) + 'px';
+    mediaLayer.style.overflow = 'hidden';
+    mediaLayer.style.pointerEvents = 'none';
   }
+
+  if ($('zoomLvl')) {
+    $('zoomLvl').textContent = Math.round(z * 100) + '%';
+  }
+}
 
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
@@ -3758,7 +3760,7 @@ Min 1 pixel · max 1,000,000
       canvas.height = nextH;
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = (zoom || 1) < 2.5;
+    ctx.imageSmoothingEnabled = true;
     const savedCell = cell, savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
@@ -3777,7 +3779,6 @@ Min 1 pixel · max 1,000,000
   function scheduleZoomHQ() {}
 
   function anchorAt(clientX, clientY) {
-    if (!viewport) return;
     const vr = viewport.getBoundingClientRect();
     const cx = (clientX != null && isFinite(clientX)) ? clientX : vr.left + vr.width * 0.5;
     const cy = (clientY != null && isFinite(clientY)) ? clientY : vr.top + vr.height * 0.5;
@@ -3794,7 +3795,7 @@ Min 1 pixel · max 1,000,000
   }
 
   function keepAnchor() {
-    if (!zoomAnchor || !viewport) return;
+    if (!zoomAnchor) return;
     const z = zoom || 1;
     const o = getWallOrigin();
     viewport.scrollLeft = o.x + zoomAnchor.bx * z - zoomAnchor.mx;
@@ -3802,43 +3803,34 @@ Min 1 pixel · max 1,000,000
     clampScroll();
   }
 
-  function tickZoom() {
-    zoomRaf = 0;
-    const target = zClamp(zoomTarget);
-    const cur = zoom || 1;
-    const diff = target - cur;
-    let next;
-    if (Math.abs(diff) < 0.002) next = target;
-    else next = cur + diff * 0.28;
-    layoutAtZoom(next);
-    keepAnchor();
-    if (next !== target) {
-      zoomRaf = requestAnimationFrame(tickZoom);
-    } else {
-      zoomAnchor = (next <= Z_MIN + 0.001) ? null : zoomAnchor;
-      if (next <= Z_MIN + 0.001) centerWallInView();
-      try { positionMediaOverlays(); } catch (e) {}
-    }
-  }
-
   function applyZoomNow(next, clientX, clientY) {
-    const newZoom = zClamp(next);
-    if (!isFinite(newZoom)) return;
-    if (clientX != null || !zoomAnchor) anchorAt(clientX, clientY);
-    zoomTarget = newZoom;
-    if (!zoomRaf) zoomRaf = requestAnimationFrame(tickZoom);
+    const z = zClamp(next);
+    if (!zoomAnchor) anchorAt(clientX, clientY);
+    zoom = z;
+    zoomTarget = z;
+    layoutAtZoom(z);
+    if (z <= Z_MIN + 0.001) {
+      zoomAnchor = null;
+      centerWallInView();
+    } else {
+      keepAnchor();
+    }
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
-    let factor;
-    if (continuous) {
-      const delta = Math.max(-0.28, Math.min(0.28, Number(d) || 0));
-      factor = Math.exp(delta);
-    } else {
-      factor = d > 0 ? 1.35 : 1 / 1.35;
-    }
+    const factor = continuous
+      ? Math.exp(Math.max(-0.35, Math.min(0.35, d)))
+      : (d > 0 ? 1.25 : 0.8);
     if (!isFinite(factor) || factor <= 0) return;
-    applyZoomNow((zoomTarget || zoom || 1) * factor, clientX, clientY);
+    if (clientX != null && isFinite(clientX)) {
+      if (!zoomAnchor) anchorAt(clientX, clientY);
+      else {
+        const vr = viewport.getBoundingClientRect();
+        zoomAnchor.mx = clientX - vr.left;
+        zoomAnchor.my = clientY - vr.top;
+      }
+    }
+    applyZoomNow((zoom || 1) * factor, clientX, clientY);
   }
 
   function detectMediaType(src, mime) {
@@ -3858,7 +3850,7 @@ Min 1 pixel · max 1,000,000
     if (!mediaLayer) return;
     const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
     if (!clips.length) return;
-    // Overlays live inside the scaled stage — use base cell size only
+    // Use current layout cell (baseCell * zoom) so overlays track canvas exactly
     const c = baseCell || 1;
     clips.forEach(clip => {
       const minC = +clip.getAttribute('data-min-c');
@@ -3906,7 +3898,7 @@ Min 1 pixel · max 1,000,000
           if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
       if (!ownsAny) return;
 
-      const unit = baseCell || cell || 1;
+      const unit = baseCell || cell;
       const x = r.minC * unit;
       const y = r.minR * unit;
       const w = (r.maxC - r.minC + 1) * unit;
@@ -4543,7 +4535,7 @@ Min 1 pixel · max 1,000,000
     // Clear border on ALL sides (top, right, bottom, left)
     ctx.strokeStyle = '#1a1512';
     ctx.lineWidth = 3;
-    ctx.strokeRect(1.5, 1.5, drawW - 3, drawH - 3);
+    ctx.strokeRect(1.5, 1.5, sizeW - 3, sizeH - 3);
 
     const n = sold.size;
     $('counterText').textContent = n + '/' + TOTAL;
@@ -4958,8 +4950,7 @@ Min 1 pixel · max 1,000,000
       return;
     }
 
-    // Keep the exact rectangle the user drew. Do not swallow neighboring pixels.
-    if (false && !(adminMode && editingRegion)) {
+    if (!(adminMode && editingRegion)) {
       const grown = swallowSlivers({ minC, maxC, minR, maxR });
       minC = grown.minC; maxC = grown.maxC; minR = grown.minR; maxR = grown.maxR;
     }
@@ -5001,7 +4992,7 @@ Min 1 pixel · max 1,000,000
         if (issues.length) {
           $('selCount').textContent = n + ' pixels · ' + issues[0];
         } else if (n < MIN_BUY) {
-          $('selCount').textContent = n + ' pixel' + (n===1?'':'s') + ' (min ' + MIN_BUY + ') · $' + q.unitPrice.toFixed(2) + ' each';
+          $('selCount').textContent = n + ' pixels (min ' + MIN_BUY + ') · $' + q.unitPrice.toFixed(2) + ' each';
         } else {
           $('selCount').textContent = n + ' pixels · $' + q.unitPrice.toFixed(2) + ' each';
         }
@@ -5017,7 +5008,6 @@ Min 1 pixel · max 1,000,000
 
   let suppressSelectUntil = 0; // after pinch, ignore stray taps that wipe selection
   let selectAwaitingMove = false; // don't replace selection until the drag moves a cell
-  let eShiftDown = false; // shift-click toggles one pixel
 
   function onDown(e) {
     if (!buyMode) return; // VIEW ONLY - no selecting
@@ -5070,7 +5060,6 @@ Min 1 pixel · max 1,000,000
     }
     startC = curC = p.c;
     startR = curR = p.r;
-    eShiftDown = !!e.shiftKey;
     additiveSelect = false;
     deselect = false;
     dragBaseline = new Set(selected);
@@ -5198,19 +5187,8 @@ Min 1 pixel · max 1,000,000
     if (!dragging) return;
     dragging = false;
     if (selectAwaitingMove) {
-      // SINGLE-PIXEL MODE: every click targets exactly one pixel.
-      // Clicking another free pixel ADDS it to the current selection.
-      // Clicking an already-selected pixel removes only that pixel.
-      // This makes arbitrary individual-pixel selection possible; there is
-      // no 10x10 snapping and no need to hold Shift.
       selectAwaitingMove = false;
       dragBox = null;
-      const key = startC + ',' + startR;
-      if (cellSelectable(startC, startR)) {
-        pushSelectHistory();
-        if (selected.has(key)) selected.delete(key);
-        else selected.add(key);
-      }
       try { updateFloat(); } catch (err) {}
       try { scheduleDraw(); } catch (err) {}
       return;
@@ -5334,9 +5312,12 @@ Min 1 pixel · max 1,000,000
     e.preventDefault();
     e.stopPropagation();
     didDrag = true; // suppress following click
-    // Buy mode is strictly per-pixel. Double-click must not switch to a
-    // 10×10 block selection; individual pixels are handled by onDown/onUp.
-    if (buyMode && !spaceHeld) return;
+    // Shift+double-click still selects a 10×10 free block in buy mode
+    if (e.shiftKey && buyMode && !spaceHeld) {
+      const p = pos(e);
+      selectBigBlock(p.c, p.r, false);
+      return;
+    }
     // Phones: double-tap is common while zooming — do not toggle buy mode
     // (that was clearing the selection). Desktop only toggles BUY ↔ VIEW.
     const touchUI = (window.matchMedia && window.matchMedia('(hover: none)').matches) ||
@@ -5731,7 +5712,9 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         break;
       }
     }
-    // Individual pixels may be toggled one-by-one; a solid rectangle is not required.
+    if (n && !isSolidRectangle(Array.from(selected))) {
+      issues.push('Selection must be one solid rectangle');
+    }
     return issues;
   }
 
@@ -8096,25 +8079,21 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     try { updateFloat(); scheduleDraw(); } catch (e) {}
     toast(selected.size ? ('FULL WALL · ' + selected.size + ' PX selected') : 'FULL WALL', 'ok');
   };
-  // Navigation:
-  // - BUY PIXELS: wheel / trackpad pinch = zoom, Shift+wheel = pan
-  // - VIEW WALL: wheel = pan, Ctrl/Cmd+wheel = zoom
+  // Navigation: scroll/trackpad = pan · pinch or Ctrl+wheel = zoom toward cursor
   viewport.addEventListener('wheel', e => {
     e.preventDefault();
     e.stopPropagation();
-
-    const zoomInput = e.ctrlKey || e.metaKey || buyMode;
-    if (zoomInput && !e.shiftKey) {
+    if (e.ctrlKey || e.metaKey) {
       let delta = -e.deltaY * 0.004;
       if (e.deltaMode === 1) delta *= 0.1;
       delta = Math.max(-0.28, Math.min(0.28, delta));
       bumpZoom(delta, e.clientX, e.clientY, true);
-      return;
+    } else {
+      // Two-finger scroll / mouse wheel → pan
+      const speed = e.deltaMode === 1 ? 24 : 1;
+      viewport.scrollLeft += (e.deltaX || 0) * speed;
+      viewport.scrollTop += (e.deltaY || 0) * speed;
     }
-
-    const speed = e.deltaMode === 1 ? 24 : 1;
-    viewport.scrollLeft += (e.deltaX || 0) * speed;
-    viewport.scrollTop += (e.deltaY || 0) * speed;
   }, { passive: false });
 
   // Safari gesture events (older Mac trackpad API)
@@ -8126,8 +8105,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   viewport.addEventListener('gesturechange', e => {
     e.preventDefault();
     const target = Math.max(Z_MIN, Math.min(Z_MAX, gestureStartZoom * e.scale));
-    const current = Math.max(Z_MIN, Math.min(Z_MAX, zoom || 1));
-    const delta = Math.log(target / current);
+    const delta = target - zoom;
     if (Math.abs(delta) > 0.001) {
       bumpZoom(delta, e.clientX || lastMouseX, e.clientY || lastMouseY, true);
     }
@@ -8169,7 +8147,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       if (lastPinch > 0) {
         const ratio = dist / lastPinch;
         if (Math.abs(ratio - 1) > 0.008) {
-          bumpZoom(Math.log(ratio), midX, midY, true);
+          bumpZoom((ratio - 1) * zoom, midX, midY, true);
         }
       }
       lastPinch = dist;
@@ -8659,7 +8637,7 @@ let scrollDrawRaf = 0;
   };
 
 
-    setTimeout(() => toast('1,000,000 PIXELS · CLICK ANY ONE · DRAG A BOX · MIN 1'), 600);
+    setTimeout(() => toast('BUY SNAPS TO 10×10 · GAPS AUTO-FILL · MIN 10 · PINCH TO ZOOM'), 600);
 
   
   if ($('adminExitBtn')) $('adminExitBtn').onclick = () => exitAdminMode();

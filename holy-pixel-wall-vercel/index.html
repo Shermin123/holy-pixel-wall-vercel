@@ -2116,7 +2116,7 @@
   background: transparent !important;
 }
 .stage {
-  position: relative !important;
+  position: absolute !important;
   display: block !important;
   margin: 0 !important;
 }
@@ -3587,18 +3587,18 @@ Min 1 pixel · max 1,000,000
   function resize(fitReset) {
     computeGrid();
     const phone = typeof isPhoneLayout === 'function' && isPhoneLayout();
-    const margin = phone ? 10 : 24;
+    const margin = phone ? 8 : 16;
     const { vw: rawW, vh: rawH } = viewportSize();
     const vw = Math.max(rawW - margin * 2, 80);
     const vh = Math.max(rawH - margin * 2, 80);
     let s = Math.min(vw / COLS, vh / ROWS);
-    if (!isFinite(s) || s < 0.2) s = 0.2;
+    if (!isFinite(s) || s < 0.15) s = 0.15;
     baseCell = s;
-    cell = s;
+    cell = s * (zoom || 1);
     baseW = COLS * s;
     baseH = ROWS * s;
-    sizeW = baseW;
-    sizeH = baseH;
+    sizeW = baseW * (zoom || 1);
+    sizeH = baseH * (zoom || 1);
     if (fitReset) {
       zoom = 1;
       zoomTarget = 1;
@@ -3609,12 +3609,11 @@ Min 1 pixel · max 1,000,000
     paintBase();
     window.__hpwPaintedOnce = true;
     layoutAtZoom(zoom || 1);
-    try { syncMediaOverlays(); } catch (e) {}
+    try { positionMediaOverlays(); } catch (e) {}
     if (fitReset) {
       requestAnimationFrame(() => {
         try { centerWallInView(); } catch (e) {}
         try { positionMediaOverlays(); } catch (e) {}
-        try { draw(); } catch (e) {}
       });
     }
   }
@@ -3640,43 +3639,47 @@ Min 1 pixel · max 1,000,000
     if (typeof layoutAtZoom === 'function') layoutAtZoom(zoom || 1);
   }
 
-  // ===== Smooth zoom (layout-sized, no transform glitch) =====
-  // Bitmap stays at base resolution; CSS width/height scales it up (pixelated).
-  // Wrap size always matches what you see — nothing jumps off-screen.
-  const Z_MIN = 1, Z_MAX = 24;
-  // Outer scroll margin only (does not shrink wall size). Minimal everywhere.
+  // ===== Smooth zoom =====
+  // Stage stays at base size; CSS transform scales it. Wrap is the scroll
+  // surface so pan/zoom stay aligned and the wall never jumps.
+  const Z_MIN = 1;
+  function maxZoomLevel() {
+    // Zoom until one pixel is ~40 CSS px so you can aim a single cell.
+    const targetCell = 40;
+    const z = targetCell / Math.max(0.15, baseCell || 0.5);
+    return Math.max(16, Math.min(64, z));
+  }
   function getZPad() {
     try {
       const w = (viewport && viewport.clientWidth) || window.innerWidth || 400;
       const phone = w < 700;
-      // Fit: tiny pad so the wall reads as a clean centered panel
-      if ((zoom || 1) <= 1.05) return phone ? 0 : 8;
-      return phone ? 36 : 40;
-    } catch (e) { return 0; }
+      return phone ? 24 : 32;
+    } catch (e) { return 24; }
   }
   function isPhoneLayout() {
     try {
       return ((viewport && viewport.clientWidth) || window.innerWidth || 800) < 700;
     } catch (e) { return false; }
   }
-  const Z_PAD = 48;
-  let wallOrigin = { x: 8, y: 8 };
+  let wallOrigin = { x: 24, y: 24 };
   function getWallOrigin() {
-    return wallOrigin && isFinite(wallOrigin.x) ? wallOrigin : { x: 8, y: 8 };
+    return wallOrigin && isFinite(wallOrigin.x) ? wallOrigin : { x: 24, y: 24 };
   }
   let zoomRaf = 0;
   let zoomTarget = 1;
-  let zoomAnchor = null; // { bx, by, mx, my } in base-pixel space
+  let zoomAnchor = null;
 
   function zClamp(z) {
     z = Number(z);
+    const zMax = maxZoomLevel();
     if (!isFinite(z) || z <= 0) return Z_MIN;
     if (z < Z_MIN) return Z_MIN;
-    if (z > Z_MAX) return Z_MAX;
+    if (z > zMax) return zMax;
     return z;
   }
 
   function clampScroll() {
+    if (!viewport) return;
     const maxX = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
     const maxY = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
     if (viewport.scrollLeft < 0) viewport.scrollLeft = 0;
@@ -3686,74 +3689,62 @@ Min 1 pixel · max 1,000,000
   }
 
   function layoutAtZoom(z) {
-  z = zClamp(z);
-  zoom = z;
+    z = zClamp(z);
+    zoom = z;
 
-  const wrap = $('wallWrap');
-  if (!wrap || !stage || !canvas) return;
+    const wrap = $('wallWrap');
+    if (!wrap || !stage || !canvas) return;
 
-  const w = Math.max(1, Math.round(baseW * z));
-  const h = Math.max(1, Math.round(baseH * z));
+    const pad = getZPad();
+    const w = Math.max(1, baseW * z);
+    const h = Math.max(1, baseH * z);
 
-  sizeW = w;
-  sizeH = h;
-  cell = baseCell * z;
+    sizeW = w;
+    sizeH = h;
+    cell = baseCell * z;
+    wallOrigin = { x: pad, y: pad };
 
-  const vpW = viewport ? viewport.clientWidth : w;
-  const vpH = viewport ? viewport.clientHeight : h;
+    wrap.style.position = 'relative';
+    wrap.style.boxSizing = 'content-box';
+    wrap.style.width = (w + pad * 2) + 'px';
+    wrap.style.height = (h + pad * 2) + 'px';
+    wrap.style.padding = '0';
+    wrap.style.margin = '0';
+    wrap.style.display = 'block';
 
-  const ox = Math.max(0, Math.floor((vpW - w) / 2));
-  const oy = Math.max(0, Math.floor((vpH - h) / 2));
+    stage.style.position = 'absolute';
+    stage.style.left = pad + 'px';
+    stage.style.top = pad + 'px';
+    stage.style.width = baseW + 'px';
+    stage.style.height = baseH + 'px';
+    stage.style.margin = '0';
+    stage.style.padding = '0';
+    stage.style.transformOrigin = '0 0';
+    stage.style.transform = 'scale(' + z + ')';
+    stage.style.willChange = 'transform';
+    stage.style.overflow = 'hidden';
 
-  wallOrigin = { x: ox, y: oy };
+    canvas.style.position = 'absolute';
+    canvas.style.left = '0';
+    canvas.style.top = '0';
+    canvas.style.width = baseW + 'px';
+    canvas.style.height = baseH + 'px';
+    canvas.style.imageRendering = z > 2.5 ? 'pixelated' : 'auto';
 
-  // Use a real layout-sized zoom surface.  Do not use CSS transforms here:
-  // transformed overflow is inconsistent between Safari/Chrome and can make
-  // the wall or its media layer vanish from the scrollable area.
-  wrap.style.position = 'relative';
-  wrap.style.boxSizing = 'border-box';
-  wrap.style.width = Math.max(vpW, w) + 'px';
-  wrap.style.height = Math.max(vpH, h) + 'px';
-  wrap.style.padding = '0';
-  wrap.style.margin = '0';
-  wrap.style.display = 'flex';
-  wrap.style.alignItems = w < vpW && h < vpH ? 'center' : 'flex-start';
-  wrap.style.justifyContent = w < vpW && h < vpH ? 'center' : 'flex-start';
+    if (mediaLayer) {
+      mediaLayer.style.position = 'absolute';
+      mediaLayer.style.left = '0';
+      mediaLayer.style.top = '0';
+      mediaLayer.style.width = baseW + 'px';
+      mediaLayer.style.height = baseH + 'px';
+      mediaLayer.style.overflow = 'hidden';
+      mediaLayer.style.pointerEvents = 'none';
+    }
 
-  stage.style.position = 'relative';
-  stage.style.left = '0';
-  stage.style.top = '0';
-  stage.style.width = w + 'px';
-  stage.style.height = h + 'px';
-  stage.style.flex = '0 0 ' + w + 'px';
-  stage.style.margin = '0';
-  stage.style.padding = '0';
-  stage.style.transformOrigin = '0 0';
-  stage.style.transform = 'none';
-  stage.style.willChange = 'auto';
-  stage.style.overflow = 'hidden';
-
-  canvas.style.position = 'absolute';
-  canvas.style.left = '0';
-  canvas.style.top = '0';
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.style.imageRendering = 'auto';
-
-  if (mediaLayer) {
-    mediaLayer.style.position = 'absolute';
-    mediaLayer.style.left = '0';
-    mediaLayer.style.top = '0';
-    mediaLayer.style.width = w + 'px';
-    mediaLayer.style.height = h + 'px';
-    mediaLayer.style.overflow = 'hidden';
-    mediaLayer.style.pointerEvents = 'none';
+    if ($('zoomLvl')) {
+      $('zoomLvl').textContent = Math.round(z * 100) + '%';
+    }
   }
-
-  if ($('zoomLvl')) {
-    $('zoomLvl').textContent = Math.round(z * 100) + '%';
-  }
-}
 
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
@@ -3767,7 +3758,7 @@ Min 1 pixel · max 1,000,000
       canvas.height = nextH;
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingEnabled = (zoom || 1) < 2.5;
     const savedCell = cell, savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
@@ -3786,6 +3777,7 @@ Min 1 pixel · max 1,000,000
   function scheduleZoomHQ() {}
 
   function anchorAt(clientX, clientY) {
+    if (!viewport) return;
     const vr = viewport.getBoundingClientRect();
     const cx = (clientX != null && isFinite(clientX)) ? clientX : vr.left + vr.width * 0.5;
     const cy = (clientY != null && isFinite(clientY)) ? clientY : vr.top + vr.height * 0.5;
@@ -3802,7 +3794,7 @@ Min 1 pixel · max 1,000,000
   }
 
   function keepAnchor() {
-    if (!zoomAnchor) return;
+    if (!zoomAnchor || !viewport) return;
     const z = zoom || 1;
     const o = getWallOrigin();
     viewport.scrollLeft = o.x + zoomAnchor.bx * z - zoomAnchor.mx;
@@ -3810,54 +3802,43 @@ Min 1 pixel · max 1,000,000
     clampScroll();
   }
 
-  // ===== Clean zoom engine =====
-  // One source of truth: zoom is a layout scale (not a CSS transform).
-  // The point under the cursor/finger stays fixed while zooming.
-  function applyZoomNow(next, clientX, clientY) {
-    const oldZoom = zoom || 1;
-    const newZoom = zClamp(next);
-    if (!isFinite(newZoom) || newZoom === oldZoom) return;
-
-    const vr = viewport.getBoundingClientRect();
-    const cx = (clientX != null && isFinite(clientX)) ? clientX : vr.left + vr.width * 0.5;
-    const cy = (clientY != null && isFinite(clientY)) ? clientY : vr.top + vr.height * 0.5;
-    const mx = cx - vr.left;
-    const my = cy - vr.top;
-    const o = getWallOrigin();
-
-    // Store the wall coordinate currently under the pointer.
-    const bx = (viewport.scrollLeft + mx - o.x) / oldZoom;
-    const by = (viewport.scrollTop + my - o.y) / oldZoom;
-
-    zoom = newZoom;
-    zoomTarget = newZoom;
-    layoutAtZoom(newZoom);
-
-    const no = getWallOrigin();
-    viewport.scrollLeft = no.x + bx * newZoom - mx;
-    viewport.scrollTop = no.y + by * newZoom - my;
-    clampScroll();
-
-    if (newZoom <= Z_MIN + 0.001) {
-      zoomAnchor = null;
-      centerWallInView();
+  function tickZoom() {
+    zoomRaf = 0;
+    const target = zClamp(zoomTarget);
+    const cur = zoom || 1;
+    const diff = target - cur;
+    let next;
+    if (Math.abs(diff) < 0.002) next = target;
+    else next = cur + diff * 0.28;
+    layoutAtZoom(next);
+    keepAnchor();
+    if (next !== target) {
+      zoomRaf = requestAnimationFrame(tickZoom);
+    } else {
+      zoomAnchor = (next <= Z_MIN + 0.001) ? null : zoomAnchor;
+      if (next <= Z_MIN + 0.001) centerWallInView();
+      try { positionMediaOverlays(); } catch (e) {}
     }
+  }
 
-    try { syncMediaOverlays(); } catch (e) {}
-    try { scheduleDraw(); } catch (e) {}
+  function applyZoomNow(next, clientX, clientY) {
+    const newZoom = zClamp(next);
+    if (!isFinite(newZoom)) return;
+    if (clientX != null || !zoomAnchor) anchorAt(clientX, clientY);
+    zoomTarget = newZoom;
+    if (!zoomRaf) zoomRaf = requestAnimationFrame(tickZoom);
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
     let factor;
     if (continuous) {
-      // Continuous inputs are logarithmic so zoom speed is identical in/out.
-      const delta = Math.max(-0.35, Math.min(0.35, Number(d) || 0));
+      const delta = Math.max(-0.28, Math.min(0.28, Number(d) || 0));
       factor = Math.exp(delta);
     } else {
-      factor = d > 0 ? 1.25 : 0.8;
+      factor = d > 0 ? 1.35 : 1 / 1.35;
     }
     if (!isFinite(factor) || factor <= 0) return;
-    applyZoomNow((zoom || 1) * factor, clientX, clientY);
+    applyZoomNow((zoomTarget || zoom || 1) * factor, clientX, clientY);
   }
 
   function detectMediaType(src, mime) {
@@ -3877,8 +3858,8 @@ Min 1 pixel · max 1,000,000
     if (!mediaLayer) return;
     const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
     if (!clips.length) return;
-    // Use current layout cell (baseCell * zoom) so overlays track canvas exactly
-    const c = (baseCell || 1) * (zoom || 1);
+    // Overlays live inside the scaled stage — use base cell size only
+    const c = baseCell || 1;
     clips.forEach(clip => {
       const minC = +clip.getAttribute('data-min-c');
       const maxC = +clip.getAttribute('data-max-c');
@@ -3925,7 +3906,7 @@ Min 1 pixel · max 1,000,000
           if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
       if (!ownsAny) return;
 
-      const unit = (baseCell || cell) * (zoom || 1);
+      const unit = baseCell || cell || 1;
       const x = r.minC * unit;
       const y = r.minR * unit;
       const w = (r.maxC - r.minC + 1) * unit;
@@ -4562,7 +4543,7 @@ Min 1 pixel · max 1,000,000
     // Clear border on ALL sides (top, right, bottom, left)
     ctx.strokeStyle = '#1a1512';
     ctx.lineWidth = 3;
-    ctx.strokeRect(1.5, 1.5, sizeW - 3, sizeH - 3);
+    ctx.strokeRect(1.5, 1.5, drawW - 3, drawH - 3);
 
     const n = sold.size;
     $('counterText').textContent = n + '/' + TOTAL;

@@ -3753,27 +3753,19 @@ Min 10 blocks · no maximum
   }
 }
 
-  function wallDrawScale() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const z = Math.max(1, Number(zoom) || 1);
-    const cap = 8192;
-    const qualityZ = Math.min(z, 5);
-    return Math.min(dpr * qualityZ, cap / Math.max(baseW, baseH, 1));
-  }
-
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
-    const scale = wallDrawScale();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cap = 4096;
+    const scale = Math.min(dpr, cap / Math.max(baseW, baseH, 1));
     const nextW = Math.max(1, Math.round(baseW * scale));
     const nextH = Math.max(1, Math.round(baseH * scale));
     if (canvas.width !== nextW || canvas.height !== nextH) {
       canvas.width = nextW;
       canvas.height = nextH;
-      try { staticWallKey = ''; } catch (e) {}
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high'; } catch (e) {}
     const savedCell = cell, savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
@@ -3789,13 +3781,7 @@ Min 10 blocks · no maximum
 
   function applyZoomHQ() { paintBase(); }
   function applyZoomSmooth() { layoutAtZoom(zoom); }
-  function scheduleZoomHQ() {
-    clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(() => {
-      try { staticWallKey = ''; } catch (e) {}
-      try { paintBase(); } catch (e) { try { draw(); } catch (e2) {} }
-    }, 90);
-  }
+  function scheduleZoomHQ() {}
 
   function anchorAt(clientX, clientY) {
     const vr = viewport.getBoundingClientRect();
@@ -3834,7 +3820,6 @@ Min 10 blocks · no maximum
     } else {
       keepAnchor();
     }
-    scheduleZoomHQ();
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
@@ -3851,7 +3836,6 @@ Min 10 blocks · no maximum
       }
     }
     applyZoomNow((zoom || 1) * factor, clientX, clientY);
-    scheduleZoomHQ();
   }
 
   function detectMediaType(src, mime) {
@@ -4670,7 +4654,6 @@ Min 10 blocks · no maximum
         '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         '<button type="button" class="btn btn-sec claim-focus" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">SHOW</button>' +
-        '<button type="button" class="btn btn-pri claim-photo" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">CHANGE PHOTO</button>' +
         '<button type="button" class="btn btn-pri claim-wp" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">WALLPAPER</button>' +
         '<button type="button" class="btn btn-sec claim-dl-txt" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">TXT</button>' +
         '<button type="button" class="btn btn-sec claim-dl-json" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">JSON</button>' +
@@ -4683,18 +4666,6 @@ Min 10 blocks · no maximum
     box.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-head"><h3>MY CLAIMS</h3><p>Buyers unlock a unique pixel wallpaper · package IDs below</p></div><div class="modal-body" style="max-height:60vh;overflow:auto">' + lines + '</div><div class="modal-foot"><button type="button" class="btn btn-sec" id="claimsClose">CLOSE</button></div></div>';
     document.body.appendChild(box);
     box.querySelector('#claimsClose').onclick = () => box.remove();
-    box.querySelectorAll('.claim-photo').forEach(btn => {
-      btn.onclick = () => {
-        const p = packages[+btn.getAttribute('data-i')];
-        box.remove();
-        const id = p && (p.claimId || p.id);
-        let r = null;
-        if (id) r = regions.find(x => x && (x.claimId === id || x.id === id));
-        if (!r && p && p.cells && p.cells[0]) r = sold.get(p.cells[0]);
-        if (!r) { toast('Claim not on this wall yet — sync first', 'error'); return; }
-        startChangePhoto(r);
-      };
-    });
     box.querySelectorAll('.claim-focus').forEach(btn => {
       btn.onclick = () => {
         const p = packages[+btn.dataset.i];
@@ -5118,49 +5089,6 @@ Min 10 blocks · no maximum
     selectAwaitingMove = true;
   }
 
-
-  function regionClaimKey(r) {
-    if (!r) return '';
-    return String(r.claimId || r.id || '');
-  }
-
-  function isMyRegion(r) {
-    if (!r) return false;
-    if (adminMode || devMode) return true;
-    const id = regionClaimKey(r);
-    const packs = (typeof loadMyPackages === 'function') ? loadMyPackages() : [];
-    if (id && packs.some(p => p && (String(p.claimId || '') === id || String(p.id || '') === id))) return true;
-    const cells = (r.cells && r.cells.length) ? r.cells.slice().sort().join('|') : '';
-    if (cells && packs.some(p => p && Array.isArray(p.cells) && p.cells.slice().sort().join('|') === cells)) return true;
-    return false;
-  }
-
-  function startChangePhoto(r) {
-    if (!r) return;
-    try { hideTip(); } catch (e) {}
-    try { openEdit(r); } catch (e) { console.warn(e); }
-    setTimeout(function () {
-      let inp = document.getElementById('replaceImageFile');
-      if (!inp) {
-        inp = document.createElement('input');
-        inp.type = 'file';
-        inp.id = 'replaceImageFile';
-        inp.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*';
-        inp.setAttribute('capture', 'environment');
-        inp.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0';
-        document.body.appendChild(inp);
-        inp.addEventListener('change', function () {
-          const f = inp.files && inp.files[0];
-          try { inp.value = ''; } catch (e) {}
-          if (!f) return;
-          try { handleFile(f); } catch (err) { console.warn(err); toast('Could not load photo', 'error'); return; }
-          toast('NEW PHOTO — crop then SAVE CHANGES', 'ok');
-        });
-      }
-      inp.click();
-    }, 60);
-  }
-
   function ownerTipHtml(r, touch) {
     const nm = escapeHtml(r.name || 'Anonymous');
     const desc = r.desc ? escapeHtml(String(r.desc).slice(0, 160)) : '';
@@ -5177,9 +5105,6 @@ Min 10 blocks · no maximum
       (r.link && safeUrl(r.link)
         ? '<div style="margin-top:4px;color:var(--gold);font-size:0.95rem">' +
           (touch ? 'Tap Open to visit link' : 'Click → open link') + '</div>'
-        : '') +
-      ((isMyRegion(r) || adminMode)
-        ? '<button type="button" class="tip-close" id="tipChangePhotoBtn" style="margin-top:8px;background:var(--gold);color:#2c221e">CHANGE PHOTO</button>'
         : '') +
       (touch
         ? '<button type="button" class="tip-close" id="tipCloseBtn">CLOSE</button>' +
@@ -5232,23 +5157,6 @@ Min 10 blocks · no maximum
           const lu = safeUrl(r.link);
           if (lu) window.open(lu, '_blank', 'noopener,noreferrer');
           hideTip();
-        };
-      }
-      const chg = $('tipChangePhotoBtn');
-      if (chg) {
-        chg.onclick = (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          startChangePhoto(r);
-        };
-      }
-    } else {
-      const chg = $('tipChangePhotoBtn');
-      if (chg) {
-        chg.onclick = (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          startChangePhoto(r);
         };
       }
     }
@@ -5377,19 +5285,22 @@ Min 10 blocks · no maximum
       }
       return;
     }
-    // Tap owned block: show card. Your own block gets CHANGE PHOTO.
-    hoverRegion = r;
-    hoverPulse = 0;
-    try { scheduleDraw(); } catch (err) {}
-    const mine = isMyRegion(r);
+    // Mobile / no-hover: show owner card on tap
     const isTouch = (window.matchMedia && window.matchMedia('(hover: none)').matches) ||
       (e.detail === 0) || ('ontouchstart' in window);
-    showOwnerTip(r, e.clientX, e.clientY, true);
-    if (mine) toast('YOUR PIXELS — tap CHANGE PHOTO to replace the image', 'ok');
-    else {
-      const ownerName = r.name || 'Anonymous';
-      const px = r.pixels || (r.cells && r.cells.length) || 0;
-      toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
+    if (isTouch) {
+      hoverRegion = r;
+      hoverPulse = 0;
+      try { scheduleDraw(); } catch (err) {}
+      showOwnerTip(r, e.clientX, e.clientY, true);
+      return;
+    }
+    // Desktop: toast + optional link
+    const ownerName = r.name || 'Anonymous';
+    const px = r.pixels || (r.cells && r.cells.length) || 0;
+    toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
+    if (r.link) {
+      setTimeout(() => { const lu = safeUrl(r.link); if (lu) window.open(lu, '_blank', 'noopener,noreferrer'); }, 200);
     }
   });
 

@@ -662,6 +662,20 @@
   .media-layer video.media-item {
     background: #000;
   }
+  /* Original-resolution image overlay. Images are no longer rasterized into the wall canvas. */
+  .media-layer .hq-image-svg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .media-layer .hq-image-svg image {
+    image-rendering: auto;
+  }
 
   .float-bar {
     position: fixed;
@@ -3757,9 +3771,7 @@ Min 10 blocks · no maximum
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const z = Math.max(1, Number(zoom) || 1);
     const cap = 8192;
-    // Render a larger backing buffer at high zoom so the wall does not
-    // become visibly soft when the user zooms into claimed artwork.
-    const qualityZ = Math.min(z, 8);
+    const qualityZ = Math.min(z, 3);
     return Math.min(dpr * qualityZ, cap / Math.max(baseW, baseH, 1));
   }
 
@@ -3913,24 +3925,127 @@ Min 10 blocks · no maximum
   function syncMediaOverlays() {
     if (!mediaLayer) return;
     mediaLayer.innerHTML = '';
-    regions.forEach(r => {
-      if (!r.media || r.mediaType === 'image') return;
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const XLINK_NS = 'http://www.w3.org/1999/xlink';
+
+    regions.forEach((r, index) => {
+      if (!r || !r.media) return;
+
       let ownsAny = false;
-      for (let c = r.minC; c <= r.maxC && !ownsAny; c++)
-        for (let row = r.minR; row <= r.maxR; row++)
-          if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
+      const ownedCells = [];
+      for (let c = r.minC; c <= r.maxC; c++) {
+        for (let row = r.minR; row <= r.maxR; row++) {
+          if (sold.get(c + ',' + row) === r) {
+            ownsAny = true;
+            ownedCells.push([c, row]);
+          }
+        }
+      }
       if (!ownsAny) return;
 
-      const unit = baseCell || cell;
+      const unit = baseCell || cell || 1;
       const x = r.minC * unit;
       const y = r.minR * unit;
-      const w = (r.maxC - r.minC + 1) * unit;
-      const h = (r.maxR - r.minR + 1) * unit;
-      const scale = Math.max(1, Number(r.cropScale) || 1);
-      const fx = r.cropX != null ? Number(r.cropX) : 0.5;
-      const fy = r.cropY != null ? Number(r.cropY) : 0.5;
+      const w = Math.max(1, (r.maxC - r.minC + 1) * unit);
+      const h = Math.max(1, (r.maxR - r.minR + 1) * unit);
+      const scale = clampCropScale(r.cropScale || 1);
+      const fx = r.cropX != null ? Math.max(0, Math.min(1, Number(r.cropX))) : 0.5;
+      const fy = r.cropY != null ? Math.max(0, Math.min(1, Number(r.cropY))) : 0.5;
 
-      // Clip box = exact claim rectangle (same math as canvas draw)
+      const isStaticImage = regionMediaIsImage(r);
+
+      /*
+       * STATIC IMAGES:
+       * Use an SVG image overlay instead of drawing the bitmap into the
+       * wall canvas. The browser can therefore render the original bitmap
+       * at the actual displayed size, rather than first baking it into the
+       * low/base-resolution canvas and then enlarging that canvas.
+       */
+      if (isStaticImage) {
+        const img = getImg(r.media);
+        if (!img) return;
+
+        if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
+          img.addEventListener('load', () => {
+            try { syncMediaOverlays(); } catch (e) {}
+          }, { once: true });
+          return;
+        }
+
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        svg.classList.add('hq-image-svg');
+        svg.setAttribute('width', String(Math.max(1, Math.round(baseW))));
+        svg.setAttribute('height', String(Math.max(1, Math.round(baseH))));
+        svg.setAttribute('viewBox', '0 0 ' + Math.max(1, baseW) + ' ' + Math.max(1, baseH));
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('aria-hidden', 'true');
+
+        const defs = document.createElementNS(SVG_NS, 'defs');
+        const clipPath = document.createElementNS(SVG_NS, 'clipPath');
+        const clipId = 'hpw-img-clip-' + String(index) + '-' + String(r.id || r.claimId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+        clipPath.setAttribute('id', clipId);
+        clipPath.setAttribute('clipPathUnits', 'userSpaceOnUse');
+
+        ownedCells.forEach(([c, row]) => {
+          const rect = document.createElementNS(SVG_NS, 'rect');
+          rect.setAttribute('x', String(c * unit));
+          rect.setAttribute('y', String(row * unit));
+          rect.setAttribute('width', String(unit));
+          rect.setAttribute('height', String(unit));
+          clipPath.appendChild(rect);
+        });
+        defs.appendChild(clipPath);
+        svg.appendChild(defs);
+
+        // Match drawCoverCrop() exactly, but keep the original bitmap as SVG <image>.
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        const ir = nw / Math.max(1, nh);
+        const br = w / Math.max(0.0001, h);
+        let bw, bh;
+        if (ir > br) { bh = h; bw = h * ir; }
+        else { bw = w; bh = w / ir; }
+        const dw = bw * scale;
+        const dh = bh * scale;
+        let dx = x + (w - dw) * fx;
+        let dy = y + (h - dh) * fy;
+        if (dw >= w) dx = Math.min(x, Math.max(x + w - dw, dx));
+        else dx = x + (w - dw) * fx;
+        if (dh >= h) dy = Math.min(y, Math.max(y + h - dh, dy));
+        else dy = y + (h - dh) * fy;
+
+        const image = document.createElementNS(SVG_NS, 'image');
+        image.setAttribute('x', String(dx));
+        image.setAttribute('y', String(dy));
+        image.setAttribute('width', String(dw));
+        image.setAttribute('height', String(dh));
+        image.setAttribute('preserveAspectRatio', 'none');
+        image.setAttribute('clip-path', 'url(#' + clipId + ')');
+        image.setAttribute('href', r.media);
+        image.setAttributeNS(XLINK_NS, 'xlink:href', r.media);
+        image.setAttribute('decoding', 'async');
+        svg.appendChild(image);
+
+        // Restore the thin per-pixel border above the image.
+        ownedCells.forEach(([c, row]) => {
+          const rect = document.createElementNS(SVG_NS, 'rect');
+          rect.setAttribute('x', String(c * unit + 0.5));
+          rect.setAttribute('y', String(row * unit + 0.5));
+          rect.setAttribute('width', String(Math.max(0, unit - 1)));
+          rect.setAttribute('height', String(Math.max(0, unit - 1)));
+          rect.setAttribute('fill', 'none');
+          rect.setAttribute('stroke', '#2a2118');
+          rect.setAttribute('stroke-width', String(Math.max(0.6, Math.min(2, unit * 0.1))));
+          rect.setAttribute('vector-effect', 'non-scaling-stroke');
+          svg.appendChild(rect);
+        });
+
+        mediaLayer.appendChild(svg);
+        return;
+      }
+
+      // GIF/video keep the existing DOM media path so GIF animation and video playback work.
       const clip = document.createElement('div');
       clip.className = 'media-item';
       clip.setAttribute('data-min-c', String(r.minC));
@@ -3968,7 +4083,7 @@ Min 10 blocks · no maximum
         el.decoding = 'async';
       }
       el.style.position = 'absolute';
-      el.style.objectFit = r.fit || 'cover';
+      el.style.objectFit = 'cover';
       el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
       el.style.pointerEvents = 'none';
       el.style.margin = '0';
@@ -3980,6 +4095,8 @@ Min 10 blocks · no maximum
       el.style.height = mh + 'px';
       el.style.left = ((w - mw) * fx) + 'px';
       el.style.top = ((h - mh) * fy) + 'px';
+      el.style.maxWidth = 'none';
+      el.style.maxHeight = 'none';
 
       clip.appendChild(el);
       mediaLayer.appendChild(clip);
@@ -4334,14 +4451,10 @@ Min 10 blocks · no maximum
       ctx.fillStyle = '#1a1512';
       ctx.fillRect(x0, y0, w, h);
       if (regionMediaIsImage(r)) {
-        const img = getImg(r.media);
-        if (img && img.complete && img.naturalWidth > 0) {
-          drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
-        } else if (img) {
-          img.onload = () => { try { flushImagesSoon(); } catch (e) {} };
-          ctx.fillStyle = r.color || '#c9a227';
-          ctx.fillRect(x0, y0, w, h);
-        }
+        // Static images are rendered by syncMediaOverlays() at original bitmap
+        // resolution. Do not bake them into this canvas.
+        ctx.fillStyle = '#1a1512';
+        ctx.fillRect(x0, y0, w, h);
       } else if (!r.media) {
         ctx.fillStyle = r.color || '#c9a227';
         ctx.fillRect(x0, y0, w, h);
@@ -6483,26 +6596,22 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     try { refreshClaimValidation(); } catch (e) {}
   }
 
-  // Preserve the uploaded image bytes exactly.
-  // IMPORTANT: do not resize or re-encode here — canvas JPEG/WebP conversion
-  // permanently removes detail and makes uploaded photos blurry when zoomed.
-  // The existing 25MB validation in handleFile remains the upload safety limit.
+  // Keep uploads high quality — only resize extreme files so claims still save
+  // IMPORTANT: preserve the uploaded image byte-for-byte.
+  // No resize, no canvas re-encode, no JPEG/WebP conversion.
   function optimizeImageFile(file) {
     return new Promise((resolve, reject) => {
       if (!file || !(file.type || '').toLowerCase().startsWith('image/')) {
         reject(new Error('not an image'));
         return;
       }
-
       const reader = new FileReader();
       reader.onload = e => {
-        const dataUrl = e.target && e.target.result;
+        const dataUrl = e && e.target ? e.target.result : null;
         if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
           reject(new Error('invalid image data'));
           return;
         }
-        // Return the original file bytes as a data URL — no resize, no JPEG
-        // quality loss, no PNG->JPEG conversion, and no 5120px ceiling.
         resolve(dataUrl);
       };
       reader.onerror = () => reject(new Error('read'));
@@ -6531,8 +6640,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         toast('VIDEO TOO LARGE (MAX 40MB)', 'error');
         return;
       }
-      if (!isVideo && f.size > 25 * 1024 * 1024) {
-        toast('IMAGE TOO LARGE (MAX 25MB)', 'error');
+      if (!isVideo && f.size > 30 * 1024 * 1024) {
+        toast('IMAGE TOO LARGE (MAX 30MB)', 'error');
         return;
       }
       toast(isVideo ? 'LOADING VIDEO…' : (isGif ? 'LOADING GIF…' : 'LOADING HIGH-QUALITY PHOTO…'));
@@ -7240,11 +7349,9 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
             storeSet('hpw_pending_claim', JSON.stringify(payload));
           } catch (e2) {
             try {
-              const slim = Object.assign({}, payload, { media: '' });
-              storeSet('hpw_pending_claim', JSON.stringify(slim));
-              toast('Image too large to cache — claim may miss image after pay', 'error');
+              storeSet('hpw_pending_claim', JSON.stringify(payload));
             } catch (e3) {
-              throw new Error('Could not save claim data before payment');
+              throw new Error('Could not save the original image before payment. Please try a smaller image or another browser.');
             }
           }
         }
@@ -8526,15 +8633,9 @@ let scrollDrawRaf = 0;
           try {
             await postClaim(payload);
           } catch (firstErr) {
-            // Never silently remove the customer's image. Doing that makes a
-            // successful payment appear as a claim with missing artwork.
-            // Retry the exact same payload once for transient network errors.
             console.warn('Claim with original media failed — retrying unchanged…', firstErr);
-            try {
-              await postClaim(payload);
-            } catch (secondErr) {
-              throw secondErr;
-            }
+            // Never silently remove or compress the customer's original image.
+            await postClaim(payload);
           }
           try { await idbDel('pending'); } catch (e) {}
           try {

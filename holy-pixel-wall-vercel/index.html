@@ -659,6 +659,11 @@
     image-rendering: auto;
     -ms-interpolation-mode: bicubic;
   }
+  .media-layer .media-item img,
+  .media-layer .media-item video {
+    image-rendering: auto;
+    -ms-interpolation-mode: bicubic;
+  }
   .media-layer video.media-item {
     background: #000;
   }
@@ -3891,7 +3896,7 @@ Min 10 blocks · no maximum
     if (!mediaLayer) return;
     mediaLayer.innerHTML = '';
     regions.forEach(r => {
-      if (!r.media || r.mediaType === 'image') return;
+      if (!r.media) return;
       let ownsAny = false;
       for (let c = r.minC; c <= r.maxC && !ownsAny; c++)
         for (let row = r.minR; row <= r.maxR; row++)
@@ -3951,6 +3956,8 @@ Min 10 blocks · no maximum
       el.style.margin = '0';
       el.style.padding = '0';
       el.style.border = 'none';
+      el.style.imageRendering = 'auto';
+      try { el.style.msInterpolationMode = 'bicubic'; } catch (e) {}
       const mw = w * scale;
       const mh = h * scale;
       el.style.width = mw + 'px';
@@ -4293,15 +4300,10 @@ Min 10 blocks · no maximum
       ctx.globalAlpha = 1;
       ctx.fillStyle = '#1a1512';
       ctx.fillRect(x0, y0, w, h);
-      if (regionMediaIsImage(r)) {
-        const img = getImg(r.media);
-        if (img && img.complete && img.naturalWidth > 0) {
-          drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
-        } else if (img) {
-          img.onload = () => { try { flushImagesSoon(); } catch (e) {} };
-          ctx.fillStyle = r.color || '#c9a227';
-          ctx.fillRect(x0, y0, w, h);
-        }
+      if (r.media) {
+        // Photo/GIF/video is a sharp DOM overlay — canvas only fills the box
+        ctx.fillStyle = '#1a1512';
+        ctx.fillRect(x0, y0, w, h);
       } else if (!r.media) {
         ctx.fillStyle = r.color || '#c9a227';
         ctx.fillRect(x0, y0, w, h);

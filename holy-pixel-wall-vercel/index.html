@@ -3753,19 +3753,27 @@ Min 10 blocks · no maximum
   }
 }
 
+  function wallDrawScale() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const z = Math.max(1, Number(zoom) || 1);
+    const cap = 8192;
+    const qualityZ = Math.min(z, 5);
+    return Math.min(dpr * qualityZ, cap / Math.max(baseW, baseH, 1));
+  }
+
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cap = 4096;
-    const scale = Math.min(dpr, cap / Math.max(baseW, baseH, 1));
+    const scale = wallDrawScale();
     const nextW = Math.max(1, Math.round(baseW * scale));
     const nextH = Math.max(1, Math.round(baseH * scale));
     if (canvas.width !== nextW || canvas.height !== nextH) {
       canvas.width = nextW;
       canvas.height = nextH;
+      try { staticWallKey = ''; } catch (e) {}
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = true;
+    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high'; } catch (e) {}
     const savedCell = cell, savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
@@ -3781,7 +3789,13 @@ Min 10 blocks · no maximum
 
   function applyZoomHQ() { paintBase(); }
   function applyZoomSmooth() { layoutAtZoom(zoom); }
-  function scheduleZoomHQ() {}
+  function scheduleZoomHQ() {
+    clearTimeout(zoomTimer);
+    zoomTimer = setTimeout(() => {
+      try { staticWallKey = ''; } catch (e) {}
+      try { paintBase(); } catch (e) { try { draw(); } catch (e2) {} }
+    }, 90);
+  }
 
   function anchorAt(clientX, clientY) {
     const vr = viewport.getBoundingClientRect();
@@ -3820,6 +3834,7 @@ Min 10 blocks · no maximum
     } else {
       keepAnchor();
     }
+    scheduleZoomHQ();
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
@@ -3836,6 +3851,7 @@ Min 10 blocks · no maximum
       }
     }
     applyZoomNow((zoom || 1) * factor, clientX, clientY);
+    scheduleZoomHQ();
   }
 
   function detectMediaType(src, mime) {

@@ -2216,8 +2216,8 @@ body::after { display: none !important; }
   <div id="wallWrap">
     <div class="stage" id="stage">
       <canvas id="canvas"></canvas>
-      <div class="media-layer" id="mediaLayer"></div>
     </div>
+    <div class="media-layer" id="mediaLayer"></div>
   </div>
 </div>
 
@@ -3740,12 +3740,14 @@ Min 10 blocks · no maximum
 
   if (mediaLayer) {
     mediaLayer.style.position = 'absolute';
-    mediaLayer.style.left = '0';
-    mediaLayer.style.top = '0';
-    mediaLayer.style.width = Math.round(baseW) + 'px';
-    mediaLayer.style.height = Math.round(baseH) + 'px';
+    mediaLayer.style.left = ox + 'px';
+    mediaLayer.style.top = oy + 'px';
+    mediaLayer.style.width = w + 'px';
+    mediaLayer.style.height = h + 'px';
     mediaLayer.style.overflow = 'hidden';
     mediaLayer.style.pointerEvents = 'none';
+    mediaLayer.style.transform = 'none';
+    mediaLayer.style.zIndex = '2';
   }
 
   if ($('zoomLvl')) {
@@ -3853,34 +3855,28 @@ Min 10 blocks · no maximum
 
   // Fast reposition after zoom — keeps GIFs locked to the same cells as canvas
   function layoutMediaClip(clip, minC, maxC, minR, maxR, cropScale, fx, fy) {
-    const unit = baseCell || 1;
-    const z = Math.max(zoom || 1, 0.01);
-    const x = minC * unit;
-    const y = minR * unit;
-    const w = Math.max(1, (maxC - minC + 1) * unit);
-    const h = Math.max(1, (maxR - minR + 1) * unit);
-    // Layout at SCREEN size so the browser samples the real photo, then
-    // counter-scale so the parent stage scale() does not blur it.
-    const sw = Math.max(1, Math.round(w * z));
-    const sh = Math.max(1, Math.round(h * z));
+    const unit = (baseCell || 1) * (zoom || 1);
+    const x = Math.round(minC * unit);
+    const y = Math.round(minR * unit);
+    const w = Math.max(1, Math.round((maxC - minC + 1) * unit));
+    const h = Math.max(1, Math.round((maxR - minR + 1) * unit));
     clip.style.left = x + 'px';
     clip.style.top = y + 'px';
-    clip.style.width = sw + 'px';
-    clip.style.height = sh + 'px';
+    clip.style.width = w + 'px';
+    clip.style.height = h + 'px';
     clip.style.overflow = 'hidden';
     clip.style.position = 'absolute';
-    clip.style.transformOrigin = '0 0';
-    clip.style.transform = 'scale(' + (1 / z) + ')';
+    clip.style.transform = 'none';
     const el = clip.firstElementChild;
     if (!el) return;
     const scale = Math.max(1, cropScale || 1);
-    const mw = Math.round(sw * scale);
-    const mh = Math.round(sh * scale);
+    const mw = Math.round(w * scale);
+    const mh = Math.round(h * scale);
     el.style.position = 'absolute';
     el.style.width = mw + 'px';
     el.style.height = mh + 'px';
-    el.style.left = Math.round((sw - mw) * fx) + 'px';
-    el.style.top = Math.round((sh - mh) * fy) + 'px';
+    el.style.left = Math.round((w - mw) * fx) + 'px';
+    el.style.top = Math.round((h - mh) * fy) + 'px';
     el.style.objectFit = 'cover';
     el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
     el.style.maxWidth = 'none';

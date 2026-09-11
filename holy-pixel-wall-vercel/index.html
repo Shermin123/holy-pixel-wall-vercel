@@ -4003,27 +4003,53 @@ Min 10 blocks · no maximum
 
   function syncMediaOverlays() {
     if (!mediaLayer) return;
-    mediaLayer.innerHTML = '';
+    const keep = new Set();
     regions.forEach(r => {
-      if (!r.media) return;
-      let ownsAny = false;
-      for (let c = r.minC; c <= r.maxC && !ownsAny; c++)
-        for (let row = r.minR; row <= r.maxR; row++)
-          if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
-      if (!ownsAny) return;
-
-      const unit = baseCell || cell;
-      const x = r.minC * unit;
-      const y = r.minR * unit;
-      const w = (r.maxC - r.minC + 1) * unit;
-      const h = (r.maxR - r.minR + 1) * unit;
+      if (!r || !r.media) return;
+      const id = String(r.id || r.claimId || (r.minC + ':' + r.minR));
+      keep.add(id);
       const scale = Math.max(1, Number(r.cropScale) || 1);
       const fx = r.cropX != null ? Number(r.cropX) : 0.5;
       const fy = r.cropY != null ? Number(r.cropY) : 0.5;
-
-      // Clip box = exact claim rectangle (same math as canvas draw)
-      const clip = document.createElement('div');
-      clip.className = 'media-item';
+      let clip = mediaLayer.querySelector('.media-item[data-claim="' + id.replace(/"/g, '') + '"]');
+      if (!clip) {
+        clip = document.createElement('div');
+        clip.className = 'media-item';
+        clip.setAttribute('data-claim', id);
+        clip.style.overflow = 'hidden';
+        clip.style.position = 'absolute';
+        clip.style.pointerEvents = 'none';
+        let el;
+        if (r.mediaType === 'video') {
+          el = document.createElement('video');
+          el.muted = true;
+          el.loop = true;
+          el.autoplay = true;
+          el.playsInline = true;
+          el.setAttribute('playsinline', '');
+          el.preload = 'auto';
+          try { el.disablePictureInPicture = true; } catch (e) {}
+          el.src = r.media;
+          el.play().catch(() => {});
+        } else {
+          el = document.createElement('img');
+          el.alt = r.name || '';
+          el.decoding = 'async';
+          el.loading = 'eager';
+          try { el.fetchPriority = 'high'; } catch (e) {}
+          el.src = r.media;
+        }
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'none';
+        el.style.margin = '0';
+        el.style.border = 'none';
+        el.style.imageRendering = 'auto';
+        clip.appendChild(el);
+        mediaLayer.appendChild(clip);
+      } else {
+        const el = clip.firstElementChild;
+        if (el && el.src !== r.media) el.src = r.media;
+      }
       clip.setAttribute('data-min-c', String(r.minC));
       clip.setAttribute('data-max-c', String(r.maxC));
       clip.setAttribute('data-min-r', String(r.minR));
@@ -4031,42 +4057,16 @@ Min 10 blocks · no maximum
       clip.setAttribute('data-crop-scale', String(scale));
       clip.setAttribute('data-crop-x', String(fx));
       clip.setAttribute('data-crop-y', String(fy));
-      clip.style.overflow = 'hidden';
-      clip.style.position = 'absolute';
-      clip.style.pointerEvents = 'none';
-
-      let el;
-      if (r.mediaType === 'video') {
-        el = document.createElement('video');
-        el.src = r.media;
-        el.muted = true;
-        el.loop = true;
-        el.autoplay = true;
-        el.playsInline = true;
-        el.setAttribute('playsinline', '');
-        el.setAttribute('webkit-playsinline', '');
-        el.preload = 'auto';
-        try { el.disablePictureInPicture = true; } catch (e) {}
-        el.play().catch(() => {});
-      } else {
-        el = document.createElement('img');
-        el.src = r.media;
-        el.alt = r.name || '';
-        el.decoding = 'async';
+      const el = clip.firstElementChild;
+      if (el) {
+        el.style.objectFit = r.fit || 'cover';
+        el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
       }
-      el.style.position = 'absolute';
-      el.style.objectFit = r.fit || 'cover';
-      el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
-      el.style.pointerEvents = 'none';
-      el.style.margin = '0';
-      el.style.padding = '0';
-      el.style.border = 'none';
-      el.style.imageRendering = 'auto';
-      try { el.style.msInterpolationMode = 'bicubic'; } catch (e) {}
-
-      clip.appendChild(el);
-      mediaLayer.appendChild(clip);
       layoutMediaClip(clip, r.minC, r.maxC, r.minR, r.maxR, scale, fx, fy);
+    });
+    Array.from(mediaLayer.children).forEach(n => {
+      const id = n.getAttribute('data-claim');
+      if (!id || !keep.has(id)) n.remove();
     });
   }
 
@@ -4158,7 +4158,8 @@ Min 10 blocks · no maximum
     imgBatchTimer = setTimeout(() => {
       try { staticWallKey = ''; } catch (e) {}
       try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
-    }, 90);
+      try { syncMediaOverlays(); } catch (e) {}
+    }, 0);
   }
 
   function preloadRegionImages(done) {
@@ -4400,10 +4401,13 @@ Min 10 blocks · no maximum
       ctx.globalAlpha = 1;
       ctx.fillStyle = '#1a1512';
       ctx.fillRect(x0, y0, w, h);
-      if (r.media) {
-        // Photo/GIF/video is a sharp DOM overlay — canvas only fills the box
-        ctx.fillStyle = '#1a1512';
-        ctx.fillRect(x0, y0, w, h);
+      if (r.media && regionMediaIsImage(r)) {
+        const img = getImg(r.media);
+        if (img && img.complete && img.naturalWidth > 0) {
+          drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
+        } else if (img) {
+          img.onload = () => { try { flushImagesSoon(); } catch (e) {} };
+        }
       } else if (!r.media) {
         ctx.fillStyle = r.color || '#c9a227';
         ctx.fillRect(x0, y0, w, h);
@@ -8400,6 +8404,12 @@ let scrollDrawRaf = 0;
       if (window.__hpwPaintedOnce) { /* keep wall visible; no blocking splash */ }
       const data = await apiFetch('/api/wall', { timeout: 15000 }, 'Wall sync');
       try { applyServerGrid(data); } catch (e) {}
+      const prevMedia = new Map();
+      regions.forEach(r => {
+        if (r && (r.id || r.claimId) && r.media) {
+          prevMedia.set(String(r.id || r.claimId), { media: r.media, mediaType: r.mediaType });
+        }
+      });
       regions = [];
       sold.clear();
       let maxCSeen = 0, maxRSeen = 0;
@@ -8421,6 +8431,11 @@ let scrollDrawRaf = 0;
           }
           if (r.maxC != null && r.maxC > maxCSeen) maxCSeen = r.maxC;
           if (r.maxR != null && r.maxR > maxRSeen) maxRSeen = r.maxR;
+          if ((!r.media || !String(r.media).length) && prevMedia.has(String(r.id || r.claimId || ''))) {
+            const p = prevMedia.get(String(r.id || r.claimId));
+            r.media = p.media;
+            r.mediaType = p.mediaType || r.mediaType;
+          }
           regions.push(r);
           (r.cells || []).forEach(k => sold.set(k, r));
         } catch (err) { /* skip bad region */ }
@@ -8434,17 +8449,18 @@ let scrollDrawRaf = 0;
       }
       try { applyCropCacheToRegions(); } catch (e) {}
       try { applyLocalGeomOverrides(); } catch (e) {}
-      try { save(); } catch (e) {}
+      try { syncMediaOverlays(); } catch (e) {}
       try { preloadRegionImages(() => {
         try { staticWallKey = ''; } catch (e) {}
         try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
+        try { syncMediaOverlays(); } catch (e) {}
       }); } catch (e) {}
       if (expanded) {
         try { resize(false); } catch (e) {}
       } else {
         try { scheduleDraw(); } catch (e) { try { draw(); } catch (e2) {} }
       }
-      try { syncMediaOverlays(); } catch (e) {}
+      setTimeout(() => { try { save(); } catch (e) {} }, 0);
       return true;
     } catch (e) {
       // Expected when API is offline / static host — use local data quietly
@@ -8458,11 +8474,12 @@ let scrollDrawRaf = 0;
     try { loadLocalGeomOverrides(); } catch (e) {}
     try { load(); } catch (e) {}
     try { applyLocalGeomOverrides(); } catch (e) {}
+    try { syncMediaOverlays(); } catch (e) {}
     try { preloadRegionImages(); } catch (e) {}
-    // Paint the wall immediately — do not wait on the network
+    const wallPromise = pullWall();
     try { resize(true, 'open'); } catch (e) { console.warn(e); }
     setBuyMode(false);
-    const ok = await pullWall();
+    const ok = await wallPromise;
     if (!ok && !navigator.onLine) {
       try { toast('Offline — showing saved wall', 'error'); } catch (e) {}
     }
@@ -8737,7 +8754,7 @@ let scrollDrawRaf = 0;
   };
 
 
-    setTimeout(() => toast('BUY SNAPS TO 10×10 · GAPS AUTO-FILL · MIN 10 · PINCH TO ZOOM'), 600);
+    setTimeout(() => toast('ZOOM IN · DRAG TO SELECT · MIN 10 PIXELS'), 600);
 
   
   if ($('adminExitBtn')) $('adminExitBtn').onclick = () => exitAdminMode();

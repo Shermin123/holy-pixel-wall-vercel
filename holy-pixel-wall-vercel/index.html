@@ -639,6 +639,14 @@
     -ms-interpolation-mode: bicubic;
   }
 
+  .grid-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 1;
+    background-repeat: repeat;
+  }
   .media-layer {
     position: absolute;
     left: 0;
@@ -2217,6 +2225,7 @@ body::after { display: none !important; }
     <div class="stage" id="stage">
       <canvas id="canvas"></canvas>
     </div>
+    <div class="grid-layer" id="gridLayer"></div>
     <div class="media-layer" id="mediaLayer"></div>
   </div>
 </div>
@@ -3749,6 +3758,33 @@ Min 10 blocks · no maximum
     mediaLayer.style.transform = 'none';
     mediaLayer.style.zIndex = '2';
   }
+  const gridLayer = $('gridLayer');
+  if (gridLayer) {
+    gridLayer.style.position = 'absolute';
+    gridLayer.style.left = ox + 'px';
+    gridLayer.style.top = oy + 'px';
+    gridLayer.style.width = w + 'px';
+    gridLayer.style.height = h + 'px';
+    gridLayer.style.pointerEvents = 'none';
+    gridLayer.style.zIndex = '1';
+    const cs = cell;
+    if (cs >= 8) {
+      gridLayer.style.backgroundImage =
+        'linear-gradient(to right, rgba(92,61,30,0.55) 1px, transparent 1px),' +
+        'linear-gradient(to bottom, rgba(92,61,30,0.55) 1px, transparent 1px)';
+      gridLayer.style.backgroundSize = cs + 'px ' + cs + 'px';
+      gridLayer.style.opacity = '1';
+    } else if (cs >= 3) {
+      const big = cs * 10;
+      gridLayer.style.backgroundImage =
+        'linear-gradient(to right, rgba(92,61,30,0.28) 1px, transparent 1px),' +
+        'linear-gradient(to bottom, rgba(92,61,30,0.28) 1px, transparent 1px)';
+      gridLayer.style.backgroundSize = big + 'px ' + big + 'px';
+      gridLayer.style.opacity = '1';
+    } else {
+      gridLayer.style.backgroundImage = 'none';
+    }
+  }
 
   if ($('zoomLvl')) {
     $('zoomLvl').textContent = Math.round(z * 100) + '%';
@@ -4337,7 +4373,7 @@ Min 10 blocks · no maximum
     const hairBold = Math.max(hair * 1.6, 2.8 / zNow);
     const hairFrame = Math.max(hair * 1.8, 3 / zNow);
 
-    if (!dragging && !zoomRaf && visCell >= 8) {
+    if (false && !dragging && !zoomRaf && visCell >= 8) {
       const { c0: gc0, r0: gr0, c1: gc1, r1: gr1 } = visibleCellRange();
       ctx.save();
       ctx.beginPath();
@@ -4951,10 +4987,7 @@ Min 10 blocks · no maximum
       return;
     }
 
-    if (!(adminMode && editingRegion)) {
-      const grown = swallowSlivers({ minC, maxC, minR, maxR });
-      minC = grown.minC; maxC = grown.maxC; minR = grown.minR; maxR = grown.maxR;
-    }
+    // Keep the exact rectangle the user dragged. Do not auto-grow.
 
     const next = new Set();
     for (let c = minC; c <= maxC; c++) {

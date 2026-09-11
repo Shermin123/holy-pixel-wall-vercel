@@ -2337,14 +2337,19 @@ body::after { display: none !important; }
         </label>
         <input type="url" id="imgUrl" placeholder="Or paste image URL" style="margin-top:8px">
         <div id="blockPreviewWrap" style="display:none;margin-top:12px">
-          <label style="margin-bottom:6px">CROP</label>
+          <label style="margin-bottom:6px">CROP · drag to pan · pinch or slider to zoom in/out</label>
           <div id="previewStage" style="position:relative;max-width:100%;touch-action:none;cursor:grab">
             <canvas id="blockPreview"></canvas>
           </div>
-          <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
-            <input type="range" id="cropZoomSlider" min="100" max="400" value="100" step="5" style="flex:1;accent-color:var(--gold)">
-            <span id="zoomPreviewLabel" style="font-family:VT323,monospace;font-size:1rem;color:var(--dark);min-width:36px;text-align:right">100%</span>
-            <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:6px 10px;font-size:0.32rem">RESET</button>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sec" id="zoomOutPreview" style="padding:6px 10px;font-size:0.32rem">−</button>
+            <span style="font-family:Press Start 2P,monospace;font-size:0.28rem;color:var(--muted)">OUT</span>
+            <input type="range" id="cropZoomSlider" min="25" max="400" value="100" step="5" style="flex:1;min-width:120px;accent-color:var(--gold)">
+            <span style="font-family:Press Start 2P,monospace;font-size:0.28rem;color:var(--muted)">IN</span>
+            <button type="button" class="btn btn-sec" id="zoomInPreview" style="padding:6px 10px;font-size:0.32rem">+</button>
+            <span id="zoomPreviewLabel" style="font-family:VT323,monospace;font-size:1rem;color:var(--dark);min-width:40px;text-align:right">100%</span>
+            <button type="button" class="btn btn-sec" id="zoomFitPreview" style="padding:6px 10px;font-size:0.32rem">FIT</button>
+            <button type="button" class="btn btn-sec" id="zoomResetPreview" style="padding:6px 10px;font-size:0.32rem">FILL</button>
           </div>
         </div>
         <div class="fit-row" id="fitRow" style="display:none"></div>
@@ -3977,29 +3982,46 @@ Min 10 blocks · no maximum
 
   
   // Draw image to fully cover (w,h) with zoom scale and focus (fx,fy in 0..1)
+  const CROP_SCALE_MIN = 0.25;
+  const CROP_SCALE_MAX = 4;
+
+  function clampCropScale(scale) {
+    const n = Number(scale);
+    if (!isFinite(n) || n <= 0) return 1;
+    return Math.max(CROP_SCALE_MIN, Math.min(CROP_SCALE_MAX, n));
+  }
+
+  // scale 1 = fill the block (cover). Below 1 = zoom out / show whole image. Above 1 = zoom in.
   function drawCoverCrop(c, img, x, y, w, h, scale, fx, fy) {
     if (!img || !img.complete || !img.naturalWidth) return;
     const prevSmooth = c.imageSmoothingEnabled;
     const prevAlpha = c.globalAlpha;
-    scale = Math.max(1, scale || 1);
-    fx = fx == null ? 0.5 : fx;
-    fy = fy == null ? 0.5 : fy;
+    scale = clampCropScale(scale);
+    fx = fx == null ? 0.5 : Number(fx);
+    fy = fy == null ? 0.5 : Number(fy);
+    if (!isFinite(fx)) fx = 0.5;
+    if (!isFinite(fy)) fy = 0.5;
+    fx = Math.max(0, Math.min(1, fx));
+    fy = Math.max(0, Math.min(1, fy));
     const nw = img.naturalWidth, nh = img.naturalHeight;
-    const ir = nw / nh, br = w / h;
+    const ir = nw / Math.max(1, nh), br = w / Math.max(0.0001, h);
     let bw, bh;
     if (ir > br) { bh = h; bw = h * ir; }
     else { bw = w; bh = w / ir; }
     const dw = bw * scale, dh = bh * scale;
     let dx = x + (w - dw) * fx;
     let dy = y + (h - dh) * fy;
-    dx = Math.min(x, Math.max(x + w - dw, dx));
-    dy = Math.min(y, Math.max(y + h - dh, dy));
+    if (dw >= w) dx = Math.min(x, Math.max(x + w - dw, dx));
+    else dx = x + (w - dw) * fx;
+    if (dh >= h) dy = Math.min(y, Math.max(y + h - dh, dy));
+    else dy = y + (h - dh) * fy;
     c.save();
     c.globalAlpha = 1;
     c.beginPath();
     c.rect(x, y, w, h);
     c.clip();
-    // High-quality photo sampling (not pixelated)
+    c.fillStyle = '#1a1512';
+    c.fillRect(x, y, w, h);
     c.imageSmoothingEnabled = true;
     try { if (c.imageSmoothingQuality) c.imageSmoothingQuality = 'high'; } catch (e) {}
     c.drawImage(img, dx, dy, dw, dh);
@@ -6224,7 +6246,39 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   }
 
   function previewZoom(delta) {
-    crop.scale = Math.max(1, Math.min(4, crop.scale + delta));
+    crop.scale = clampCropScale((Number(crop.scale) || 1) + delta);
+    const sl = $('cropZoomSlider');
+    if (sl) sl.value = String(Math.round(crop.scale * 100));
+    updateBlockPreview();
+    liveApplyCrop();
+  }
+
+  function fitCropToImage() {
+    const img = pendingMedia ? getImg(pendingMedia) : null;
+    const wrap = $('previewStage');
+    let bw = 160, bh = 160;
+    try {
+      if (selected && selected.size) {
+        let minC = Infinity, maxC = -1, minR = Infinity, maxR = -1;
+        selected.forEach(k => {
+          const p = String(k).split(',');
+          const c = +p[0], r = +p[1];
+          if (c < minC) minC = c; if (c > maxC) maxC = c;
+          if (r < minR) minR = r; if (r > maxR) maxR = r;
+        });
+        bw = Math.max(1, maxC - minC + 1);
+        bh = Math.max(1, maxR - minR + 1);
+      }
+    } catch (e) {}
+    if (img && img.naturalWidth && img.naturalHeight) {
+      const cover = Math.max(bw / img.naturalWidth, bh / img.naturalHeight);
+      const contain = Math.min(bw / img.naturalWidth, bh / img.naturalHeight);
+      crop.scale = clampCropScale(contain / Math.max(cover, 0.0001));
+    } else {
+      crop.scale = CROP_SCALE_MIN;
+    }
+    crop.x = 0.5;
+    crop.y = 0.5;
     const sl = $('cropZoomSlider');
     if (sl) sl.value = String(Math.round(crop.scale * 100));
     updateBlockPreview();
@@ -6271,13 +6325,41 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       updateBlockPreview();
       liveApplyCrop();
     };
+    if ($('zoomFitPreview')) $('zoomFitPreview').onclick = () => fitCropToImage();
+    if ($('zoomInPreview')) $('zoomInPreview').onclick = () => previewZoom(0.15);
+    if ($('zoomOutPreview')) $('zoomOutPreview').onclick = () => previewZoom(-0.15);
     if ($('cropZoomSlider')) {
       $('cropZoomSlider').oninput = () => {
-        crop.scale = Math.max(1, Math.min(4, (parseInt($('cropZoomSlider').value, 10) || 100) / 100));
+        crop.scale = clampCropScale((parseInt($('cropZoomSlider').value, 10) || 100) / 100);
         updateBlockPreview();
         liveApplyCrop();
       };
     }
+    // Pinch-to-zoom on the crop preview
+    let previewPinch = 0;
+    stage.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        previewPinch = Math.hypot(dx, dy);
+        previewDrag = null;
+      }
+    }, { passive: true });
+    stage.addEventListener('touchmove', e => {
+      if (e.touches.length !== 2 || !previewPinch) return;
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const ratio = dist / previewPinch;
+      if (Math.abs(ratio - 1) > 0.02) {
+        previewZoom((ratio - 1) * (Number(crop.scale) || 1));
+        previewPinch = dist;
+      }
+    }, { passive: false });
+    stage.addEventListener('touchend', e => {
+      if (e.touches.length < 2) previewPinch = 0;
+    });
   }
 
   function clearPending() {
@@ -6680,7 +6762,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       media: pendingMedia,
       mediaType: pendingType,
       fit: 'cover',
-      cropScale: crop.scale,
+      cropScale: clampCropScale(crop.scale),
       cropX: crop.x,
       cropY: crop.y,
       link: buildLink(),
@@ -6984,7 +7066,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         media: pendingMedia || '',
         mediaType: pendingType || 'image',
         fit: 'cover',
-        cropScale: crop.scale,
+        cropScale: clampCropScale(crop.scale),
         cropX: crop.x,
         cropY: crop.y,
         link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),
@@ -7046,7 +7128,7 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
       media: pendingMedia || '',
       mediaType: pendingType || 'image',
       fit: 'cover',
-      cropScale: crop.scale,
+      cropScale: clampCropScale(crop.scale),
       cropX: crop.x,
       cropY: crop.y,
       link: typeof buildLink === 'function' ? buildLink() : ($('link').value || ''),

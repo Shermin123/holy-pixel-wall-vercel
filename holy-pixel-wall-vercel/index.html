@@ -662,20 +662,6 @@
   .media-layer video.media-item {
     background: #000;
   }
-  /* Original-resolution image overlay. Images are no longer rasterized into the wall canvas. */
-  .media-layer .hq-image-svg {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .media-layer .hq-image-svg image {
-    image-rendering: auto;
-  }
 
   .float-bar {
     position: fixed;
@@ -3767,27 +3753,19 @@ Min 10 blocks · no maximum
   }
 }
 
-  function wallDrawScale() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const z = Math.max(1, Number(zoom) || 1);
-    const cap = 8192;
-    const qualityZ = Math.min(z, 3);
-    return Math.min(dpr * qualityZ, cap / Math.max(baseW, baseH, 1));
-  }
-
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
-    const scale = wallDrawScale();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cap = 4096;
+    const scale = Math.min(dpr, cap / Math.max(baseW, baseH, 1));
     const nextW = Math.max(1, Math.round(baseW * scale));
     const nextH = Math.max(1, Math.round(baseH * scale));
     if (canvas.width !== nextW || canvas.height !== nextH) {
       canvas.width = nextW;
       canvas.height = nextH;
-      try { staticWallKey = ''; } catch (e) {}
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high'; } catch (e) {}
     const savedCell = cell, savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
@@ -3803,13 +3781,7 @@ Min 10 blocks · no maximum
 
   function applyZoomHQ() { paintBase(); }
   function applyZoomSmooth() { layoutAtZoom(zoom); }
-  function scheduleZoomHQ() {
-    clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(() => {
-      try { staticWallKey = ''; } catch (e) {}
-      try { paintBase(); } catch (e) { try { draw(); } catch (e2) {} }
-    }, 90);
-  }
+  function scheduleZoomHQ() {}
 
   function anchorAt(clientX, clientY) {
     const vr = viewport.getBoundingClientRect();
@@ -3848,7 +3820,6 @@ Min 10 blocks · no maximum
     } else {
       keepAnchor();
     }
-    scheduleZoomHQ();
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
@@ -3865,7 +3836,6 @@ Min 10 blocks · no maximum
       }
     }
     applyZoomNow((zoom || 1) * factor, clientX, clientY);
-    scheduleZoomHQ();
   }
 
   function detectMediaType(src, mime) {
@@ -3925,127 +3895,24 @@ Min 10 blocks · no maximum
   function syncMediaOverlays() {
     if (!mediaLayer) return;
     mediaLayer.innerHTML = '';
-
-    const SVG_NS = 'http://www.w3.org/2000/svg';
-    const XLINK_NS = 'http://www.w3.org/1999/xlink';
-
-    regions.forEach((r, index) => {
-      if (!r || !r.media) return;
-
+    regions.forEach(r => {
+      if (!r.media || r.mediaType === 'image') return;
       let ownsAny = false;
-      const ownedCells = [];
-      for (let c = r.minC; c <= r.maxC; c++) {
-        for (let row = r.minR; row <= r.maxR; row++) {
-          if (sold.get(c + ',' + row) === r) {
-            ownsAny = true;
-            ownedCells.push([c, row]);
-          }
-        }
-      }
+      for (let c = r.minC; c <= r.maxC && !ownsAny; c++)
+        for (let row = r.minR; row <= r.maxR; row++)
+          if (sold.get(c + ',' + row) === r) { ownsAny = true; break; }
       if (!ownsAny) return;
 
-      const unit = baseCell || cell || 1;
+      const unit = baseCell || cell;
       const x = r.minC * unit;
       const y = r.minR * unit;
-      const w = Math.max(1, (r.maxC - r.minC + 1) * unit);
-      const h = Math.max(1, (r.maxR - r.minR + 1) * unit);
-      const scale = clampCropScale(r.cropScale || 1);
-      const fx = r.cropX != null ? Math.max(0, Math.min(1, Number(r.cropX))) : 0.5;
-      const fy = r.cropY != null ? Math.max(0, Math.min(1, Number(r.cropY))) : 0.5;
+      const w = (r.maxC - r.minC + 1) * unit;
+      const h = (r.maxR - r.minR + 1) * unit;
+      const scale = Math.max(1, Number(r.cropScale) || 1);
+      const fx = r.cropX != null ? Number(r.cropX) : 0.5;
+      const fy = r.cropY != null ? Number(r.cropY) : 0.5;
 
-      const isStaticImage = regionMediaIsImage(r);
-
-      /*
-       * STATIC IMAGES:
-       * Use an SVG image overlay instead of drawing the bitmap into the
-       * wall canvas. The browser can therefore render the original bitmap
-       * at the actual displayed size, rather than first baking it into the
-       * low/base-resolution canvas and then enlarging that canvas.
-       */
-      if (isStaticImage) {
-        const img = getImg(r.media);
-        if (!img) return;
-
-        if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
-          img.addEventListener('load', () => {
-            try { syncMediaOverlays(); } catch (e) {}
-          }, { once: true });
-          return;
-        }
-
-        const svg = document.createElementNS(SVG_NS, 'svg');
-        svg.classList.add('hq-image-svg');
-        svg.setAttribute('width', String(Math.max(1, Math.round(baseW))));
-        svg.setAttribute('height', String(Math.max(1, Math.round(baseH))));
-        svg.setAttribute('viewBox', '0 0 ' + Math.max(1, baseW) + ' ' + Math.max(1, baseH));
-        svg.setAttribute('preserveAspectRatio', 'none');
-        svg.setAttribute('aria-hidden', 'true');
-
-        const defs = document.createElementNS(SVG_NS, 'defs');
-        const clipPath = document.createElementNS(SVG_NS, 'clipPath');
-        const clipId = 'hpw-img-clip-' + String(index) + '-' + String(r.id || r.claimId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-        clipPath.setAttribute('id', clipId);
-        clipPath.setAttribute('clipPathUnits', 'userSpaceOnUse');
-
-        ownedCells.forEach(([c, row]) => {
-          const rect = document.createElementNS(SVG_NS, 'rect');
-          rect.setAttribute('x', String(c * unit));
-          rect.setAttribute('y', String(row * unit));
-          rect.setAttribute('width', String(unit));
-          rect.setAttribute('height', String(unit));
-          clipPath.appendChild(rect);
-        });
-        defs.appendChild(clipPath);
-        svg.appendChild(defs);
-
-        // Match drawCoverCrop() exactly, but keep the original bitmap as SVG <image>.
-        const nw = img.naturalWidth;
-        const nh = img.naturalHeight;
-        const ir = nw / Math.max(1, nh);
-        const br = w / Math.max(0.0001, h);
-        let bw, bh;
-        if (ir > br) { bh = h; bw = h * ir; }
-        else { bw = w; bh = w / ir; }
-        const dw = bw * scale;
-        const dh = bh * scale;
-        let dx = x + (w - dw) * fx;
-        let dy = y + (h - dh) * fy;
-        if (dw >= w) dx = Math.min(x, Math.max(x + w - dw, dx));
-        else dx = x + (w - dw) * fx;
-        if (dh >= h) dy = Math.min(y, Math.max(y + h - dh, dy));
-        else dy = y + (h - dh) * fy;
-
-        const image = document.createElementNS(SVG_NS, 'image');
-        image.setAttribute('x', String(dx));
-        image.setAttribute('y', String(dy));
-        image.setAttribute('width', String(dw));
-        image.setAttribute('height', String(dh));
-        image.setAttribute('preserveAspectRatio', 'none');
-        image.setAttribute('clip-path', 'url(#' + clipId + ')');
-        image.setAttribute('href', r.media);
-        image.setAttributeNS(XLINK_NS, 'xlink:href', r.media);
-        image.setAttribute('decoding', 'async');
-        svg.appendChild(image);
-
-        // Restore the thin per-pixel border above the image.
-        ownedCells.forEach(([c, row]) => {
-          const rect = document.createElementNS(SVG_NS, 'rect');
-          rect.setAttribute('x', String(c * unit + 0.5));
-          rect.setAttribute('y', String(row * unit + 0.5));
-          rect.setAttribute('width', String(Math.max(0, unit - 1)));
-          rect.setAttribute('height', String(Math.max(0, unit - 1)));
-          rect.setAttribute('fill', 'none');
-          rect.setAttribute('stroke', '#2a2118');
-          rect.setAttribute('stroke-width', String(Math.max(0.6, Math.min(2, unit * 0.1))));
-          rect.setAttribute('vector-effect', 'non-scaling-stroke');
-          svg.appendChild(rect);
-        });
-
-        mediaLayer.appendChild(svg);
-        return;
-      }
-
-      // GIF/video keep the existing DOM media path so GIF animation and video playback work.
+      // Clip box = exact claim rectangle (same math as canvas draw)
       const clip = document.createElement('div');
       clip.className = 'media-item';
       clip.setAttribute('data-min-c', String(r.minC));
@@ -4083,7 +3950,7 @@ Min 10 blocks · no maximum
         el.decoding = 'async';
       }
       el.style.position = 'absolute';
-      el.style.objectFit = 'cover';
+      el.style.objectFit = r.fit || 'cover';
       el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
       el.style.pointerEvents = 'none';
       el.style.margin = '0';
@@ -4095,8 +3962,6 @@ Min 10 blocks · no maximum
       el.style.height = mh + 'px';
       el.style.left = ((w - mw) * fx) + 'px';
       el.style.top = ((h - mh) * fy) + 'px';
-      el.style.maxWidth = 'none';
-      el.style.maxHeight = 'none';
 
       clip.appendChild(el);
       mediaLayer.appendChild(clip);
@@ -4451,10 +4316,14 @@ Min 10 blocks · no maximum
       ctx.fillStyle = '#1a1512';
       ctx.fillRect(x0, y0, w, h);
       if (regionMediaIsImage(r)) {
-        // Static images are rendered by syncMediaOverlays() at original bitmap
-        // resolution. Do not bake them into this canvas.
-        ctx.fillStyle = '#1a1512';
-        ctx.fillRect(x0, y0, w, h);
+        const img = getImg(r.media);
+        if (img && img.complete && img.naturalWidth > 0) {
+          drawCoverCrop(ctx, img, x0, y0, w, h, Number(r.cropScale) || 1, r.cropX != null ? Number(r.cropX) : 0.5, r.cropY != null ? Number(r.cropY) : 0.5);
+        } else if (img) {
+          img.onload = () => { try { flushImagesSoon(); } catch (e) {} };
+          ctx.fillStyle = r.color || '#c9a227';
+          ctx.fillRect(x0, y0, w, h);
+        }
       } else if (!r.media) {
         ctx.fillStyle = r.color || '#c9a227';
         ctx.fillRect(x0, y0, w, h);
@@ -4785,7 +4654,6 @@ Min 10 blocks · no maximum
         '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         '<button type="button" class="btn btn-sec claim-focus" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">SHOW</button>' +
-        '<button type="button" class="btn btn-pri claim-photo" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">CHANGE PHOTO</button>' +
         '<button type="button" class="btn btn-pri claim-wp" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">WALLPAPER</button>' +
         '<button type="button" class="btn btn-sec claim-dl-txt" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">TXT</button>' +
         '<button type="button" class="btn btn-sec claim-dl-json" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">JSON</button>' +
@@ -4798,18 +4666,6 @@ Min 10 blocks · no maximum
     box.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-head"><h3>MY CLAIMS</h3><p>Buyers unlock a unique pixel wallpaper · package IDs below</p></div><div class="modal-body" style="max-height:60vh;overflow:auto">' + lines + '</div><div class="modal-foot"><button type="button" class="btn btn-sec" id="claimsClose">CLOSE</button></div></div>';
     document.body.appendChild(box);
     box.querySelector('#claimsClose').onclick = () => box.remove();
-    box.querySelectorAll('.claim-photo').forEach(btn => {
-      btn.onclick = () => {
-        const p = packages[+btn.getAttribute('data-i')];
-        box.remove();
-        const id = p && (p.claimId || p.id);
-        let r = null;
-        if (id) r = regions.find(x => x && (x.claimId === id || x.id === id));
-        if (!r && p && p.cells && p.cells[0]) r = sold.get(p.cells[0]);
-        if (!r) { toast('Claim not on this wall yet — sync first', 'error'); return; }
-        startChangePhoto(r);
-      };
-    });
     box.querySelectorAll('.claim-focus').forEach(btn => {
       btn.onclick = () => {
         const p = packages[+btn.dataset.i];
@@ -5233,49 +5089,6 @@ Min 10 blocks · no maximum
     selectAwaitingMove = true;
   }
 
-
-  function regionClaimKey(r) {
-    if (!r) return '';
-    return String(r.claimId || r.id || '');
-  }
-
-  function isMyRegion(r) {
-    if (!r) return false;
-    if (adminMode || devMode) return true;
-    const id = regionClaimKey(r);
-    const packs = (typeof loadMyPackages === 'function') ? loadMyPackages() : [];
-    if (id && packs.some(p => p && (String(p.claimId || '') === id || String(p.id || '') === id))) return true;
-    const cells = (r.cells && r.cells.length) ? r.cells.slice().sort().join('|') : '';
-    if (cells && packs.some(p => p && Array.isArray(p.cells) && p.cells.slice().sort().join('|') === cells)) return true;
-    return false;
-  }
-
-  function startChangePhoto(r) {
-    if (!r) return;
-    try { hideTip(); } catch (e) {}
-    try { openEdit(r); } catch (e) { console.warn(e); }
-    setTimeout(function () {
-      let inp = document.getElementById('replaceImageFile');
-      if (!inp) {
-        inp = document.createElement('input');
-        inp.type = 'file';
-        inp.id = 'replaceImageFile';
-        inp.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*';
-        inp.setAttribute('capture', 'environment');
-        inp.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0';
-        document.body.appendChild(inp);
-        inp.addEventListener('change', function () {
-          const f = inp.files && inp.files[0];
-          try { inp.value = ''; } catch (e) {}
-          if (!f) return;
-          try { handleFile(f); } catch (err) { console.warn(err); toast('Could not load photo', 'error'); return; }
-          toast('NEW PHOTO — crop then SAVE CHANGES', 'ok');
-        });
-      }
-      inp.click();
-    }, 60);
-  }
-
   function ownerTipHtml(r, touch) {
     const nm = escapeHtml(r.name || 'Anonymous');
     const desc = r.desc ? escapeHtml(String(r.desc).slice(0, 160)) : '';
@@ -5292,9 +5105,6 @@ Min 10 blocks · no maximum
       (r.link && safeUrl(r.link)
         ? '<div style="margin-top:4px;color:var(--gold);font-size:0.95rem">' +
           (touch ? 'Tap Open to visit link' : 'Click → open link') + '</div>'
-        : '') +
-      ((isMyRegion(r) || adminMode)
-        ? '<button type="button" class="tip-close" id="tipChangePhotoBtn" style="margin-top:8px;background:var(--gold);color:#2c221e">CHANGE PHOTO</button>'
         : '') +
       (touch
         ? '<button type="button" class="tip-close" id="tipCloseBtn">CLOSE</button>' +
@@ -5347,23 +5157,6 @@ Min 10 blocks · no maximum
           const lu = safeUrl(r.link);
           if (lu) window.open(lu, '_blank', 'noopener,noreferrer');
           hideTip();
-        };
-      }
-      const chg = $('tipChangePhotoBtn');
-      if (chg) {
-        chg.onclick = (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          startChangePhoto(r);
-        };
-      }
-    } else {
-      const chg = $('tipChangePhotoBtn');
-      if (chg) {
-        chg.onclick = (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          startChangePhoto(r);
         };
       }
     }
@@ -5492,19 +5285,22 @@ Min 10 blocks · no maximum
       }
       return;
     }
-    // Tap owned block: show card. Your own block gets CHANGE PHOTO.
-    hoverRegion = r;
-    hoverPulse = 0;
-    try { scheduleDraw(); } catch (err) {}
-    const mine = isMyRegion(r);
+    // Mobile / no-hover: show owner card on tap
     const isTouch = (window.matchMedia && window.matchMedia('(hover: none)').matches) ||
       (e.detail === 0) || ('ontouchstart' in window);
-    showOwnerTip(r, e.clientX, e.clientY, true);
-    if (mine) toast('YOUR PIXELS — tap CHANGE PHOTO to replace the image', 'ok');
-    else {
-      const ownerName = r.name || 'Anonymous';
-      const px = r.pixels || (r.cells && r.cells.length) || 0;
-      toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
+    if (isTouch) {
+      hoverRegion = r;
+      hoverPulse = 0;
+      try { scheduleDraw(); } catch (err) {}
+      showOwnerTip(r, e.clientX, e.clientY, true);
+      return;
+    }
+    // Desktop: toast + optional link
+    const ownerName = r.name || 'Anonymous';
+    const px = r.pixels || (r.cells && r.cells.length) || 0;
+    toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
+    if (r.link) {
+      setTimeout(() => { const lu = safeUrl(r.link); if (lu) window.open(lu, '_blank', 'noopener,noreferrer'); }, 200);
     }
   });
 
@@ -6597,25 +6393,70 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
   }
 
   // Keep uploads high quality — only resize extreme files so claims still save
-  // IMPORTANT: preserve the uploaded image byte-for-byte.
-  // No resize, no canvas re-encode, no JPEG/WebP conversion.
   function optimizeImageFile(file) {
     return new Promise((resolve, reject) => {
-      if (!file || !(file.type || '').toLowerCase().startsWith('image/')) {
-        reject(new Error('not an image'));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = e => {
-        const dataUrl = e && e.target ? e.target.result : null;
-        if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
-          reject(new Error('invalid image data'));
+      const type = (file.type || '').toLowerCase();
+      // GIF: keep original so animation is preserved
+      if (type === 'image/gif' || /\.gif$/i.test(file.name || '')) {
+        if (file.size > 12 * 1024 * 1024) {
+          reject(new Error('GIF too large (max 12MB)'));
           return;
         }
-        resolve(dataUrl);
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('read'));
+        reader.readAsDataURL(file);
+        return;
+      }
+      // Small PNG/WebP: keep lossless original
+      if ((type === 'image/png' || type === 'image/webp') && file.size <= 4e6) {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('read'));
+        reader.readAsDataURL(file);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          // High-res ceiling — photos stay clear on the wall
+          const maxSide = 5120;
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (!w || !h) { URL.revokeObjectURL(url); reject(new Error('bad image')); return; }
+          if (w > maxSide || h > maxSide) {
+            const sc = maxSide / Math.max(w, h);
+            w = Math.round(w * sc);
+            h = Math.round(h * sc);
+          }
+          const c = document.createElement('canvas');
+          c.width = w;
+          c.height = h;
+          const cx = c.getContext('2d');
+          cx.imageSmoothingEnabled = true;
+          if (cx.imageSmoothingQuality) cx.imageSmoothingQuality = 'high';
+          cx.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          let out;
+          if (type === 'image/png') {
+            out = c.toDataURL('image/png');
+            // Only fall back to JPEG if PNG is huge
+            if (out.length > 10e6) out = c.toDataURL('image/jpeg', 0.96);
+          } else if (type === 'image/webp') {
+            out = c.toDataURL('image/webp', 0.96);
+            if (!out || out.length < 100) out = c.toDataURL('image/jpeg', 0.96);
+          } else {
+            out = c.toDataURL('image/jpeg', 0.96);
+          }
+          resolve(out);
+        } catch (err) {
+          try { URL.revokeObjectURL(url); } catch (e) {}
+          reject(err);
+        }
       };
-      reader.onerror = () => reject(new Error('read'));
-      reader.readAsDataURL(file);
+      img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} reject(new Error('load')); };
+      img.src = url;
     });
   }
 
@@ -6640,8 +6481,8 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
         toast('VIDEO TOO LARGE (MAX 40MB)', 'error');
         return;
       }
-      if (!isVideo && f.size > 30 * 1024 * 1024) {
-        toast('IMAGE TOO LARGE (MAX 30MB)', 'error');
+      if (!isVideo && f.size > 25 * 1024 * 1024) {
+        toast('IMAGE TOO LARGE (MAX 25MB)', 'error');
         return;
       }
       toast(isVideo ? 'LOADING VIDEO…' : (isGif ? 'LOADING GIF…' : 'LOADING HIGH-QUALITY PHOTO…'));
@@ -7349,9 +7190,11 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
             storeSet('hpw_pending_claim', JSON.stringify(payload));
           } catch (e2) {
             try {
-              storeSet('hpw_pending_claim', JSON.stringify(payload));
+              const slim = Object.assign({}, payload, { media: '' });
+              storeSet('hpw_pending_claim', JSON.stringify(slim));
+              toast('Image too large to cache — claim may miss image after pay', 'error');
             } catch (e3) {
-              throw new Error('Could not save the original image before payment. Please try a smaller image or another browser.');
+              throw new Error('Could not save claim data before payment');
             }
           }
         }
@@ -8633,9 +8476,19 @@ let scrollDrawRaf = 0;
           try {
             await postClaim(payload);
           } catch (firstErr) {
-            console.warn('Claim with original media failed — retrying unchanged…', firstErr);
-            // Never silently remove or compress the customer's original image.
-            await postClaim(payload);
+            console.warn('Claim with media failed, retrying smaller…', firstErr);
+            // Retry: compress / drop media if payload too large for host
+            const slim = Object.assign({}, payload);
+            if (slim.media && String(slim.media).length > 200000) {
+              slim.media = '';
+              slim.mediaType = 'none';
+            }
+            try {
+              await postClaim(slim);
+              toast('Payment OK — claimed (image skipped — too large)', 'ok');
+            } catch (secondErr) {
+              throw secondErr;
+            }
           }
           try { await idbDel('pending'); } catch (e) {}
           try {

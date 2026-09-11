@@ -3751,6 +3751,7 @@ Min 10 blocks · no maximum
   if ($('zoomLvl')) {
     $('zoomLvl').textContent = Math.round(z * 100) + '%';
   }
+  try { positionMediaOverlays(); } catch (e) {}
 }
 
   function paintBase() {
@@ -3851,12 +3852,45 @@ Min 10 blocks · no maximum
   }
 
   // Fast reposition after zoom — keeps GIFs locked to the same cells as canvas
+  function layoutMediaClip(clip, minC, maxC, minR, maxR, cropScale, fx, fy) {
+    const unit = baseCell || 1;
+    const z = Math.max(zoom || 1, 0.01);
+    const x = minC * unit;
+    const y = minR * unit;
+    const w = Math.max(1, (maxC - minC + 1) * unit);
+    const h = Math.max(1, (maxR - minR + 1) * unit);
+    // Layout at SCREEN size so the browser samples the real photo, then
+    // counter-scale so the parent stage scale() does not blur it.
+    const sw = Math.max(1, Math.round(w * z));
+    const sh = Math.max(1, Math.round(h * z));
+    clip.style.left = x + 'px';
+    clip.style.top = y + 'px';
+    clip.style.width = sw + 'px';
+    clip.style.height = sh + 'px';
+    clip.style.overflow = 'hidden';
+    clip.style.position = 'absolute';
+    clip.style.transformOrigin = '0 0';
+    clip.style.transform = 'scale(' + (1 / z) + ')';
+    const el = clip.firstElementChild;
+    if (!el) return;
+    const scale = Math.max(1, cropScale || 1);
+    const mw = Math.round(sw * scale);
+    const mh = Math.round(sh * scale);
+    el.style.position = 'absolute';
+    el.style.width = mw + 'px';
+    el.style.height = mh + 'px';
+    el.style.left = Math.round((sw - mw) * fx) + 'px';
+    el.style.top = Math.round((sh - mh) * fy) + 'px';
+    el.style.objectFit = 'cover';
+    el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
+    el.style.maxWidth = 'none';
+    el.style.maxHeight = 'none';
+    el.style.imageRendering = 'auto';
+  }
+
   function positionMediaOverlays() {
     if (!mediaLayer) return;
     const clips = mediaLayer.querySelectorAll('.media-item[data-min-c]');
-    if (!clips.length) return;
-    // Use current layout cell (baseCell * zoom) so overlays track canvas exactly
-    const c = baseCell || 1;
     clips.forEach(clip => {
       const minC = +clip.getAttribute('data-min-c');
       const maxC = +clip.getAttribute('data-max-c');
@@ -3866,29 +3900,7 @@ Min 10 blocks · no maximum
       const fx = clip.getAttribute('data-crop-x') != null ? +clip.getAttribute('data-crop-x') : 0.5;
       const fy = clip.getAttribute('data-crop-y') != null ? +clip.getAttribute('data-crop-y') : 0.5;
       if (!Number.isFinite(minC) || !Number.isFinite(maxC)) return;
-      // Floor positions so GIF/video never drift off the painted claim box
-      const x = Math.round(minC * c);
-      const y = Math.round(minR * c);
-      const w = Math.max(1, Math.round((maxC - minC + 1) * c));
-      const h = Math.max(1, Math.round((maxR - minR + 1) * c));
-      clip.style.left = x + 'px';
-      clip.style.top = y + 'px';
-      clip.style.width = w + 'px';
-      clip.style.height = h + 'px';
-      clip.style.overflow = 'hidden';
-      const el = clip.firstElementChild;
-      if (el) {
-        const mw = Math.round(w * scale);
-        const mh = Math.round(h * scale);
-        el.style.width = mw + 'px';
-        el.style.height = mh + 'px';
-        el.style.left = Math.round((w - mw) * fx) + 'px';
-        el.style.top = Math.round((h - mh) * fy) + 'px';
-        el.style.objectFit = 'cover';
-        el.style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
-        el.style.maxWidth = 'none';
-        el.style.maxHeight = 'none';
-      }
+      layoutMediaClip(clip, minC, maxC, minR, maxR, scale, fx, fy);
     });
   }
 
@@ -3922,10 +3934,6 @@ Min 10 blocks · no maximum
       clip.setAttribute('data-crop-scale', String(scale));
       clip.setAttribute('data-crop-x', String(fx));
       clip.setAttribute('data-crop-y', String(fy));
-      clip.style.left = x + 'px';
-      clip.style.top = y + 'px';
-      clip.style.width = w + 'px';
-      clip.style.height = h + 'px';
       clip.style.overflow = 'hidden';
       clip.style.position = 'absolute';
       clip.style.pointerEvents = 'none';
@@ -3958,15 +3966,10 @@ Min 10 blocks · no maximum
       el.style.border = 'none';
       el.style.imageRendering = 'auto';
       try { el.style.msInterpolationMode = 'bicubic'; } catch (e) {}
-      const mw = w * scale;
-      const mh = h * scale;
-      el.style.width = mw + 'px';
-      el.style.height = mh + 'px';
-      el.style.left = ((w - mw) * fx) + 'px';
-      el.style.top = ((h - mh) * fy) + 'px';
 
       clip.appendChild(el);
       mediaLayer.appendChild(clip);
+      layoutMediaClip(clip, r.minC, r.maxC, r.minR, r.maxR, scale, fx, fy);
     });
   }
 

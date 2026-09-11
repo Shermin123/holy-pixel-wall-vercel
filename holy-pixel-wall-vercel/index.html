@@ -3753,19 +3753,29 @@ Min 10 blocks · no maximum
   }
 }
 
+  function wallDrawScale() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const z = Math.max(1, Number(zoom) || 1);
+    const cap = 8192;
+    // Render a larger backing buffer at high zoom so the wall does not
+    // become visibly soft when the user zooms into claimed artwork.
+    const qualityZ = Math.min(z, 8);
+    return Math.min(dpr * qualityZ, cap / Math.max(baseW, baseH, 1));
+  }
+
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cap = 4096;
-    const scale = Math.min(dpr, cap / Math.max(baseW, baseH, 1));
+    const scale = wallDrawScale();
     const nextW = Math.max(1, Math.round(baseW * scale));
     const nextH = Math.max(1, Math.round(baseH * scale));
     if (canvas.width !== nextW || canvas.height !== nextH) {
       canvas.width = nextW;
       canvas.height = nextH;
+      try { staticWallKey = ''; } catch (e) {}
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = true;
+    try { if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high'; } catch (e) {}
     const savedCell = cell, savedW = sizeW, savedH = sizeH;
     cell = baseCell;
     sizeW = baseW;
@@ -3781,7 +3791,13 @@ Min 10 blocks · no maximum
 
   function applyZoomHQ() { paintBase(); }
   function applyZoomSmooth() { layoutAtZoom(zoom); }
-  function scheduleZoomHQ() {}
+  function scheduleZoomHQ() {
+    clearTimeout(zoomTimer);
+    zoomTimer = setTimeout(() => {
+      try { staticWallKey = ''; } catch (e) {}
+      try { paintBase(); } catch (e) { try { draw(); } catch (e2) {} }
+    }, 90);
+  }
 
   function anchorAt(clientX, clientY) {
     const vr = viewport.getBoundingClientRect();
@@ -3820,6 +3836,7 @@ Min 10 blocks · no maximum
     } else {
       keepAnchor();
     }
+    scheduleZoomHQ();
   }
 
   function bumpZoom(d, clientX, clientY, continuous) {
@@ -3836,6 +3853,7 @@ Min 10 blocks · no maximum
       }
     }
     applyZoomNow((zoom || 1) * factor, clientX, clientY);
+    scheduleZoomHQ();
   }
 
   function detectMediaType(src, mime) {
@@ -4654,6 +4672,7 @@ Min 10 blocks · no maximum
         '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         '<button type="button" class="btn btn-sec claim-focus" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">SHOW</button>' +
+        '<button type="button" class="btn btn-pri claim-photo" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">CHANGE PHOTO</button>' +
         '<button type="button" class="btn btn-pri claim-wp" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">WALLPAPER</button>' +
         '<button type="button" class="btn btn-sec claim-dl-txt" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">TXT</button>' +
         '<button type="button" class="btn btn-sec claim-dl-json" data-i="' + i + '" style="font-size:0.28rem;padding:6px 8px">JSON</button>' +
@@ -4666,6 +4685,18 @@ Min 10 blocks · no maximum
     box.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-head"><h3>MY CLAIMS</h3><p>Buyers unlock a unique pixel wallpaper · package IDs below</p></div><div class="modal-body" style="max-height:60vh;overflow:auto">' + lines + '</div><div class="modal-foot"><button type="button" class="btn btn-sec" id="claimsClose">CLOSE</button></div></div>';
     document.body.appendChild(box);
     box.querySelector('#claimsClose').onclick = () => box.remove();
+    box.querySelectorAll('.claim-photo').forEach(btn => {
+      btn.onclick = () => {
+        const p = packages[+btn.getAttribute('data-i')];
+        box.remove();
+        const id = p && (p.claimId || p.id);
+        let r = null;
+        if (id) r = regions.find(x => x && (x.claimId === id || x.id === id));
+        if (!r && p && p.cells && p.cells[0]) r = sold.get(p.cells[0]);
+        if (!r) { toast('Claim not on this wall yet — sync first', 'error'); return; }
+        startChangePhoto(r);
+      };
+    });
     box.querySelectorAll('.claim-focus').forEach(btn => {
       btn.onclick = () => {
         const p = packages[+btn.dataset.i];
@@ -5089,6 +5120,49 @@ Min 10 blocks · no maximum
     selectAwaitingMove = true;
   }
 
+
+  function regionClaimKey(r) {
+    if (!r) return '';
+    return String(r.claimId || r.id || '');
+  }
+
+  function isMyRegion(r) {
+    if (!r) return false;
+    if (adminMode || devMode) return true;
+    const id = regionClaimKey(r);
+    const packs = (typeof loadMyPackages === 'function') ? loadMyPackages() : [];
+    if (id && packs.some(p => p && (String(p.claimId || '') === id || String(p.id || '') === id))) return true;
+    const cells = (r.cells && r.cells.length) ? r.cells.slice().sort().join('|') : '';
+    if (cells && packs.some(p => p && Array.isArray(p.cells) && p.cells.slice().sort().join('|') === cells)) return true;
+    return false;
+  }
+
+  function startChangePhoto(r) {
+    if (!r) return;
+    try { hideTip(); } catch (e) {}
+    try { openEdit(r); } catch (e) { console.warn(e); }
+    setTimeout(function () {
+      let inp = document.getElementById('replaceImageFile');
+      if (!inp) {
+        inp = document.createElement('input');
+        inp.type = 'file';
+        inp.id = 'replaceImageFile';
+        inp.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp,image/*,video/mp4,video/webm,video/quicktime,video/*';
+        inp.setAttribute('capture', 'environment');
+        inp.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0';
+        document.body.appendChild(inp);
+        inp.addEventListener('change', function () {
+          const f = inp.files && inp.files[0];
+          try { inp.value = ''; } catch (e) {}
+          if (!f) return;
+          try { handleFile(f); } catch (err) { console.warn(err); toast('Could not load photo', 'error'); return; }
+          toast('NEW PHOTO — crop then SAVE CHANGES', 'ok');
+        });
+      }
+      inp.click();
+    }, 60);
+  }
+
   function ownerTipHtml(r, touch) {
     const nm = escapeHtml(r.name || 'Anonymous');
     const desc = r.desc ? escapeHtml(String(r.desc).slice(0, 160)) : '';
@@ -5105,6 +5179,9 @@ Min 10 blocks · no maximum
       (r.link && safeUrl(r.link)
         ? '<div style="margin-top:4px;color:var(--gold);font-size:0.95rem">' +
           (touch ? 'Tap Open to visit link' : 'Click → open link') + '</div>'
+        : '') +
+      ((isMyRegion(r) || adminMode)
+        ? '<button type="button" class="tip-close" id="tipChangePhotoBtn" style="margin-top:8px;background:var(--gold);color:#2c221e">CHANGE PHOTO</button>'
         : '') +
       (touch
         ? '<button type="button" class="tip-close" id="tipCloseBtn">CLOSE</button>' +
@@ -5157,6 +5234,23 @@ Min 10 blocks · no maximum
           const lu = safeUrl(r.link);
           if (lu) window.open(lu, '_blank', 'noopener,noreferrer');
           hideTip();
+        };
+      }
+      const chg = $('tipChangePhotoBtn');
+      if (chg) {
+        chg.onclick = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          startChangePhoto(r);
+        };
+      }
+    } else {
+      const chg = $('tipChangePhotoBtn');
+      if (chg) {
+        chg.onclick = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          startChangePhoto(r);
         };
       }
     }
@@ -5285,22 +5379,19 @@ Min 10 blocks · no maximum
       }
       return;
     }
-    // Mobile / no-hover: show owner card on tap
+    // Tap owned block: show card. Your own block gets CHANGE PHOTO.
+    hoverRegion = r;
+    hoverPulse = 0;
+    try { scheduleDraw(); } catch (err) {}
+    const mine = isMyRegion(r);
     const isTouch = (window.matchMedia && window.matchMedia('(hover: none)').matches) ||
       (e.detail === 0) || ('ontouchstart' in window);
-    if (isTouch) {
-      hoverRegion = r;
-      hoverPulse = 0;
-      try { scheduleDraw(); } catch (err) {}
-      showOwnerTip(r, e.clientX, e.clientY, true);
-      return;
-    }
-    // Desktop: toast + optional link
-    const ownerName = r.name || 'Anonymous';
-    const px = r.pixels || (r.cells && r.cells.length) || 0;
-    toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
-    if (r.link) {
-      setTimeout(() => { const lu = safeUrl(r.link); if (lu) window.open(lu, '_blank', 'noopener,noreferrer'); }, 200);
+    showOwnerTip(r, e.clientX, e.clientY, true);
+    if (mine) toast('YOUR PIXELS — tap CHANGE PHOTO to replace the image', 'ok');
+    else {
+      const ownerName = r.name || 'Anonymous';
+      const px = r.pixels || (r.cells && r.cells.length) || 0;
+      toast('OWNED BY ' + ownerName + ' · ' + px + ' PX');
     }
   });
 
@@ -6392,71 +6483,30 @@ const delBtn = document.getElementById('adminDeleteClaimBtn');
     try { refreshClaimValidation(); } catch (e) {}
   }
 
-  // Keep uploads high quality — only resize extreme files so claims still save
+  // Preserve the uploaded image bytes exactly.
+  // IMPORTANT: do not resize or re-encode here — canvas JPEG/WebP conversion
+  // permanently removes detail and makes uploaded photos blurry when zoomed.
+  // The existing 25MB validation in handleFile remains the upload safety limit.
   function optimizeImageFile(file) {
     return new Promise((resolve, reject) => {
-      const type = (file.type || '').toLowerCase();
-      // GIF: keep original so animation is preserved
-      if (type === 'image/gif' || /\.gif$/i.test(file.name || '')) {
-        if (file.size > 12 * 1024 * 1024) {
-          reject(new Error('GIF too large (max 12MB)'));
+      if (!file || !(file.type || '').toLowerCase().startsWith('image/')) {
+        reject(new Error('not an image'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target && e.target.result;
+        if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+          reject(new Error('invalid image data'));
           return;
         }
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
-        reader.onerror = () => reject(new Error('read'));
-        reader.readAsDataURL(file);
-        return;
-      }
-      // Small PNG/WebP: keep lossless original
-      if ((type === 'image/png' || type === 'image/webp') && file.size <= 4e6) {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
-        reader.onerror = () => reject(new Error('read'));
-        reader.readAsDataURL(file);
-        return;
-      }
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        try {
-          // High-res ceiling — photos stay clear on the wall
-          const maxSide = 5120;
-          let w = img.naturalWidth || img.width;
-          let h = img.naturalHeight || img.height;
-          if (!w || !h) { URL.revokeObjectURL(url); reject(new Error('bad image')); return; }
-          if (w > maxSide || h > maxSide) {
-            const sc = maxSide / Math.max(w, h);
-            w = Math.round(w * sc);
-            h = Math.round(h * sc);
-          }
-          const c = document.createElement('canvas');
-          c.width = w;
-          c.height = h;
-          const cx = c.getContext('2d');
-          cx.imageSmoothingEnabled = true;
-          if (cx.imageSmoothingQuality) cx.imageSmoothingQuality = 'high';
-          cx.drawImage(img, 0, 0, w, h);
-          URL.revokeObjectURL(url);
-          let out;
-          if (type === 'image/png') {
-            out = c.toDataURL('image/png');
-            // Only fall back to JPEG if PNG is huge
-            if (out.length > 10e6) out = c.toDataURL('image/jpeg', 0.96);
-          } else if (type === 'image/webp') {
-            out = c.toDataURL('image/webp', 0.96);
-            if (!out || out.length < 100) out = c.toDataURL('image/jpeg', 0.96);
-          } else {
-            out = c.toDataURL('image/jpeg', 0.96);
-          }
-          resolve(out);
-        } catch (err) {
-          try { URL.revokeObjectURL(url); } catch (e) {}
-          reject(err);
-        }
+        // Return the original file bytes as a data URL — no resize, no JPEG
+        // quality loss, no PNG->JPEG conversion, and no 5120px ceiling.
+        resolve(dataUrl);
       };
-      img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} reject(new Error('load')); };
-      img.src = url;
+      reader.onerror = () => reject(new Error('read'));
+      reader.readAsDataURL(file);
     });
   }
 
@@ -8476,16 +8526,12 @@ let scrollDrawRaf = 0;
           try {
             await postClaim(payload);
           } catch (firstErr) {
-            console.warn('Claim with media failed, retrying smaller…', firstErr);
-            // Retry: compress / drop media if payload too large for host
-            const slim = Object.assign({}, payload);
-            if (slim.media && String(slim.media).length > 200000) {
-              slim.media = '';
-              slim.mediaType = 'none';
-            }
+            // Never silently remove the customer's image. Doing that makes a
+            // successful payment appear as a claim with missing artwork.
+            // Retry the exact same payload once for transient network errors.
+            console.warn('Claim with original media failed — retrying unchanged…', firstErr);
             try {
-              await postClaim(slim);
-              toast('Payment OK — claimed (image skipped — too large)', 'ok');
+              await postClaim(payload);
             } catch (secondErr) {
               throw secondErr;
             }

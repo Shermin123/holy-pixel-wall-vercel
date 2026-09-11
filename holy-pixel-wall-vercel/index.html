@@ -647,6 +647,26 @@
     z-index: 1;
     background-repeat: repeat;
   }
+  .sel-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .sel-box {
+    position: absolute;
+    box-sizing: border-box;
+    background-color: rgba(240, 193, 75, 0.40);
+    border: 2px solid #8b5a2b;
+    outline: 2px solid #f0c14b;
+    outline-offset: -4px;
+    background-image:
+      linear-gradient(to right, rgba(60, 40, 20, 0.55) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(60, 40, 20, 0.55) 1px, transparent 1px);
+    background-repeat: repeat;
+    image-rendering: pixelated;
+  }
   .media-layer {
     position: absolute;
     left: 0;
@@ -2226,6 +2246,7 @@ body::after { display: none !important; }
       <canvas id="canvas"></canvas>
     </div>
     <div class="grid-layer" id="gridLayer"></div>
+    <div class="sel-layer" id="selLayer"></div>
     <div class="media-layer" id="mediaLayer"></div>
   </div>
 </div>
@@ -3785,12 +3806,56 @@ Min 10 blocks · no maximum
       gridLayer.style.backgroundImage = 'none';
     }
   }
+  const selLayer = $('selLayer');
+  if (selLayer) {
+    selLayer.style.position = 'absolute';
+    selLayer.style.left = ox + 'px';
+    selLayer.style.top = oy + 'px';
+    selLayer.style.width = w + 'px';
+    selLayer.style.height = h + 'px';
+    selLayer.style.pointerEvents = 'none';
+    selLayer.style.zIndex = '3';
+  }
 
   if ($('zoomLvl')) {
     $('zoomLvl').textContent = Math.round(z * 100) + '%';
   }
   try { positionMediaOverlays(); } catch (e) {}
+  try { syncSelectionOverlay(); } catch (e) {}
 }
+
+  function syncSelectionOverlay() {
+    const layer = $('selLayer');
+    if (!layer) return;
+    const unit = (typeof cell === 'number' && cell > 0) ? cell : ((baseCell || 1) * (zoom || 1));
+    let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
+    if (dragging && dragBox) {
+      sMinC = dragBox.minC; sMaxC = dragBox.maxC; sMinR = dragBox.minR; sMaxR = dragBox.maxR;
+    } else if (selected && selected.size) {
+      selected.forEach(k => {
+        const p = String(k).split(',');
+        const c = +p[0], r = +p[1];
+        if (!Number.isFinite(c) || !Number.isFinite(r)) return;
+        if (c < sMinC) sMinC = c; if (c > sMaxC) sMaxC = c;
+        if (r < sMinR) sMinR = r; if (r > sMaxR) sMaxR = r;
+      });
+    }
+    if (sMaxC < sMinC || sMaxR < sMinR) {
+      layer.innerHTML = '';
+      return;
+    }
+    let box = layer.firstElementChild;
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'sel-box';
+      layer.appendChild(box);
+    }
+    box.style.left = (sMinC * unit) + 'px';
+    box.style.top = (sMinR * unit) + 'px';
+    box.style.width = ((sMaxC - sMinC + 1) * unit) + 'px';
+    box.style.height = ((sMaxR - sMinR + 1) * unit) + 'px';
+    box.style.backgroundSize = unit + 'px ' + unit + 'px';
+  }
 
   function paintBase() {
     if (!baseW || !baseH || !canvas || !ctx) return;
@@ -4468,9 +4533,10 @@ Min 10 blocks · no maximum
       }
     }
 
-    // 5) Selection — one gold rect while dragging (fast)
-    const liveBox = (dragging && dragBox) ? dragBox : null;
-    if (liveBox || selected.size) {
+    try { syncSelectionOverlay(); } catch (e) {}
+    // 5) Selection is a sharp DOM overlay (canvas fill was blurry when zoomed)
+    const liveBox = false;
+    if (false && (liveBox || selected.size)) {
       let sMinC = COLS, sMaxC = -1, sMinR = ROWS, sMaxR = -1;
       if (liveBox) {
         sMinC = liveBox.minC; sMaxC = liveBox.maxC; sMinR = liveBox.minR; sMaxR = liveBox.maxR;
